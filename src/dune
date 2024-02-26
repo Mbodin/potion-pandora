@@ -1,0 +1,16 @@
+
+(library
+ 	(public_name potion-pandora)
+	(name potion_pandora)
+	(libraries lwt tyxml)
+	(preprocess
+    (pps
+      ppx_inline_test
+      lwt_ppx
+      tyxml-ppx))
+	(modules_without_implementation
+  )
+  (inline_tests))
+
+(copy_files %{project_root}/images_coords.ml)
+

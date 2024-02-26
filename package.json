@@ -14,16 +14,18 @@
 		"server": "./server.sh"
 	},
 	"dependencies": {
+		"ocaml": "~4.13",
 		"@opam/dune": "~3.11",
 		"@opam/ocamlfind": "1.9.5",
-		"@opam/lwt_ppx": "*",
 		"@opam/js_of_ocaml": "~5.4",
 		"@opam/js_of_ocaml-lwt": "*",
 		"@opam/js_of_ocaml-ppx": "*",
 		"@opam/js_of_ocaml-ppx_deriving_json": "*",
+		"@opam/lwt_ppx": "*",
 		"@opam/tyxml": "*",
 		"@opam/tyxml-ppx": "*",
 		"@opam/js_of_ocaml-tyxml": "*",
-		"ocaml": "~4.13"
+		"@opam/ppx_inline_test": "*",
+		"@opam/imagelib": "*"
 	}
 }

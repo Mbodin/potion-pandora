@@ -1,0 +1,5 @@
+(executable
+  (name bundle_png)
+  (modules bundle_png)
+  (libraries str imagelib))
+
