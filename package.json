@@ -24,6 +24,6 @@
 		"@opam/tyxml": "*",
 		"@opam/tyxml-ppx": "*",
 		"@opam/js_of_ocaml-tyxml": "*",
-		"ocaml": "~5.1"
+		"ocaml": "~4.13"
 	}
 }
