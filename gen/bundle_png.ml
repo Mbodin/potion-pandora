@@ -4,17 +4,66 @@
 let image_folder = "images"
 let png_output = "all.png"
 
+(* Declaration of some regexpes. *)
 let regexp_name = Str.regexp {|^\([a-z][A-Za-z0-9_]*\).png$|}
-let regexp_forbidden_names = Str.regexp {|^\(\)$|}
+let regexp_forbidden_names = Str.regexp {|^\(make_subimage\)$|}
 
-let all_images =
+module SMap = Map.Make (String)
+
+(* Copy an image into a buffer image at a given position.
+  The buffer image must be large enough for the copied image to fit. *)
+let copy_into image buffer pos_x pos_y =
+  for x = 0 to image.Image.width - 1 do
+    for y = 0 to image.Image.height - 1 do
+      Image.read_rgba image x y (fun r g b a ->
+        Image.write_rgba buffer (pos_x + x) (pos_y + y) r g b a)
+    done
+  done
+
+(* Given an image, split it into several images along its white lines. *)
+let split image =
+  assert (image.Image.height > 0) ;
+  let check r g b a =
+    List.for_all ((=) image.Image.max_val) [r; g; b; a] in
+  let extract_image x_begin x_end =
+    let buffer = Image.create_rgb ~alpha:true (x_end - x_begin + 1) image.Image.height in
+    for x = x_begin to x_end do
+      for y = 0 to image.Image.height - 1 do
+        Image.read_rgba image x y (fun r g b a ->
+          Image.write_rgba buffer (x - x_begin) y r g b a)
+      done
+    done ;
+    buffer in
+  let rec scan_x previous_x x =
+    if x = image.Image.width then (
+      if x = previous_x then []
+      else [extract_image previous_x (x - 1)]
+    ) else (
+      let line =
+        Image.read_rgba image x 0 (fun r g b a ->
+          if check r g b a then (
+            for y = 0 to image.Image.height - 1 do
+              assert (Image.read_rgba image x y check)
+            done ;
+            true
+          ) else false) in
+      if line then (
+        let img = extract_image previous_x (x - 1) in
+        img :: scan_x (x + 1) (x + 1)
+      ) else scan_x previous_x (x + 1)
+    ) in
+  scan_x 0 0
+
+(* List of all individual images paired with their name and index, as well
+  as the a map of images for each name. *)
+let all_images, image_map =
   let all_files = Array.to_list (Sys.readdir image_folder) in
   let all_filenames =
     List.filter_map (fun file ->
       if Str.string_match regexp_name file 0 then (
         let name = Str.matched_group 1 file in
-        if Str.string_match regexp_forbidden_names file 0 then
-          Printf.eprintf "Warning: unexpected file name %s.\n" file ;
+        if Str.string_match regexp_forbidden_names name 0 then
+          Printf.eprintf "Warning: unexpected name %s.\n" file ;
         Some (name, image_folder ^ "/" ^ file)
       ) else (
         Printf.eprintf "Warning: unexpected file name %s.\n" file ;
@@ -27,46 +76,69 @@ let all_images =
       let content = really_input_string channel len in
       let chunk = ImageUtil.chunk_reader_of_string content in
       (name, ImageLib.PNG.parsefile chunk)) all_filenames in
-  List.sort (fun (_name1, i1) (_name2, i2) ->
-    let c = compare i1.Image.width i2.Image.width in
-    if c = 0 then
-      - compare i1.Image.height i2.Image.height
-    else -c) all_images
+  let all_images =
+    List.map (fun (name, i) -> (name, split i)) all_images in
+  let image_map =
+    List.fold_left (fun image_map (name, l) ->
+      assert (not (SMap.mem name image_map)) ;
+      SMap.add name l image_map) SMap.empty all_images in
+  let all_images =
+    List.concat_map (fun (name, l) ->
+      List.mapi (fun index i -> ((name, index), i)) l) all_images in
+  let all_images =
+    List.sort (fun (_id1, i1) (_id2, i2) ->
+      let c = compare i1.Image.width i2.Image.width in
+      if c = 0 then
+        - compare i1.Image.height i2.Image.height
+      else -c) all_images in
+  all_images, image_map
 
 let max_width =
   match all_images with
   | [] -> 1
-  | (_name, i) :: _ -> i.Image.width
+  | (_id, i) :: _ -> i.Image.width
 
 let () =
-  assert (List.for_all (fun (_name, i) -> i.Image.width <= max_width) all_images)
+  assert (List.for_all (fun (_id, i) -> i.Image.width <= max_width) all_images)
 
-module SMap = Map.Make (String)
+(* Set and get coordinates for a specific name and index (which paired forms their identifier). *)
+let set_coordinates, get_coordinates =
+  let coordinates =
+    SMap.map (fun l -> Array.make (List.length l) None) (image_map) in
+  let set (name, index) coords =
+    match SMap.find_opt name coordinates with
+    | None -> assert false
+    | Some a ->
+      assert (a.(index) = None) ;
+      a.(index) <- Some coords in
+  let get (name, index) =
+    match SMap.find_opt name coordinates with
+    | None -> assert false
+    | Some a -> a.(index) in
+  set, get
 
+(* Set up the coordinates of all images into a large single image. *)
 let coordinates =
   let all_images = Array.of_list all_images in
-  let rec build_level index coordinates level_y =
-    if index = Array.length all_images then coordinates
-    else (
-      let (first_name, first_image) = all_images.(index) in
-      if SMap.mem first_name coordinates then
+  let rec build_level index level_y =
+    if index <> Array.length all_images then (
+      let (first_id, first_image) = all_images.(index) in
+      if get_coordinates first_id <> None then
         (* The current image has actually already been placed. *)
-        build_level (index + 1) coordinates level_y
+        build_level (index + 1) level_y
       else (
         (* We create a new level by filling in the first available image (i.e., the widest left). *)
-        let coordinates = SMap.add first_name (0, level_y) coordinates in
+        set_coordinates first_id (0, level_y) ;
         (* We are left with a partially completed level, and we will try to fill it. *)
         let level_height = first_image.Image.height in
-        let rec fill_level coordinates x =
+        let rec fill_level x =
           let rest_x = max_width - x in
           (* We want to fetch the largest image fitting a rectangle of level_height by rest_x. *)
-          if rest_x = 0 || index + 1 = Array.length all_images then
-            coordinates
-          else (
+          if rest_x > 0 && index < Array.length all_images then (
             (* First, fetching the minimum index in the array all_images from which all images are
               at least rest_x wide. *)
             let fit index =
-              let (_name, image) = all_images.(index) in
+              let (_id, image) = all_images.(index) in
               image.Image.width <= rest_x in
             let min_index =
               let rec aux min max =
@@ -79,65 +151,53 @@ let coordinates =
                   else aux (middle + 1) max
                 ) in
               aux (index + 1) (Array.length all_images - 1) in
-            if not (fit min_index) then
-              coordinates
-            else (
+            if fit min_index then (
               (* We then iterate over each non-yet-placed images, taking the first that could fit. *)
               let rec aux index =
                 if index = Array.length all_images then
                   (* None were found: we leave the coordinates as-is, and let the rest of the function
                     create a new level. *)
-                  coordinates
+                  ()
                 else (
-                  let (name, image) = all_images.(index) in
+                  let (id, image) = all_images.(index) in
                   assert (image.Image.width <= rest_x) ;
-                  if SMap.mem name coordinates then
+                  if get_coordinates id <> None then
                     (* This image has already been placed. *)
                     aux (index + 1)
                   else if image.Image.height <= level_height then (
                     assert (x + image.Image.width <= max_width) ;
                     (* We found a fitting candidate. *)
-                    let coordinates = SMap.add name (x, level_y) coordinates in
-                    fill_level coordinates (x + image.Image.width)
+                    set_coordinates id (x, level_y) ;
+                    fill_level (x + image.Image.width)
                   ) else aux (index + 1)
                 ) in
               aux min_index)
           ) in
-        let coordinates = fill_level coordinates first_image.Image.width in
-        build_level (index + 1) coordinates (level_y + level_height)
+        fill_level first_image.Image.width ;
+        build_level (index + 1) (level_y + level_height)
     )) in
-  build_level 0 SMap.empty 0
+  build_level 0 0
 
 let () =
-  assert (List.for_all (fun (name, i) ->
-    match SMap.find_opt name coordinates with
-    | None -> assert false
+  assert (List.for_all (fun (id, i) ->
+    match get_coordinates id with
+    | None -> false
     | Some (x, _y) -> x + i.Image.width <= max_width) all_images)
 
 let max_height =
-  List.fold_left (fun v (name, i) ->
+  List.fold_left (fun v (id, i) ->
     let v' =
-      match SMap.find_opt name coordinates with
+      match get_coordinates id with
       | None -> assert false
       | Some (_x, y) -> y + i.Image.height in
     max v v') 1 all_images
 
-(* Copy an image into a buffer image at a given position.
-  The buffer image must be large enough for the copied image to fit. *)
-let copy_into image buffer pos_x pos_y =
-  for x = 0 to image.Image.width - 1 do
-    for y = 0 to image.Image.height - 1 do
-      Image.read_rgba image x y (fun r g b a ->
-        Image.write_rgba buffer (pos_x + x) (pos_y + y) r g b a)
-    done
-  done
-
 let full_image =
   let image = Image.create_rgb ~alpha:true max_width max_height in
   Image.fill_rgb ~alpha:0 image 0 0 0 ;
-  List.iter (fun (name, i) ->
+  List.iter (fun (id, i) ->
     let (x, y) =
-      match SMap.find_opt name coordinates with
+      match get_coordinates id with
       | None -> assert false
       | Some xy -> xy in
     copy_into i image x y) all_images ;
@@ -153,12 +213,16 @@ let () =
 (* Creating the ML output. *)
 let () =
   print_endline {|[@@@warning "-32"]|} ;
-  List.iter (fun (name, i) ->
-    let (w, h) = (i.Image.width, i.Image.height) in
-    let (x, y) =
-      match SMap.find_opt name coordinates with
-      | None -> assert false
-      | Some xy -> xy in
-    print_endline (Printf.sprintf "let %s = ((%i, %i), (%i, %i))" name w h x y)) all_images ;
+  print_endline {|open Animation|} ;
+  SMap.iter (fun name images ->
+    print_endline (Printf.sprintf "let %s = [" name) ;
+    List.iteri (fun index i ->
+      let (w, h) = (i.Image.width, i.Image.height) in
+      let (x, y) =
+        match get_coordinates (name, index) with
+        | None -> assert false
+        | Some xy -> xy in
+      print_endline (Printf.sprintf "\tmake_subimage %i %i (%i, %i) ;" w h x y)) images ;
+    print_endline "]") image_map ;
   ()
 
