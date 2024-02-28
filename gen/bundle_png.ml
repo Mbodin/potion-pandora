@@ -4,7 +4,7 @@
 let image_folder = "images"
 let png_output = "all.png"
 
-let regexp_name = Str.regexp {|^\([a-z][A-Za-z0-9]*\).png$|}
+let regexp_name = Str.regexp {|^\([a-z][A-Za-z0-9_]*\).png$|}
 let regexp_forbidden_names = Str.regexp {|^\(\)$|}
 
 let all_images =
@@ -153,7 +153,12 @@ let () =
 (* Creating the ML output. *)
 let () =
   print_endline {|[@@@warning "-32"]|} ;
-  SMap.iter (fun name (x, y) ->
-    print_endline (Printf.sprintf "let %s = (%i, %i)" name x y)) coordinates ;
+  List.iter (fun (name, i) ->
+    let (w, h) = (i.Image.width, i.Image.height) in
+    let (x, y) =
+      match SMap.find_opt name coordinates with
+      | None -> assert false
+      | Some xy -> xy in
+    print_endline (Printf.sprintf "let %s = ((%i, %i), (%i, %i))" name w h x y)) all_images ;
   ()
 
