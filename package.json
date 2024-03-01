@@ -26,6 +26,7 @@
 		"@opam/tyxml-ppx": "*",
 		"@opam/js_of_ocaml-tyxml": "*",
 		"@opam/ppx_inline_test": "*",
-		"@opam/imagelib": "*"
+		"@opam/imagelib": "*",
+		"@opam/ppx_deriving": "*"
 	}
 }

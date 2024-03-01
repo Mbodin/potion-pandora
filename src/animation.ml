@@ -7,26 +7,6 @@ type subimage = {
 
 let make_subimage width height position = { width ; height ; position }
 
-type event =
-  | MoveLeft
-  | MoveRight
-  | LookDown
-  | LookUp
-  | LookBehind
-  | Touch
-  | Wind
-  | RandomFlicker
-  | RandomFrequent
-  | RandomNormal
-  | RandomRare
-  | Tau
-
-(* A module for events for the Map module. *)
-module Event = struct
-  type t = event
-  let compare = compare
-end
-
 module EMap = Map.Make (Event)
 module ESet = Set.Make (Event)
 
@@ -69,7 +49,7 @@ type time = Time.t
   Each state is an array index.
   It then stores the associated image, as well as the next step for each event.
   The next state is itself associated *)
-type automaton = (subimage * (event -> (time * state))) array
+type automaton = (subimage * (time * state) Event.map) array
 
 type t = {
   state : state (* The current state of the automaton. *) ;
@@ -83,7 +63,7 @@ let image t =
 
 let next t e =
   let (_image, next) = t.delta.(t.state) in
-  let (time, st) = next e in
+  let (time, st) = Event.fetch next e in
   if Time.(t.time < time) then
     { t with time = Time.incr t.time }
   else { t with state = st ; time = Time.zero }
@@ -95,7 +75,7 @@ let loop s =
   assert (len > 0) ;
   let automaton =
     Array.of_list (List.mapi (fun index (image, time) ->
-      (image, fun _ -> (Time.of_seconds time, (index + 1) mod len))) s) in {
+      (image, Event.create_map (fun _ -> (Time.of_seconds time, (index + 1) mod len)))) s) in {
     delta = automaton ;
     time = Time.zero ;
     state = 0
@@ -103,30 +83,84 @@ let loop s =
 
 let static i = loop [(i, 1.)]
 
-let react t es s =
+(* Create an automaton part encoding a sequence [s].
+  The shift represents the first state of the sequence (it is meant to be concatenated at
+  the end of the automaton and thus starts its indexes there).
+  The set [es] is a set of event that restart the sequence.
+  [state] represents the state targeted after the sequence ended, and the last argument is
+  [t.delta.(state)]: it is useful to tune the behaviour of [skip]. *)
+let create_sequence shift skip es s state (_image, action) =
+  let len = List.length s in
+  Array.of_list (List.mapi (fun index (image, time) ->
+    let next =
+      if index = len - 1 then state
+      else shift + index + 1 in
+    (image, Event.create_map (fun e ->
+      (* Reaction of the state after the sequence to this event. *)
+      let reaction =
+        if skip then
+          let (time, state') = Event.fetch action e in
+          if time = Time.zero && state' <> state then
+            Some state'
+          else None
+        else None in
+      if ESet.mem e es then (Time.zero, shift)
+      else
+        match reaction with
+        | None -> (Time.of_seconds time, next)
+        | Some next -> (Time.zero, next)))) s)
+
+let react t es ?(skip = false) s =
   let len = List.length s in
   if len = 0 then t
   else
     let es = ESet.of_list es in
     let shift = Array.length t.delta in
-    let sequence =
-      Array.of_list (List.mapi (fun index (image, time) ->
-        let next =
-          if index = len - 1 then t.state
-          else shift + index + 1 in
-        (image, fun e ->
-          if ESet.mem e es then (Time.zero, shift)
-          else (Time.of_seconds time, next))) s) in
+    let sequence = create_sequence shift skip es s t.state t.delta.(t.state) in
     let automaton =
       Array.append
         (Array.map (fun (image, next) ->
-          (image, fun e ->
+          (image, Event.create_map (fun e ->
             if ESet.mem e es then (Time.zero, shift)
-            else next e)) t.delta)
-        sequence in {
-      delta = automaton ;
-      time = Time.zero ;
-      state = 0
-    }
+            else Event.fetch next e))) t.delta)
+        sequence in
+    { t with delta = automaton }
 
+let switch t1 es1 ?(skip = false) s1 =
+  let skip1 = skip in fun t2 es2 ?(skip = false) s2 ->
+  let skip2 = skip in
+  let es1 = ESet.of_list es1 in
+  let es2 = ESet.of_list es2 in
+  (* There are four portions of states in the new automaton:
+      - The states of t1,
+      - The states of t2 (shifted by [Array.length t1.delta]),
+      - The states to encode the sequence s1,
+      - The states to encore the sequence s2. *)
+  let shift2 = Array.length t1.delta in
+  let shift_s1 = shift2 + Array.length t2.delta in
+  let shift_s2 = shift_s1 + List.length s1 in
+  let delta1 =
+    Array.map (fun (image, f) ->
+      (image, Event.create_map (fun e ->
+        if ESet.mem e es1 then
+          (Time.zero, shift_s1)
+        else Event.fetch f e))) t1.delta in
+  let delta2 =
+    Array.map (fun (image, f) ->
+      (image, Event.create_map (fun e ->
+        if ESet.mem e es2 then
+          (Time.zero, shift_s2)
+        else
+          let (time, state) = Event.fetch f e in
+          (time, state + shift2)))) t2.delta in
+  let delta_s1 = create_sequence shift_s1 skip1 ESet.empty s1 t2.state t2.delta.(t2.state) in
+  let delta_s2 = create_sequence shift_s2 skip2 ESet.empty s2 t1.state t1.delta.(t1.state) in
+  let automaton =
+    Array.concat [
+      delta1 ;
+      delta2 ;
+      delta_s1 ;
+      delta_s2
+    ] in
+  { t1 with delta = automaton }
 

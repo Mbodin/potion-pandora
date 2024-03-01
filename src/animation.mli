@@ -15,32 +15,11 @@ val make_subimage : int -> int -> (int * int) -> subimage
   It can respond to events to update its internal image. *)
 type t
 
-(* The events from which the automaton responds. *)
-type event =
-  (* The object is moving. *)
-  | MoveLeft
-  | MoveRight
-  (* Some user actions. *)
-  | LookDown
-  | LookUp
-  | LookBehind
-  (* The object was touched by another moving object. *)
-  | Touch
-  (* The wind reached the object (occurs randomly and propagates from left to right). *)
-  | Wind
-  (* Randomly occurring event pulsing at different frequencies. *)
-  | RandomFlicker (* Several times per second. *)
-  | RandomFrequent (* About every second. *)
-  | RandomNormal (* Every 5–10 seconds. *)
-  | RandomRare (* More than 30 seconds. *)
-  (* Time simply passes (it's a no-event). *)
-  | Tau
-
 (* The current image of the object. *)
 val image : t -> subimage
 
 (* Respond to an event. *)
-val next : t -> event -> t
+val next : t -> Event.t -> t
 
 (* An animation sequence, composed of subimages associated with a time (in seconds). *)
 type sequence = (subimage * float) list
@@ -52,6 +31,17 @@ val static : subimage -> t
 val loop : sequence -> t
 
 (* Like its first argument except when one of the provided event is fired:
-  it then plays the sequence then goes back to its initial state. *)
-val react : t -> event list -> sequence -> t
+  it then plays the sequence then goes back to its initial state.
+  The skip argument states whether the sequence will be skipped if the state after it
+  (in this case the initial state of t) would react to the current event (that is,
+  the associated time condition is zero and the transition makes it jump to a different state. *)
+val react : t -> Event.t list -> ?skip:bool -> sequence -> t
+
+(* Switch between two variant automatons for the same object, with events to go from
+  one to the other.
+  [switch t1 [e1] s1 t2 [e2] s2] behaves like [t1] until [e1] occurs.
+  It then applies the sequence [s1], then act like [t2]… until [e2] occurs.
+  It then applies the sequence [s2] and goes back to its initial behavior. *)
+val switch : t -> Event.t list -> ?skip:bool -> sequence ->
+             t -> Event.t list -> ?skip:bool -> sequence -> t
 
