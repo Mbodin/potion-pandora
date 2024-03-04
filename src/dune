@@ -2,7 +2,7 @@
 (library
  	(public_name potion-pandora)
 	(name potion_pandora)
-	(libraries lwt tyxml)
+	(libraries lwt tyxml imagelib)
 	(preprocess
     (pps
       ppx_inline_test
@@ -13,5 +13,13 @@
   )
   (inline_tests))
 
-(copy_files %{project_root}/images_coords.ml)
+(rule
+	(targets images_coords.ml all.png)
+  (deps (:gen ../gen/bundle_png.exe) (glob_files ../images/*))
+	(action (with-stdout-to images_coords.ml (run %{gen}))))
+
+(rule
+	(target all_image.ml)
+  (deps (:gen ../gen/incl_png.exe) all.png)
+	(action (with-stdout-to %{target} (run %{gen}))))
 

@@ -1,7 +1,7 @@
 (* Merge all the images of the images/ folder into a single png file.
   Also outputs an ml file containing the location of each bits within this giant image. *)
 
-let image_folder = "images"
+let image_folder = "../images"
 let png_output = "all.png"
 
 (* Declaration of some regexpes. *)
@@ -54,6 +54,9 @@ let split image =
     ) in
   scan_x 0 0
 
+(* Area of an image. *)
+let area i = i.Image.width * i.Image.height
+
 (* List of all individual images paired with their name and index, as well
   as the a map of images for each name. *)
 let all_images, image_map =
@@ -87,19 +90,11 @@ let all_images, image_map =
       List.mapi (fun index i -> ((name, index), i)) l) all_images in
   let all_images =
     List.sort (fun (_id1, i1) (_id2, i2) ->
-      let c = compare i1.Image.width i2.Image.width in
-      if c = 0 then
-        - compare i1.Image.height i2.Image.height
-      else -c) all_images in
+      - compare (area i1) (area i2)) all_images in
   all_images, image_map
 
 let max_width =
-  match all_images with
-  | [] -> 1
-  | (_id, i) :: _ -> i.Image.width
-
-let () =
-  assert (List.for_all (fun (_id, i) -> i.Image.width <= max_width) all_images)
+  List.fold_left (fun w (_id, i) -> max w i.Image.width) 1 all_images
 
 (* Set and get coordinates for a specific name and index (which paired forms their identifier). *)
 let set_coordinates, get_coordinates =
@@ -137,41 +132,39 @@ let coordinates =
           if rest_x > 0 && index < Array.length all_images then (
             (* First, fetching the minimum index in the array all_images from which all images are
               at least rest_x wide. *)
-            let fit index =
+            let smaller_area index =
               let (_id, image) = all_images.(index) in
-              image.Image.width <= rest_x in
+              area image <= rest_x * level_height in
             let min_index =
               let rec aux min max =
                 if min >= max then min
                 else (
                   let middle = (min + max) / 2 in
                   assert (middle <> max) ;
-                  if fit middle then
+                  if smaller_area middle then
                     aux min middle
                   else aux (middle + 1) max
                 ) in
               aux (index + 1) (Array.length all_images - 1) in
-            if fit min_index then (
-              (* We then iterate over each non-yet-placed images, taking the first that could fit. *)
-              let rec aux index =
-                if index = Array.length all_images then
-                  (* None were found: we leave the coordinates as-is, and let the rest of the function
-                    create a new level. *)
-                  ()
-                else (
-                  let (id, image) = all_images.(index) in
-                  assert (image.Image.width <= rest_x) ;
-                  if get_coordinates id <> None then
-                    (* This image has already been placed. *)
-                    aux (index + 1)
-                  else if image.Image.height <= level_height then (
-                    assert (x + image.Image.width <= max_width) ;
-                    (* We found a fitting candidate. *)
-                    set_coordinates id (x, level_y) ;
-                    fill_level (x + image.Image.width)
-                  ) else aux (index + 1)
-                ) in
-              aux min_index)
+            (* We then iterate over each non-yet-placed images, taking the first that could fit. *)
+            let rec aux index =
+              if index = Array.length all_images then
+                (* None were found: we leave the coordinates as-is, and let the rest of the function
+                  create a new level. *)
+                ()
+              else (
+                let (id, image) = all_images.(index) in
+                if get_coordinates id <> None then
+                  (* This image has already been placed. *)
+                  aux (index + 1)
+                else if image.Image.width <= rest_x && image.Image.height <= level_height then (
+                  assert (x + image.Image.width <= max_width) ;
+                  (* We found a fitting candidate. *)
+                  set_coordinates id (x, level_y) ;
+                  fill_level (x + image.Image.width)
+                ) else aux (index + 1)
+              ) in
+            aux min_index
           ) in
         fill_level first_image.Image.width ;
         build_level (index + 1) (level_y + level_height)
