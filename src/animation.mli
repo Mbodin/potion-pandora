@@ -21,6 +21,11 @@ val image : t -> subimage
 (* Respond to an event. *)
 val next : t -> Event.t -> t
 
+(* Whether an animation listens to a particular event.
+  If an animation doesn't listen to an event, then its behaviour won't change when
+  getting this event. *)
+val listen : t -> Event.t -> bool
+
 (* An animation sequence, composed of subimages associated with a time (in seconds). *)
 type sequence = (subimage * float) list
 
@@ -34,8 +39,10 @@ val loop : sequence -> t
   it then plays the sequence then goes back to its initial state.
   The skip argument states whether the sequence will be skipped if the state after it
   (in this case the initial state of t) would react to the current event (that is,
-  the associated time condition is zero and the transition makes it jump to a different state. *)
-val react : t -> Event.t list -> ?skip:bool -> sequence -> t
+  the associated time condition is zero and the transition makes it jump to a different state.
+  The restart argument states whether a firing of such an event in the middle of the sequence
+  should restart the sequence. *)
+val react : t -> Event.t list -> ?skip:bool -> ?restart:bool -> sequence -> t
 
 (* Switch between two variant automatons for the same object, with events to go from
   one to the other.

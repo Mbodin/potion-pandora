@@ -18,6 +18,7 @@ type state = int
 module Time : sig
   type t
   val zero : t
+  val infinity : t
   val incr : t -> t
   val of_int : int -> t
   val compare : t -> t -> int
@@ -29,6 +30,7 @@ module Time : sig
 end = struct
   type t = int
   let zero = 0
+  let infinity = max_int
   let incr t =
     if t = max_int then max_int
     else t + 1
@@ -64,9 +66,14 @@ let image t =
 let next t e =
   let (_image, next) = t.delta.(t.state) in
   let (time, st) = Event.fetch next e in
-  if Time.(t.time < time) then
+  if Time.(t.time <= time) then
     { t with time = Time.incr t.time }
   else { t with state = st ; time = Time.zero }
+
+let listen t e =
+  let (_image, next) = t.delta.(t.state) in
+  let (time, st) = Event.fetch next e in
+  (st <> t.state && Time.(t.time < time))
 
 type sequence = (subimage * float) list
 
@@ -75,7 +82,9 @@ let loop s =
   assert (len > 0) ;
   let automaton =
     Array.of_list (List.mapi (fun index (image, time) ->
-      (image, Event.create_map (fun _ -> (Time.of_seconds time, (index + 1) mod len)))) s) in {
+      (image, Event.create_map (function
+        | Event.Tau -> (Time.of_seconds time, (index + 1) mod len)
+        | _ -> (Time.infinity, index)))) s) in {
     delta = automaton ;
     time = Time.zero ;
     state = 0
@@ -86,37 +95,42 @@ let static i = loop [(i, 1.)]
 (* Create an automaton part encoding a sequence [s].
   The shift represents the first state of the sequence (it is meant to be concatenated at
   the end of the automaton and thus starts its indexes there).
-  The set [es] is a set of event that restart the sequence.
+  The set [restart] is a set of event that restart the sequence.
   [state] represents the state targeted after the sequence ended, and the last argument is
   [t.delta.(state)]: it is useful to tune the behaviour of [skip]. *)
-let create_sequence shift skip es s state (_image, action) =
+let create_sequence shift skip restart s state (_image, action) =
   let len = List.length s in
   Array.of_list (List.mapi (fun index (image, time) ->
+    let self = shift + index in
     let next =
       if index = len - 1 then state
-      else shift + index + 1 in
-    (image, Event.create_map (fun e ->
-      (* Reaction of the state after the sequence to this event. *)
-      let reaction =
-        if skip then
-          let (time, state') = Event.fetch action e in
-          if time = Time.zero && state' <> state then
-            Some state'
-          else None
-        else None in
-      if ESet.mem e es then (Time.zero, shift)
-      else
-        match reaction with
-        | None -> (Time.of_seconds time, next)
-        | Some next -> (Time.zero, next)))) s)
+      else self + 1 in
+    (image, Event.create_map (function
+      | Event.Tau -> (Time.of_seconds time, next)
+      | e ->
+        if ESet.mem e restart then (Time.zero, shift)
+        else
+          (* Reaction of the state after the sequence to this event. *)
+          let reaction =
+            if skip then
+              let (time, state') = Event.fetch action e in
+              if time = Time.zero && state' <> state then
+                Some state'
+              else None
+            else None in
+          match reaction with
+          | None -> (Time.infinity, self)
+          | Some next -> (Time.zero, next)))) s)
 
-let react t es ?(skip = false) s =
+let react t es ?(skip = false) ?(restart = false) s =
   let len = List.length s in
   if len = 0 then t
   else
     let es = ESet.of_list es in
     let shift = Array.length t.delta in
-    let sequence = create_sequence shift skip es s t.state t.delta.(t.state) in
+    let sequence =
+      let restart = if restart then es else ESet.empty in
+      create_sequence shift skip restart s t.state t.delta.(t.state) in
     let automaton =
       Array.append
         (Array.map (fun (image, next) ->

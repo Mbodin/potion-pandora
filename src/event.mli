@@ -1,7 +1,7 @@
 (* Events from which animation object can respond to. *)
 
 type t =
-  (* The object is moving. The event is regularly repeated during the move. *)
+  (* The object is moving (at least until the next Tau). *)
   | MoveLeft
   | MoveRight
   | Fall
@@ -19,11 +19,12 @@ type t =
   | RandomNormal (* Every 5–10 seconds. *)
   | RandomFrequent (* About every second. *)
   | RandomFlicker (* Several times per second. *)
-  (* Time simply passes (it's a no-event). *)
+  (* Time simply passes.
+    It's not a no-event: it specifically states that time passed.
+    Intuitively, at each turn an animation will receive several events, but exactly one Tau. *)
   | Tau
 
-(* Comparison function.
-  The more important events are considered lower than the less important ones. *)
+(* Comparison function. *)
 val compare : t -> t -> int
 
 (* A total map from events to something. *)
