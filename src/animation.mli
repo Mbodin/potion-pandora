@@ -1,14 +1,12 @@
 (* This modules deals with storing the animation aspect (images, dynamics, etc.)
   of the displayed objects. *)
 
-(* In this program, all images are bundled up into a single large image.
-  This, any part is actually a subpart of this image.
-  This type stores the corresponding coordinates. *)
-type subimage
+(* A static image, ready to be displayed. *)
+type image
 
 (* Given the width, height, and (x, y) position of the image part in the program data,
   store the corresponding subimage. *)
-val make_subimage : int -> int -> (int * int) -> subimage
+val make_subimage : int -> int -> (int * int) -> image
 
 
 (* A representation of an object as an automaton.
@@ -16,10 +14,10 @@ val make_subimage : int -> int -> (int * int) -> subimage
 type t
 
 (* The current image of the object. *)
-val image : t -> subimage
+val image : t -> image
 
 (* Respond to an event. *)
-val next : t -> Event.t -> t
+val send : t -> Event.t -> t
 
 (* Whether an animation listens to a particular event.
   If an animation doesn't listen to an event, then its behaviour won't change when
@@ -27,10 +25,10 @@ val next : t -> Event.t -> t
 val listen : t -> Event.t -> bool
 
 (* An animation sequence, composed of subimages associated with a time (in seconds). *)
-type sequence = (subimage * float) list
+type sequence = (image * float) list
 
 (* An object with a single image, never changing. *)
-val static : subimage -> t
+val static : image -> t
 
 (* An object doing a single looping sequence. *)
 val loop : sequence -> t

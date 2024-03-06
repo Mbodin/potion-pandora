@@ -15,6 +15,7 @@ type t =
   | RandomFlicker
   | Tau
   [@@deriving enum]
+(* Note: the deriving above shadows min and max. *)
 
 let compare e1 e2 =
   compare (to_enum e1) (to_enum e2)

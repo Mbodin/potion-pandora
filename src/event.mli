@@ -14,7 +14,8 @@ type t =
   | LookBehind
   (* The wind reached the object (occurs randomly and propagates from left to right). *)
   | Wind
-  (* Randomly occurring event pulsing at different frequencies. *)
+  (* Randomly occurring event pulsing at different frequencies, when the object is visible.
+    There is no guarantee for off-the-screen object to receive any event. *)
   | RandomRare (* More than 30 seconds. *)
   | RandomNormal (* Every 5–10 seconds. *)
   | RandomFrequent (* About every second. *)

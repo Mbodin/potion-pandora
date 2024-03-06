@@ -1,11 +1,18 @@
 
+(* In this program, all images are bundled up into a single large image.
+  This, any part is actually a subpart of this image.
+  This type stores the corresponding coordinates. *)
 type subimage = {
   width : int ;
   height : int ;
   position : int * int ;
 }
 
-let make_subimage width height position = { width ; height ; position }
+type image =
+  | Subimage of subimage
+  (* TODO: Generated images. *)
+
+let make_subimage width height position = Subimage { width ; height ; position }
 
 module EMap = Map.Make (Event)
 module ESet = Set.Make (Event)
@@ -20,8 +27,6 @@ module Time : sig
   val zero : t
   val infinity : t
   val incr : t -> t
-  val of_int : int -> t
-  val compare : t -> t -> int
   val (<) : t -> t -> bool
 
   (* This converts a time in seconds into a time in number of frames. *)
@@ -34,8 +39,6 @@ end = struct
   let incr t =
     if t = max_int then max_int
     else t + 1
-  let of_int t = t
-  let compare = compare
   let (<) = (<)
 
   (* Number of frame per seconds. *)
@@ -51,7 +54,7 @@ type time = Time.t
   Each state is an array index.
   It then stores the associated image, as well as the next step for each event.
   The next state is itself associated *)
-type automaton = (subimage * (time * state) Event.map) array
+type automaton = (image * (time * state) Event.map) array
 
 type t = {
   state : state (* The current state of the automaton. *) ;
@@ -63,19 +66,19 @@ let image t =
   let (image, _next) = t.delta.(t.state) in
   image
 
-let next t e =
+let send t e =
   let (_image, next) = t.delta.(t.state) in
   let (time, st) = Event.fetch next e in
-  if Time.(t.time <= time) then
+  if e = Tau && Time.(t.time < time) then
     { t with time = Time.incr t.time }
   else { t with state = st ; time = Time.zero }
 
 let listen t e =
   let (_image, next) = t.delta.(t.state) in
   let (time, st) = Event.fetch next e in
-  (st <> t.state && Time.(t.time < time))
+  (st <> t.state && not Time.(t.time < time))
 
-type sequence = (subimage * float) list
+type sequence = (image * float) list
 
 let loop s =
   let len = List.length s in
