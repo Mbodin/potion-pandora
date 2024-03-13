@@ -5,8 +5,16 @@
 type image
 
 (* Given the width, height, and (x, y) position of the image part in the program data,
-  store the corresponding subimage. *)
-val make_subimage : int -> int -> (int * int) -> image
+  store the corresponding subimage.
+  The optional argument is there to extract an image from another image then the default
+  bundle for Bundled_image. *)
+val make_subimage : ?bundle:Image.image -> int -> int -> (int * int) -> image
+
+(* Given an image, reads its (r, g, b, a) values at the provided coordinate. *)
+val read_image : image -> (int * int) -> (int * int * int * int)
+
+(* Return the dimensions (width, height) of the image. *)
+val image_dimensions : image -> (int * int)
 
 
 (* A representation of an object as an automaton.

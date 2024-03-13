@@ -6,7 +6,7 @@ let png_output = "all.png"
 
 (* Declaration of some regexpes. *)
 let regexp_name = Str.regexp {|^\([a-z][A-Za-z0-9_]*\).png$|}
-let regexp_forbidden_names = Str.regexp {|^\(make_subimage\)$|}
+let regexp_forbidden_names = Str.regexp {|^\(make\|coords\)$|}
 
 module SMap = Map.Make (String)
 
@@ -206,7 +206,8 @@ let () =
 (* Creating the ML output. *)
 let () =
   print_endline {|[@@@warning "-32"]|} ;
-  print_endline {|open Animation|} ;
+  print_endline {|type coords = (int * int) * (int * int)|} ;
+  print_endline {|let make width height (x, y) : coords = ((width, height), (x, y))|} ;
   SMap.iter (fun name images ->
     print_endline (Printf.sprintf "let %s = [" name) ;
     List.iteri (fun index i ->
@@ -215,7 +216,7 @@ let () =
         match get_coordinates (name, index) with
         | None -> assert false
         | Some xy -> xy in
-      print_endline (Printf.sprintf "\tmake_subimage %i %i (%i, %i) ;" w h x y)) images ;
+      print_endline (Printf.sprintf "\tmake %i %i (%i, %i) ;" w h x y)) images ;
     print_endline "]") image_map ;
   ()
 

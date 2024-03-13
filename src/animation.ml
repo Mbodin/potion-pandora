@@ -1,18 +1,29 @@
 
-(* In this program, all images are bundled up into a single large image.
+(* In this program, most images are bundled up into a single large image.
   This, any part is actually a subpart of this image.
   This type stores the corresponding coordinates. *)
-type subimage = {
+type image = {
   width : int ;
   height : int ;
   position : int * int ;
+  picture : Image.image (* The larger picture from which this image is taken from. *)
 }
 
-type image =
-  | Subimage of subimage
-  (* TODO: Generated images. *)
+let image_dimensions img =
+  (img.width, img.height)
 
-let make_subimage width height position = Subimage { width ; height ; position }
+let make_subimage ?(bundle = Bundled_image.image) width height position =
+  assert (fst position >= 0 && snd position >= 0) ;
+  assert (fst position + width < bundle.Image.width) ;
+  assert (snd position + height < bundle.Image.height) ;
+  { width ; height ; position ; picture = bundle }
+
+let read_image img (x, y) =
+  assert (x >= 0 && y >= 0) ;
+  assert (x < img.width && y < img.width) ;
+  let (px, py) = img.position in
+  Image.read_rgba img.picture (x + px) (y + py) (fun r g b a -> (r, g, b, a))
+
 
 module EMap = Map.Make (Event)
 module ESet = Set.Make (Event)

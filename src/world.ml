@@ -6,8 +6,18 @@ open Animation
 let range a b =
   List.init (b - a + 1) (fun c -> c + a)
 
-let from img i =
-  List.nth img i
+(* Converts the coordinates of Images_coords into an image. *)
+let from_coords ~bundle ((width, height), (x, y)) =
+  Animation.make_subimage ~bundle width height (x, y)
+
+(* Call the above conversion function on the nth element of a list of coordinates,
+  as given in Images_coords. *)
+let from ?(bundle = Bundled_image.image) coords i : Animation.image =
+  from_coords ~bundle (List.nth coords i)
+
+(* Directly converts a list. *)
+let fromlist ?(bundle = Bundled_image.image) coords : Animation.image list =
+  List.map (from_coords ~bundle) coords
 
 (* Convert a list of images into a sequence staying that time per picture. *)
 let to_sequence time l =
@@ -16,6 +26,9 @@ let to_sequence time l =
 (* An object that only reacts to wind/explosions. *)
 let rwind img s =
   react (static img) Event.[Wind; Explode] s
+
+let vert_fonce = Filter.decolor ~pattern:(from Images_coords.palette 3) Bundled_image.image
+let vert_tres_fonce = Filter.decolor ~pattern:(from Images_coords.palette 2) Bundled_image.image
 
 module Perso = struct
 
@@ -39,10 +52,18 @@ module Perso = struct
 
 end
 
-let potion = loop (to_sequence 0.1 Images_coords.potion)
+let potion = loop (to_sequence 0.1 (fromlist Images_coords.potion))
 
 let plante1 =
   let mk = from Images_coords.plante1 in
+  rwind (mk 0) (to_sequence 0.2 [mk 1])
+
+let plante1_sombre =
+  let mk = from ~bundle:vert_fonce Images_coords.plante1 in
+  rwind (mk 0) (to_sequence 0.2 [mk 1])
+
+let plante1_tres_sombre =
+  let mk = from ~bundle:vert_tres_fonce Images_coords.plante1 in
   rwind (mk 0) (to_sequence 0.2 [mk 1])
 
 let buisson =
