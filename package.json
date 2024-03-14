@@ -1,5 +1,6 @@
 {
 	"name": "potion-pandora",
+	"author": "Martin Bodin <martin.bodin@ens-lyon.org>",
 	"version": "0.1",
 	"description": "A little narrative game.",
 	"license": "CC-BY-4.0",
