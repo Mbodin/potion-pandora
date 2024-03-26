@@ -25,7 +25,7 @@ let decolor ~pattern img =
     for y = 0 to img.Image.height - 1 do
       let (pr, pg, pb, pa) =
         Animation.read_image pattern (x mod pattern_width, y mod pattern_height) in
-      Image.read_rgba img x y (fun r g b a ->
+      Image.read_rgba img x y (fun _r _g _b a ->
         Image.write_rgba img x y pr pg pb (min a pa))
     done
   done ;
@@ -88,5 +88,5 @@ let shimmer ?(quantity = 50) ?(amplitude = 5) ?(duration = 10) img =
   done ;
   (* Finally, bundling the images. *)
   List.init duration (fun t ->
-    Animation.make_subimage ~bundle img.Image.width img.Image.height (img.Image.width * duration, 0))
+    Animation.make_subimage ~bundle img.Image.width img.Image.height (img.Image.width * t, 0))
 

@@ -13,6 +13,7 @@ let from_coords ~bundle ((width, height), (x, y)) =
 (* Call the above conversion function on the nth element of a list of coordinates,
   as given in Images_coords. *)
 let from ?(bundle = Bundled_image.image) coords i : Animation.image =
+  assert (i < List.length coords) ;
   from_coords ~bundle (List.nth coords i)
 
 (* Directly converts a list. *)
@@ -27,8 +28,18 @@ let to_sequence time l =
 let rwind img s =
   react (static img) Event.[Wind; Explode] s
 
-let vert_fonce = Filter.decolor ~pattern:(from Images_coords.palette 3) Bundled_image.image
-let vert_tres_fonce = Filter.decolor ~pattern:(from Images_coords.palette 2) Bundled_image.image
+(* The palette is an exception, as it is provided as a single image (with a single line).
+  We here split it into several one-pixel images. *)
+let palette =
+  match Images_coords.palette with
+  | [((width, height), (x, y))] ->
+    assert (height = 1) ;
+    List.init width (fun dx ->
+      ((1, height), (x + dx, y)))
+  | _ -> assert false
+
+let vert_fonce = Filter.decolor ~pattern:(from palette 3) Bundled_image.image
+let vert_tres_fonce = Filter.decolor ~pattern:(from palette 2) Bundled_image.image
 
 module Perso = struct
 

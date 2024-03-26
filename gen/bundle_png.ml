@@ -113,7 +113,7 @@ let set_coordinates, get_coordinates =
   set, get
 
 (* Set up the coordinates of all images into a large single image. *)
-let coordinates =
+let () =
   let all_images = Array.of_list all_images in
   let rec build_level index level_y =
     if index <> Array.length all_images then (

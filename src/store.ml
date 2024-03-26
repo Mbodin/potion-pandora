@@ -8,8 +8,13 @@ module IMap = Map.Make (Integer)
 
 (* Generation of new identifiers. *)
 module Id : sig
+
+  (* The type of identifiers *)
   type t
+
+  (* Create a new identifier. *)
   val fresh : unit -> t
+
 end = struct
   type t = int
   let fresh =
@@ -20,6 +25,82 @@ end = struct
       ret
 end
 
+(* Bi-directional arrays. *)
+module Biarray : sig
+
+  (* Like array, but accept negative arguments. *)
+  type 'a t
+
+  (* Create a new bi-array, of initial size provided, and with default value. *)
+  val init : int -> 'a -> 'a t
+
+  (* Read a bi-array at the provided position (possibly returning the default
+    value if outside the allocated range).  The position can be negative. *)
+  val get : 'a t -> int -> 'a
+
+  (* Modify in-place the array at the provided position (possibly negative) and return the array.
+    If it is outside the allocated range, a new array is defined, invalidating the old one. *)
+  val set : 'a t -> int -> 'a -> 'a t
+
+end = struct
+
+  type 'a t = {
+    default : 'a ;
+    positive : 'a array ;
+    negative : 'a array
+  }
+
+  let init size default = {
+    default ;
+    positive = Array.make size default ;
+    negative = Array.make size default
+  }
+
+  let get a i =
+    let (t, i) =
+      if i >= 0 then
+        (a.positive, i)
+      else (a.negative, 1 - i) in
+    if i < Array.length t then t.(i)
+    else a.default
+
+  let set a i v =
+    let (t, i, set) =
+      if i >= 0 then
+        (a.positive, i, fun t -> { a with positive = t })
+      else (a.negative, 1 - i, fun t -> { a with negative = t }) in
+    if i < Array.length t then (
+      t.(i) <- v ;
+      a
+    ) else (
+      let t' = Array.make (1 + max (2 * Array.length t) i) a.default in
+      Array.blit t 0 t' 0 (Array.length t) ;
+      t'.(i) <- v ;
+      set t'
+    )
+
+end
+
+let%test "biarray set-get positive" =
+  let open Biarray in
+  let a = init 10 None in
+  let a = set a 42 (Some 18) in
+  get a 42 = Some 18
+
+let%test "biarray set-get negative" =
+  let open Biarray in
+  let a = init 10 None in
+  let a = set a (-42) (Some 18) in
+  get a (-42) = Some 18
+
+let%test "biarray set-get both" =
+  let open Biarray in
+  let a = init 10 None in
+  let a = set a 42 (Some 18) in
+  let a = set a (-42) (Some 12) in
+  get a (-42) = Some 12 && get a 42 = Some 18
+
+
 (* The objects stored. *)
 type obj_store = {
   id : Id.t (* A unique identifier. *) ;
@@ -28,6 +109,10 @@ type obj_store = {
   move : ((int * int) * int * bool) option (* When the object is moving, this is its target
     position, speed (in pixel per turn, always positive), and ghostness. *)
 }
+
+(* TODO: Use bi-arrays instead of a single array. Also add two-dimensional arrays for the
+  coordinates.
+  We probably also want to add a specific module for this, with an abstracted type for the groups. *)
 
 (* The store array groups objects by their x-coordinates, but not every x-coordinates is associated
   by a cell. Instead objects are grouped by several x-coordinates into a single cell. *)
