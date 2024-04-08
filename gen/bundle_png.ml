@@ -115,60 +115,40 @@ let set_coordinates, get_coordinates =
 (* Set up the coordinates of all images into a large single image. *)
 let () =
   let all_images = Array.of_list all_images in
+  (* Fill-in all the images from the provided index that can be filled-in,
+    starting from position (angle_x, angle_y) and using at most max_y of height. *)
+  let rec build_from index angle_x angle_y max_height =
+    if index <> Array.length all_images then (
+      let (id, image) = all_images.(index) in
+      let index = index + 1 in
+      if get_coordinates id <> None
+         || image.Image.height > max_height
+         || angle_x + image.Image.width > max_width then
+        (* The current image has actually already been placed or it is too big. *)
+        build_from index angle_x angle_y max_height
+      else (
+        (* We place the current image. *)
+        set_coordinates id (angle_x, angle_y) ;
+        (* We then recurse over both left-over lines. *)
+        let height = image.Image.height in
+        build_from index (angle_x + image.Image.width) angle_y height ;
+        build_from index angle_x (angle_y + height) (max_height - height)
+      )
+    ) in
+  (* Fill in all images from the provided index, creating new levels on the way. *)
   let rec build_level index level_y =
     if index <> Array.length all_images then (
-      let (first_id, first_image) = all_images.(index) in
-      if get_coordinates first_id <> None then
-        (* The current image has actually already been placed. *)
-        build_level (index + 1) level_y
+      let (id, image) = all_images.(index) in
+      let index = index + 1 in
+      if get_coordinates id <> None then
+        build_level index level_y
       else (
-        (* We create a new level by filling in the first available image (i.e., the widest left). *)
-        set_coordinates first_id (0, level_y) ;
-        (* We are left with a partially completed level, and we will try to fill it. *)
-        let level_height = first_image.Image.height in
-        let rec fill_level x =
-          let rest_x = max_width - x in
-          (* We want to fetch the largest image fitting a rectangle of level_height by rest_x. *)
-          if rest_x > 0 && index < Array.length all_images then (
-            (* First, fetching the minimum index in the array all_images from which all images are
-              at least rest_x wide. *)
-            let smaller_area index =
-              let (_id, image) = all_images.(index) in
-              area image <= rest_x * level_height in
-            let min_index =
-              let rec aux min max =
-                if min >= max then min
-                else (
-                  let middle = (min + max) / 2 in
-                  assert (middle <> max) ;
-                  if smaller_area middle then
-                    aux min middle
-                  else aux (middle + 1) max
-                ) in
-              aux (index + 1) (Array.length all_images - 1) in
-            (* We then iterate over each non-yet-placed images, taking the first that could fit. *)
-            let rec aux index =
-              if index = Array.length all_images then
-                (* None were found: we leave the coordinates as-is, and let the rest of the function
-                  create a new level. *)
-                ()
-              else (
-                let (id, image) = all_images.(index) in
-                if get_coordinates id <> None then
-                  (* This image has already been placed. *)
-                  aux (index + 1)
-                else if image.Image.width <= rest_x && image.Image.height <= level_height then (
-                  assert (x + image.Image.width <= max_width) ;
-                  (* We found a fitting candidate. *)
-                  set_coordinates id (x, level_y) ;
-                  fill_level (x + image.Image.width)
-                ) else aux (index + 1)
-              ) in
-            aux min_index
-          ) in
-        fill_level first_image.Image.width ;
-        build_level (index + 1) (level_y + level_height)
-    )) in
+        (* This is the first non-yet-placed image. *)
+        set_coordinates id (0, level_y) ;
+        build_from index image.Image.width level_y image.Image.height ;
+        build_level index (level_y + image.Image.height)
+      )
+    ) in
   build_level 0 0
 
 let () =
