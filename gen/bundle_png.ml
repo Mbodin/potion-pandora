@@ -21,7 +21,7 @@ let copy_into image buffer pos_x pos_y =
   done
 
 (* Given an image, split it into several images along its white lines. *)
-let split image =
+let split ?name image =
   assert (image.Image.height > 0) ;
   let check r g b a =
     List.for_all ((=) image.Image.max_val) [r; g; b; a] in
@@ -39,11 +39,17 @@ let split image =
       if x = previous_x then []
       else [extract_image previous_x (x - 1)]
     ) else (
+      let print_assert msg b =
+        if not b then prerr_endline msg ;
+        assert b in
       let line =
         Image.read_rgba image x 0 (fun r g b a ->
           if check r g b a then (
             for y = 0 to image.Image.height - 1 do
-              assert (Image.read_rgba image x y check)
+              print_assert
+                (Printf.sprintf "Uncomplete white ligne%s."
+                  (Option.fold ~none:"" ~some:(fun n -> " in " ^ n) name))
+                (Image.read_rgba image x y check)
             done ;
             true
           ) else false) in
@@ -80,7 +86,7 @@ let all_images, image_map =
       let chunk = ImageUtil.chunk_reader_of_string content in
       (name, ImageLib.PNG.parsefile chunk)) all_filenames in
   let all_images =
-    List.map (fun (name, i) -> (name, split i)) all_images in
+    List.map (fun (name, i) -> (name, split ~name i)) all_images in
   let image_map =
     List.fold_left (fun image_map (name, l) ->
       assert (not (SMap.mem name image_map)) ;
