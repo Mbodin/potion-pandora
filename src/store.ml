@@ -127,7 +127,7 @@ type store = {
 type t = store ref
 
 (* Get the index within the store array corresponding to an x-coordinate. *)
-let get_group x =
+let get_group x = (* TODO: This should be bi-directionnal at some point. *)
   if x < 0 then
     1 + 2 * ((-x) / group_size)
   else 2 * (x / group_size)
@@ -141,6 +141,10 @@ let%test "get_group" =
     get_group (-group_size) <> get_group (1 - group_size) ;
     get_group (-group_size) <> get_group group_size
   ]
+
+(* Return a value of x such that its group is the group of the next smaller value
+  of x with a different group. *)
+let next_group x = x + group_size
 
 (* We store a direct reference to the object within the cell list: this enables us to directly
   manipulate it whithout having to update its carrying list.
@@ -204,6 +208,28 @@ let remove store (level, obj) =
   let l = List.filter (fun o -> !o.id <> !obj.id) l in
   let a = write a i l in
   store := { !store with data = IMap.add level a !store.data }
+
+(* Similar to the all function, but limited to a particular level.
+  Instead of a store *)
+let all_at_level a min_coords max_coords =
+  let ((min_x, min_y), (max_x, max_y)) =
+    let apply f proj = f (proj min_coords) (proj max_coords) in
+    ((apply min fst, apply min snd), (apply max fst, apply max snd)) in
+  let stop_group = get_group (next_group max_x) in
+  let rec aux x acc =
+    let current =
+      List.map (fun o -> (!o.position, !o.display)) (read a (get_group x)) in
+    let x = next_group x in
+    if get_group x = stop_group then List.flatten (current :: acc)
+    else aux x (current :: acc) in
+  aux min_x []
+
+let all store min_coords max_coords =
+  let l =
+    IMap.fold (fun level a acc ->
+      (* TODO: Change min_coords and max_coords according to the level projection. *)
+      all_at_level a min_coords max_coords :: acc) !store.data [] in
+  List.concat l
 
 let send _store (_level, obj) ?(safe = true) e =
   if safe then

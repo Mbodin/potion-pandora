@@ -10,7 +10,7 @@
       tyxml-ppx
       ppx_deriving.enum))
 	(modules_without_implementation
-  )
+    interface)
   (inline_tests))
 
 (rule
