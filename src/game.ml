@@ -1,6 +1,8 @@
 
 module Launch (I : Interface.T) = struct
 
+  open I
+
   module E = Engine.Engine (I)
 
   (* First step: prepare the levels. *)
@@ -12,7 +14,6 @@ module Launch (I : Interface.T) = struct
     (player, store)
 
   let play_level (player, store) =
-    let open I in
     let* interface = E.interface in
     E.load store ;
     let rec play () =
@@ -25,7 +26,9 @@ module Launch (I : Interface.T) = struct
     play ()
 
   let _ : unit I.m =
-    play_level level
+    let* interface = E.interface in
+    let* () = play_level level in
+    I.quit interface
 
 end
 

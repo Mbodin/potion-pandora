@@ -25,8 +25,12 @@ module type T = sig
   val ( let* ) : 'a m -> ('a -> 'b m) -> 'b m
 
   (* Initialise the interface of a given width and height.
-    Called only once at the very beginning. *)
+    To be called only once at the very beginning. *)
   val init : int -> int -> t m
+
+  (* Invalidate all objects created with this interface.
+    To be called once at the very end. *)
+  val quit : t -> unit m
 
   (* Display the (r, g, b) pixel at position (x, y). *)
   val write : t -> (int * int * int) -> (int * int) -> unit m

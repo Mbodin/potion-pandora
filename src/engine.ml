@@ -3,6 +3,8 @@
 let display_width = 120
 let display_height = 120
 
+let () = Random.self_init ()
+
 module Engine (I : Interface.T) = struct
 
   let interface = I.init display_width display_height
