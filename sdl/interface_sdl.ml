@@ -17,25 +17,29 @@ let ( let* ) v f = f v
 let init width height =
   Sdl.init [`VIDEO] ;
   let (window, renderer) =
+    let width = width * scale_factor in
+    let height = height * scale_factor in
     Sdlrender.create_window_and_renderer ~width ~height ~flags:[] in
   let image = Image.create_rgb width height in
   Image.fill_rgb image 0 0 0 ;
   { window ; renderer ; image }
 
-let write { image } (r, g, b) (x, y) =
+let write { image ; _ } (r, g, b) (x, y) =
+  assert (x >= 0 && y >= 0) ;
+  assert (x < image.Image.width && y < image.Image.height) ;
   Image.write_rgb image x y r g b
 
-let flush { window ; renderer ; image } =
+let flush { renderer ; image ; _ } =
   Sdlrender.set_draw_color3 renderer ~r:0 ~g:0 ~b:0 ~a:255 ;
   Sdlrender.clear renderer ;
-  for x = 0 to image.Image.width do
-    for y = 0 to image.Image.height do
+  for x = 0 to image.Image.width - 1 do
+    for y = 0 to image.Image.height - 1 do
       Image.read_rgb image x y (fun r g b ->
         let rect =
           Sdlrect.make4 ~x:(scale_factor * x) ~y:(scale_factor * y)
             ~w:scale_factor ~h:scale_factor in
         Sdlrender.set_draw_color3 renderer ~r ~g ~b ~a:255 ;
-        Sdlrender.draw_rect renderer rect)
+        Sdlrender.fill_rect renderer rect)
     done
   done ;
   Sdlrender.render_present renderer

@@ -3,5 +3,6 @@
 	(public_name potion-pandora)
   (name main_sdl)
 	(libraries potion_pandora sdl2 imagelib)
-	(modes native))
+	(modes native)
+  (flags (:standard -warn-error -A)))
 

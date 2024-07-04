@@ -21,7 +21,7 @@ module Engine (I : Interface.T) = struct
     if min > max then return ()
     else
       let* () = f min in
-      for_ (1 + min) max f
+      for_ (min + 1) max f
 
   (* Iteration on lists within monads. *)
   let iter_ f l =

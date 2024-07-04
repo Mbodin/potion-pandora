@@ -11,7 +11,8 @@
       ppx_deriving.enum))
 	(modules_without_implementation
     interface)
-  (inline_tests))
+  (inline_tests)
+  (flags (:standard -warn-error -A)))
 
 (rule
 	(targets images_coords.ml all.png)

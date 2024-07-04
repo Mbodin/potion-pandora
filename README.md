@@ -4,11 +4,13 @@ In construction.
 
 # Compiling
 
-The prefered source is using `esy`.
+The prefered source is using `esy`, which can deal with all OCaml dependencies.
+The native graphical output depends on the system package libsdl2-dev.
 
 ## Using `esy`
 
 ```bash
+apt install libsdl2-dev
 # Installing esy
 npm install esy
 # Installing the dependencies and compiling

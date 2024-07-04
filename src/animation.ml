@@ -20,7 +20,7 @@ let make_subimage ?(bundle = Bundled_image.image) width height position =
 
 let read_image img (x, y) =
   assert (x >= 0 && y >= 0) ;
-  assert (x < img.width && y < img.width) ;
+  assert (x < img.width && y < img.height) ;
   let (px, py) = img.position in
   Image.read_rgba img.picture (x + px) (y + py) (fun r g b a -> (r, g, b, a))
 
