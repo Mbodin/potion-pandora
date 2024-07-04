@@ -1,7 +1,7 @@
 
 (executable
 	(public_name potion-pandora)
-  (name main_native)
-	(libraries potion_pandora ocamlsdl2 imagelib)
+  (name main_sdl)
+	(libraries potion_pandora sdl2 imagelib)
 	(modes native))
 

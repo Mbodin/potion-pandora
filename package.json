@@ -31,5 +31,8 @@
 		"@opam/imagelib": "*",
 		"@opam/ppx_deriving": "*",
 		"@opam/ocamlsdl2": "*"
+	},
+	"resolutions": {
+		"@opam/ocamlsdl2": "github:Mbodin/OCamlSDL2#d7c2abb12483ee7fb20df2d20683e3e385b1d014"
 	}
 }
