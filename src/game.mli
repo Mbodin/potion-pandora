@@ -1,5 +1,7 @@
 
-(* The main file, launching the game. *)
+(* The main file, launching the game.
+  This module contains the main game loop.
+  It also deal of loading each levels. *)
 
 module Launch (I : Interface.T) : sig
 

@@ -53,9 +53,14 @@ module type T = sig
     Otherwise, the callback function only receives None. *)
   val on_key_pressed : t -> (direction option -> unit m) -> unit m
 
+  (* Called when the game window was closed.
+    Note that this will not automatically call the quit function above. *)
+  val on_quit : t -> (unit -> unit m) -> unit m
+
   (* Perform the computation provided in argument (its unit argument is added for convenience as
     the computation typically includes pure but computationnal parts), but ensure that the overall
-    computation time is around this number of milliseconds. *)
+    computation time is around this number of milliseconds.
+    This will also trigger the functions associated to the current events. *)
   val wait : t -> int -> (unit -> 'a m) -> 'a m
 
 end

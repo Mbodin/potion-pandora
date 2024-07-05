@@ -17,7 +17,13 @@ npm install esy
 esy
 ```
 
-Then, to access it on a webbrowser, type:
+The compiled program will then be located in `_build/install/default/bin/potion-pandora`.
+It can be called as-is, or alternatively as:
+```bash
+esy dune exec sdl/main_sdl.exe
+```
+
+Alternatively, to run the program on a webbrowser, type:
 ```bash
 # Run a local server on port 8000.
 esy server > /dev/null &

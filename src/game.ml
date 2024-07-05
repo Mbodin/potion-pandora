@@ -16,19 +16,22 @@ module Launch (I : Interface.T) = struct
   let play_level (player, store) =
     let* interface = E.interface in
     E.load store ;
+    let quit = ref false in
+    let* () = I.on_quit interface (fun () -> quit := true; I.quit interface) in
     let rec play () =
       let* () =
-        wait interface 300 (fun () ->
+        wait interface 200 (fun () ->
           let* () = E.step () in
           (* TODO: Move player here. *)
           return ()) in
-      play () in
+      if !quit then return ()
+      else play () in
     play ()
 
   let _ : unit I.m =
     let* interface = E.interface in
     let* () = play_level level in
-    I.quit interface
+    return ()
 
 end
 
