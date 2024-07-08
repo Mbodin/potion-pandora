@@ -20,7 +20,7 @@ esy
 The compiled program will then be located in `_build/install/default/bin/potion-pandora`.
 It can be called as-is, or alternatively as:
 ```bash
-esy dune exec sdl/main_sdl.exe
+esy run
 ```
 
 Alternatively, to run the program on a webbrowser, type:

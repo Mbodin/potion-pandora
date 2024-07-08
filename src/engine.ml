@@ -1,13 +1,14 @@
 
-(* The width and height of the screen. *)
-let display_width = 120
-let display_height = 120
+module type Display = sig
+  val width : int
+  val height : int
+end
 
 let () = Random.self_init ()
 
-module Engine (I : Interface.T) = struct
+module Engine (D : Display) (I : Interface.T) = struct
 
-  let interface = I.init display_width display_height
+  let interface = I.init D.width D.height
 
   (* The current selected level. *)
   let level = ref (Store.create ())
@@ -34,9 +35,9 @@ module Engine (I : Interface.T) = struct
   let display_image img (coord_x, coord_y) =
     let (dim_x, dim_y) = Animation.image_dimensions img in
     let min_x = max 0 (-coord_x) in
-    let max_x = min (dim_x - 1) (display_width - coord_x - 1) in
+    let max_x = min (dim_x - 1) (D.width - coord_x - 1) in
     let min_y = max 0 (-coord_y) in
-    let max_y = min (dim_y - 1) (display_height - coord_y - 1) in
+    let max_y = min (dim_y - 1) (D.height - coord_y - 1) in
     let open I in
     let* interface in
     for_ min_x max_x (fun x ->
@@ -53,8 +54,8 @@ module Engine (I : Interface.T) = struct
     Store.step !level ;
     (* The display coordinates. *)
     let coords = (0, 0) (* TODO: stay close to the player. *) in
-    let min_coords = (fst coords - display_width / 2, snd coords - display_height / 2) in
-    let max_coords = (fst min_coords + display_width - 1, snd min_coords + display_height - 1) in
+    let min_coords = (fst coords - D.width / 2, snd coords - D.height / 2) in
+    let max_coords = (fst min_coords + D.width - 1, snd min_coords + D.height - 1) in
     let* () =
       iter_
         (fun (coord, anim) -> display_image (Animation.image anim) coord)

@@ -4,7 +4,6 @@
 let scale_factor = 10
 
 type t = {
-  window : Sdlwindow.t ;
   renderer : Sdlrender.t ;
   image : Image.image
 }
@@ -16,20 +15,20 @@ let ( let* ) v f = f v
 
 let init width height =
   Sdl.init [`VIDEO] ;
-  let (window, renderer) =
+  let (_window, renderer) =
     let width = width * scale_factor in
     let height = height * scale_factor in
     Sdlrender.create_window_and_renderer ~width ~height ~flags:[] in
   let image = Image.create_rgb width height in
   Image.fill_rgb image 0 0 0 ;
-  { window ; renderer ; image }
+  { renderer ; image }
 
 let write { image ; _ } (r, g, b) (x, y) =
   assert (x >= 0 && y >= 0) ;
   assert (x < image.Image.width && y < image.Image.height) ;
   Image.write_rgb image x y r g b
 
-let flush { renderer ; image ; _ } =
+let flush { renderer ; image } =
   Sdlrender.set_draw_color3 renderer ~r:0 ~g:0 ~b:0 ~a:255 ;
   Sdlrender.clear renderer ;
   for x = 0 to image.Image.width - 1 do
@@ -97,7 +96,7 @@ let rec process_events () =
       call_move
         (convert_coords (e.mm_x - e.mm_xrel, e.mm_y - e.mm_yrel))
         (convert_coords (e.mm_x, e.mm_y))
-    | Window_Event { kind = WindowEvent_Close } -> call_quit ()
+    | Window_Event { kind = WindowEvent_Close ; _ } -> call_quit ()
     | _ -> () in
   match poll_event () with
   | None -> ()
@@ -105,14 +104,20 @@ let rec process_events () =
     aux e ;
     process_events ()
 
+(* A global variable to detect when quitting has been requested,
+  hence preventing the program to launch anything that might take time. *)
+let has_quit = ref false
+
+let quit _ =
+  has_quit := true ;
+  Sdl.quit ()
+
 let wait _ time f =
   let before = Sdltimer.get_ticks () in
   let r = f () in
   process_events () ;
   let diff = Sdltimer.get_ticks () - before in
-  if time > diff then
+  if time > diff && not !has_quit then
     Sdltimer.delay ~ms:(time - diff) ;
   r
-
-let quit _ = Sdl.quit ()
 

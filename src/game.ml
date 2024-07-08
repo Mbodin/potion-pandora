@@ -3,7 +3,12 @@ module Launch (I : Interface.T) = struct
 
   open I
 
-  module E = Engine.Engine (I)
+  module Display = struct
+    let width = 120
+    let height = 80
+  end
+
+  module E = Engine.Engine (Display) (I)
 
   (* First step: prepare the levels. *)
   let level =

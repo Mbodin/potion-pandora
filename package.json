@@ -10,6 +10,7 @@
 	},
 	"scripts": {
 		"clean": "rm -Rf _build",
+		"run": "dune exec sdl/main_sdl.exe",
 		"test": "dune runtest",
 		"doc": "dune build @doc",
 		"server": "./server.sh"
