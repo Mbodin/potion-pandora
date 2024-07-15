@@ -1,4 +1,6 @@
 
+let () = Random.self_init ()
+
 module Launch (I : Interface.T) = struct
 
   open I

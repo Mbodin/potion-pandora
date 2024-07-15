@@ -1,9 +1,4 @@
 
-(* Module declaration for integers. *)
-module Integer = struct
-  type t = int
-  let compare = compare
-end
 module IMap = Map.Make (Integer)
 
 (* Generation of new identifiers. *)
@@ -15,14 +10,20 @@ module Id : sig
   (* Create a new identifier. *)
   val fresh : unit -> t
 
+  (* The comparison function for identifiers. *)
+  val compare : t -> t -> int
+
 end = struct
-  type t = int
+
+  include Integer
+
   let fresh =
     let available = ref 0 in
     fun () ->
       let ret = !available in
       incr available ;
       ret
+
 end
 
 (* Bi-directional arrays. *)
@@ -146,15 +147,7 @@ end = struct
   type group = int * int
 
   (* We are taking the euclidean division, so that e.g. [div (-3) 2 = -2]. *)
-  let div a b =
-    if (a >= 0) = (b >= 0) then (
-      (* They have the same sign, so the truncating division is fine. *)
-      a / b
-    ) else (
-      (* They have opposite signs, so we need to compute back the euclidean division. *)
-      let d = a / b in
-      d - 1
-    )
+  let div = Integer.div
 
   let%test "Data.div" =
     let divg a = div a group_size in
@@ -227,7 +220,7 @@ type obj_store = {
 
 (* We store a direct reference to the object within the cell list: this enables us to directly
   manipulate it whithout having to update its carrying list.
-  We also attach the level to be able to refind it into the store. *)
+  We also attach the level to be able to find it again into the store. *)
 type obj = int * obj_store ref
 
 let get_coords _store obj =
@@ -320,10 +313,9 @@ let remove store (level, obj) =
   Instead of a store *)
 let all_at_level a min_coords max_coords =
   let groups = Data.groups_between (Data.get_group min_coords) (Data.get_group max_coords) in
-  List.flatten (List.map (fun g ->
-      let objs = Data.get a g in
-      List.map (fun o -> (!o.position, !o.display)) objs
-    ) groups)
+  let l = List.flatten (List.map (Data.get a) groups) in
+  let l = List.sort (fun o1 o2 -> Id.compare !o1.id !o2.id) l in
+  List.map (fun o -> (!o.position, !o.display)) l
 
 let all store min_coords max_coords =
   let l =
