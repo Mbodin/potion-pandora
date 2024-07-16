@@ -1,6 +1,6 @@
 
 (* In this program, most images are bundled up into a single large image.
-  This, any part is actually a subpart of this image.
+  Thus, any part is actually a subpart of this image.
   This type stores the corresponding coordinates. *)
 type image = {
   width : int ;
@@ -34,6 +34,7 @@ type state = int
 (* A type to count time, as a number of cycles.
   The type is abstracted away to avoid mixing with the state. *)
 module Time : sig
+
   type t
   val zero : t
   val infinity : t
@@ -44,6 +45,7 @@ module Time : sig
   val of_seconds : float -> t
 
 end = struct
+
   type t = int
   let zero = 0
   let infinity = max_int
@@ -76,6 +78,13 @@ type t = {
 let image t =
   let (image, _next) = t.delta.(t.state) in
   image
+
+let check_size t =
+  let dim =
+    let image = image t in
+    (image.width, image.height) in
+  Array.for_all (fun (image, _next) ->
+    dim = (image.width, image.height)) t.delta
 
 let send t e =
   let (_image, next) = t.delta.(t.state) in

@@ -22,9 +22,9 @@ module Launch (I : Interface.T) = struct
 
   (* Given coordinates and a direction, move the coordinate in the direction by step. *)
   let follow_direction ?(step=1) (x, y) = function
-    | Interface.North -> (x, y + step)
+    | Interface.North -> (x, y - step)
     | Interface.West -> (x - step, y)
-    | Interface.South -> (x, y - step)
+    | Interface.South -> (x, y + step)
     | Interface.East -> (x + step, y)
 
   let play_level (player, store) =
@@ -42,7 +42,7 @@ module Launch (I : Interface.T) = struct
           I.return ()) in
     let rec play () =
       let* () =
-        wait interface 200 (fun () ->
+        wait interface 100 (fun () ->
           let* () = E.step () in
           (* TODO: Move player here.
             It currently blindly goes where targetted. *)

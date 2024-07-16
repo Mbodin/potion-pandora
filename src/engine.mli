@@ -5,14 +5,6 @@ module type Display = sig
   val height : int
 end
 
-(* Given a level and a coordinate, return the screen coordinates where this object
-  will be displayed. *)
-val projection : int -> (int * int) -> (int * int)
-
-(* Inverse of the projection function: given a level and a screen coordinate,
-  return the corresponding game coordinates. *)
-val inverse_projection : int -> (int * int) -> (int * int)
-
 (* The main game engine.
   It deals with every object move, except special cases (like player or scripts).
   It can only step through the store, and is meant to be intertwinned with some

@@ -27,6 +27,9 @@ val all : t -> (int * int) -> (int * int) -> ((int * int) * Animation.t) list
 (* Given an object, return its coordinates. *)
 val get_coords : t -> obj -> (int * int)
 
+(* Given an object, return its level. *)
+val get_level : t -> obj -> int
+
 (* Given an object, return its animation object. *)
 val get_display : t -> obj -> Animation.t
 
@@ -41,7 +44,7 @@ val explode : t -> ?level:int -> (int * int) -> int -> unit
 
 (* Send an event to this object.
   By itself, the store already takes care of several events: by default, these events are
-  refused.  The safe option disables this check. *)
+  rejected, but the safe option disables this check. *)
 val send : t -> obj -> ?safe:bool -> Event.t -> unit
 
 (* Make a single time step to the whole scene. *)

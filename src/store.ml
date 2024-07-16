@@ -213,25 +213,24 @@ end
 type obj_store = {
   id : Id.t (* A unique identifier. *) ;
   position : int * int (* Its precise position. *) ;
+  level : int (* Its level (this is redundant information but it makes processing easier). *) ;
   display : Animation.t (* Its animation automaton. *) ;
   move : ((int * int) * int * bool) option (* When the object is moving, this is its target
     position, speed (in pixel per turn, always positive), and ghostness. *)
 }
 
 (* We store a direct reference to the object within the cell list: this enables us to directly
-  manipulate it whithout having to update its carrying list.
-  We also attach the level to be able to find it again into the store. *)
-type obj = int * obj_store ref
+  manipulate it whithout having to update its carrying list. *)
+type obj = obj_store ref
 
 let get_coords _store obj =
-  !(snd obj).position
+  !obj.position
+
+let get_level _store obj =
+  !obj.level
 
 let get_display _store obj =
-  !(snd obj).display
-
-(* TODO: If an object is big enough, it may be present in several groups.
-  In such cases, it is important to leave a dummy object at the place, pointing to the
-  actual group where the object is stored. *)
+  !obj.display
 
 (* A module to store data groups. *)
 module GroupSet =
@@ -240,12 +239,18 @@ module GroupSet =
     let compare = compare
   end)
 
-(* The store maps each level to an array of objects. *)
+(* The store maps each level to an array of objects.
+  Note that objects are present several times within the data: one for each
+  cell in which it is present. *)
 type store = {
-  data : (obj_store ref list Data.t) IMap.t (* The actual store, for each level. *) ;
+  data : obj list Data.t IMap.t (* The actual store data, for each level. *) ;
   moving : GroupSet.t ref IMap.t ; (* The groups containing moving objects. *)
   wind : int list (* The groups where there is currently wind *)
 }
+
+(* Given an object, return the list of all cell groups covered by its image. *)
+let covered_cells obj =
+  [Data.get_group !obj.position] (* TODO *)
 
 type t = store ref
 
@@ -280,25 +285,28 @@ let add_moving_at store level coords =
   m := GroupSet.add (Data.get_group coords) !m
 
 let add store anim ?(level = 0) pos =
+  assert (Animation.check_size anim) ;
   store := create_level !store level ;
   let obj =
-   ref {
-     id = Id.fresh () ;
-     position = pos ;
-     display = anim ;
-     move = None
-   } in
+    ref {
+      id = Id.fresh () ;
+      position = pos ;
+      level ;
+      display = anim ;
+      move = None
+    } in
   let a = IMap.find level !store.data in
-  let g = Data.get_group pos in
-  let a = Data.add_to_list a g obj in
+  let a =
+    List.fold_left (fun a g ->
+      Data.add_to_list a g obj) a (covered_cells obj) in
   store := { !store with data = IMap.add level a !store.data } ;
   add_moving_at store level pos ;
-  (level, obj)
+  obj
 
-let remove store (level, obj) =
-  add_moving_at store level !obj.position ;
+let remove store obj =
+  add_moving_at store !obj.level !obj.position ;
   let a =
-    match IMap.find_opt level !store.data with
+    match IMap.find_opt !obj.level !store.data with
     | Some a -> a
     | None ->
       (* As the object has been created somehow, its level must be present. *)
@@ -307,7 +315,7 @@ let remove store (level, obj) =
   let l = Data.get a g in
   let l = List.filter (fun o -> !o.id <> !obj.id) l in
   let a = Data.set a g l in
-  store := { !store with data = IMap.add level a !store.data }
+  store := { !store with data = IMap.add !obj.level a !store.data }
 
 (* Similar to the all function, but limited to a particular level.
   Instead of a store *)
@@ -320,12 +328,15 @@ let all_at_level a min_coords max_coords =
 let all store min_coords max_coords =
   let l =
     IMap.fold (fun level a acc ->
-      (* TODO: Change min_coords and max_coords according to the level projection. *)
-      all_at_level a min_coords max_coords :: acc) !store.data [] in
+      let p = Projection.from_screen level in
+      all_at_level a (p min_coords) (p max_coords) :: acc) !store.data [] in
   List.concat l
 
-(* Just a version of send with more options. *)
-let send_internal store (level, obj) ?(add_moving = true) ?(safe = true) e =
+(* An internal version of send that only updates the object, without any check. *)
+let send_direct obj e =
+  obj := { !obj with display = Animation.send !obj.display e }
+
+let send store obj ?(safe = true) e =
   if safe then
     assert (not (List.mem e Event.[
       MoveLeft ; MoveRight ; Fall ;
@@ -333,14 +344,10 @@ let send_internal store (level, obj) ?(add_moving = true) ?(safe = true) e =
       Wind ;
       RandomRare ; RandomNormal ; RandomFrequent ; RandomFlicker ;
       Tau])) ;
-  obj := { !obj with display = Animation.send !obj.display e } ;
-  if add_moving then
-    add_moving_at store level !obj.position
+  send_direct obj e ;
+  add_moving_at store !obj.level !obj.position
 
-let send store lobj ?(safe = true) e =
-  send_internal store lobj ~safe e
-
-let move store (level, obj) ?(ghost = false) ?(fast = false) pos' =
+let move store obj ?(ghost = false) ?(fast = false) pos' =
   let speed = if fast then 3 else 1 in
   obj := { !obj with move = Some (pos', speed, ghost) } ;
   let turns =
@@ -348,7 +355,7 @@ let move store (level, obj) ?(ghost = false) ?(fast = false) pos' =
     let (x', y') = pos' in
     let divide_round_up a b = - ((-a) / b) in
     divide_round_up (max (abs (x - x')) (abs (y - y'))) speed in
-  add_moving_at store level !obj.position ;
+  add_moving_at store !obj.level !obj.position ;
   turns
 
 let explode store ?(level = 0) (x, y) radius =
@@ -375,12 +382,53 @@ let explode store ?(level = 0) (x, y) radius =
       List.iter (fun obj ->
         let (x, y) = !obj.position in
         if x >= min_x && x <= max_x && y >= min_y && y <= max_y then
-          send_internal store (level, obj) ~add_moving:false ~safe:false Event.Explode) objs
+          send_direct obj Event.Explode) objs
     ) groups
+
+(* Compute a new position towards the target position with the provided speed.
+  Return the new position as well as an optionnal event dependent of the direction of the move. *)
+let move_towards position target speed =
+  let closer x tx =
+    if x > tx then max (x - speed) tx
+    else min (x + speed) tx in
+  let x' = closer (fst position) (fst target) in
+  let y' = closer (snd position) (snd target) in
+  let e =
+    if y' > snd position then Some Event.Fall
+    else if x' > fst position then Some Event.MoveRight
+    else if x' < fst position then Some Event.MoveLeft
+    else None in
+  ((x', y'), e)
 
 let step store =
   (* TODO: Move wind, and trigger its associated events. *)
   (* TODO: Create new wind, as well as the randomly occuring events. *)
-  (* TODO: Send a moving event to the moving objects, as well as moving them. *)
-  ignore store (* TODO *)
+  (* Send a moving event to the moving objects, as well as moving them. *)
+  let data =
+    IMap.fold (fun level m data ->
+      let a =
+        match IMap.find_opt level data with
+        | Some a -> a
+        | None -> assert false in
+      let gs = !m in
+      m := GroupSet.empty ;
+      let a =
+        GroupSet.fold (fun g a ->
+          let objs = Data.get a g in
+          List.fold_left (fun a obj ->
+            (* TODO: Actually check that this object touches a (non-ghost) moving object. *)
+            send_direct obj Event.Touch ;
+            match !obj.move with
+            | None -> a
+            | Some (tpos, speed, ghost) ->
+              let (position, e) = move_towards !obj.position tpos speed in
+              Option.iter (send_direct obj) e ;
+              obj := { !obj with position } ;
+              if position = tpos then obj := { !obj with move = None }
+              else m := GroupSet.add g !m ;
+              (* TODO: Removing the object from its current cells and move it to the new ones. *)
+              a) a objs) gs a in
+      IMap.add level a data) !store.moving !store.data in
+  store := { !store with data } ;
+  (* TODO: Send Tau event to every object on screen. *)
 

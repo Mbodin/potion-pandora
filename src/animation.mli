@@ -24,6 +24,9 @@ type t
 (* The current image of the object. *)
 val image : t -> image
 
+(* Check that all the images of the animation have the exact same size. *)
+val check_size : t -> bool
+
 (* Respond to an event. *)
 val send : t -> Event.t -> t
 
