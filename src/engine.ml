@@ -49,11 +49,11 @@ module Engine (D : Display) (I : Interface.T) = struct
   let step () =
     let open I in
     let* interface in
-    Store.step !level ;
     (* The display coordinates. *)
-    let coords = (0, 0) (* TODO: stay close to the player. *) in
+    let coords = Projection.to_screen 0 (0, 0) (* TODO: stay close to the player. *) in
     let min_coords = (fst coords - D.width / 2, snd coords - D.height / 2) in
     let max_coords = (fst min_coords + D.width - 1, snd min_coords + D.height - 1) in
+    Store.step !level min_coords max_coords ;
     let* () =
       iter_
         (fun (coord, anim) -> display_image (Animation.image anim) coord)

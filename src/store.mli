@@ -47,6 +47,8 @@ val explode : t -> ?level:int -> (int * int) -> int -> unit
   rejected, but the safe option disables this check. *)
 val send : t -> obj -> ?safe:bool -> Event.t -> unit
 
-(* Make a single time step to the whole scene. *)
-val step : t -> unit
+(* Make a single time step to the whole scene.
+  It takes as argument the screen coordinates, as the displayed objects are treated slightly
+  differently than the others. *)
+val step : t -> (int * int) -> (int * int) -> unit
 

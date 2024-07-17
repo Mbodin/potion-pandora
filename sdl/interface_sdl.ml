@@ -15,10 +15,14 @@ let ( let* ) v f = f v
 
 let init width height =
   Sdl.init [`VIDEO] ;
-  let (_window, renderer) =
-    let width = width * scale_factor in
-    let height = height * scale_factor in
-    Sdlrender.create_window_and_renderer ~width ~height ~flags:[] in
+  let window =
+    Sdlwindow.create
+      ~pos:(`centered, `centered)
+      ~dims:(width * scale_factor, height * scale_factor)
+      ~title:"Potion Pandora"
+      ~flags:[Sdlwindow.Shown] in
+  let renderer =
+    Sdlrender.create_renderer ~win:window ~index:(-1) ~flags:[Sdlrender.Accelerated] in
   let image = Image.create_rgb width height in
   Image.fill_rgb image 0 0 0 ;
   { renderer ; image }
@@ -41,7 +45,8 @@ let flush { renderer ; image } =
         Sdlrender.fill_rect renderer rect)
     done
   done ;
-  Sdlrender.render_present renderer
+  Sdlrender.render_present renderer ;
+  Image.fill_rgb image 0 0 0
 
 let set_event default =
   let e = ref default in

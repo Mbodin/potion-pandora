@@ -137,6 +137,10 @@ module Data : sig
   (* A useful combination of get_group and set. *)
   val write : 'a t -> (int * int) -> 'a -> 'a t
 
+  (* Often get and set are called one after the other to simply change a single value.
+    This function performs this combination. *)
+  val map_at : 'a t -> group -> ('a -> 'a) -> 'a t
+
   (* If the stored data is a list, this function adds an element in front of it. *)
   val add_to_list : 'a list t -> group -> 'a -> 'a list t
 
@@ -204,8 +208,11 @@ end = struct
 
   let write a coords v = set a (get_group coords) v
 
+  let map_at a ij f =
+    set a ij (f (get a ij))
+
   let add_to_list a ij e =
-    set a ij (e :: get a ij)
+    map_at a ij (fun l -> e :: l)
 
 end
 
@@ -248,9 +255,19 @@ type store = {
   wind : int list (* The groups where there is currently wind *)
 }
 
+(* Return all the groups between the provided screen coordinates at this level. *)
+let all_groups_within level min_coord max_coord =
+  let min_coord = Projection.from_screen level min_coord in
+  let max_coord = Projection.from_screen level max_coord in
+  [Data.get_group min_coord; Data.get_group max_coord] (* TODO *)
+
 (* Given an object, return the list of all cell groups covered by its image. *)
 let covered_cells obj =
-  [Data.get_group !obj.position] (* TODO *)
+  let (posx, posy) = !obj.position in
+  let max_pos =
+    let (dimx, dimy) = Animation.image_dimensions (Animation.image !obj.display) in
+    (posx + dimx - 1, posy + dimy - 1) in
+  all_groups_within !obj.level (posx, posy) max_pos
 
 type t = store ref
 
@@ -400,7 +417,28 @@ let move_towards position target speed =
     else None in
   ((x', y'), e)
 
-let step store =
+(* Fold over all the objects in a list of groups, but only once per object.
+  The f function might update the bidirectionnal array of data along the way:
+  it is thus transmitted along the way. *)
+let fold_once_over_groups f gs a acc =
+  let module ISet = Set.Make (Id) in
+  let seen_objs = ref ISet.empty in
+  GroupSet.fold (fun g (a, acc) ->
+    let objs = Data.get a g in
+    List.fold_left (fun (a, acc) obj ->
+      if ISet.mem !obj.id !seen_objs then (a, acc)
+      else (
+        seen_objs := ISet.add !obj.id !seen_objs ;
+        f a acc obj
+      )) (a, acc) objs) gs (a, acc)
+
+(* Remove an object from a list, assuming the object is present exactly once in the list. *)
+let rec remove_obj obj = function
+  | [] -> assert false
+  | obj' :: l when !obj.id = !obj'.id -> l
+  | obj' :: l -> obj' :: remove_obj obj l
+
+let step store min_screen max_screen =
   (* TODO: Move wind, and trigger its associated events. *)
   (* TODO: Create new wind, as well as the randomly occuring events. *)
   (* Send a moving event to the moving objects, as well as moving them. *)
@@ -411,24 +449,36 @@ let step store =
         | Some a -> a
         | None -> assert false in
       let gs = !m in
+      let gs =
+        (* TODO: We might want to add some size to the screen. *)
+        GroupSet.union gs (GroupSet.of_list (all_groups_within level min_screen max_screen)) in
       m := GroupSet.empty ;
-      let a =
-        GroupSet.fold (fun g a ->
-          let objs = Data.get a g in
-          List.fold_left (fun a obj ->
-            (* TODO: Actually check that this object touches a (non-ghost) moving object. *)
-            send_direct obj Event.Touch ;
-            match !obj.move with
-            | None -> a
-            | Some (tpos, speed, ghost) ->
-              let (position, e) = move_towards !obj.position tpos speed in
-              Option.iter (send_direct obj) e ;
-              obj := { !obj with position } ;
-              if position = tpos then obj := { !obj with move = None }
-              else m := GroupSet.add g !m ;
-              (* TODO: Removing the object from its current cells and move it to the new ones. *)
-              a) a objs) gs a in
+      let (a, ()) =
+        fold_once_over_groups (fun a () obj ->
+          send_direct obj Event.Tau ;
+          (* TODO: Actually check that this object touches a (non-ghost) moving object. *)
+          send_direct obj Event.Touch ;
+          match !obj.move with
+          | None -> (a, ())
+          | Some (tpos, speed, ghost) ->
+            let gs_before = covered_cells obj in
+            let (position, e) = move_towards !obj.position tpos speed in
+            Option.iter (send_direct obj) e ;
+            obj := { !obj with position } ;
+            if position = tpos then obj := { !obj with move = None } ;
+            let gs_after = covered_cells obj in
+            let gs_after_set = GroupSet.of_list gs_after in
+            let (gs_inter, gs_before_only) =
+              List.partition (fun g -> GroupSet.mem g gs_after_set) gs_before in
+            let gs_after_only =
+              let gs_inter_set = GroupSet.of_list gs_inter in
+              List.filter (fun g -> not (GroupSet.mem g gs_inter_set)) gs_after in
+            let a =
+              List.fold_left (fun a g -> Data.map_at a g (remove_obj obj)) a gs_before_only in
+            let a =
+              List.fold_left (fun a g -> Data.add_to_list a g obj) a gs_after_only in
+            if !obj.move <> None then m := GroupSet.union gs_after_set !m ;
+            (a, ())) gs a () in
       IMap.add level a data) !store.moving !store.data in
-  store := { !store with data } ;
-  (* TODO: Send Tau event to every object on screen. *)
+  store := { !store with data }
 
