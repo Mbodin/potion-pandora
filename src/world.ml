@@ -59,7 +59,7 @@ module Perso = struct
   let chute = range 16 17
   let atterissage = mk 18
 
-  (* TODO: automaton *)
+  let perso = static normal (* TODO: automaton *)
 
 end
 

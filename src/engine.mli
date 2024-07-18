@@ -20,8 +20,9 @@ module Engine (_ : Display) (I : Interface.T) : sig
   val load : Store.t -> unit
 
   (* Make the scene move one step, and display it, but without dealing with specifics
-    for the player. *)
-  val step : unit -> unit I.m
+    for the player.
+    It takes as argument the center of the screen to be displayed. *)
+  val step : Projection.screen_coords -> unit I.m
 
 end
 

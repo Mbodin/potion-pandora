@@ -32,7 +32,8 @@ module type T = sig
     To be called once at the very end. *)
   val quit : t -> unit m
 
-  (* Display the (r, g, b) pixel at position (x, y). *)
+  (* Display the (r, g, b) pixel at position (x, y).
+    The position (0, 0) represents by convention the upper left pixel. *)
   val write : t -> (int * int * int) -> (int * int) -> unit m
 
   (* Flushes the interface to actually display all the pixels to the user.

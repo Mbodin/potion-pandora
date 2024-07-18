@@ -31,6 +31,9 @@ module ESet = Set.Make (Event)
 (* The representation of an object state. *)
 type state = int
 
+(* Number of frames per second. *)
+let frames_per_second = 30
+
 (* A type to count time, as a number of cycles.
   The type is abstracted away to avoid mixing with the state. *)
 module Time : sig
@@ -54,11 +57,8 @@ end = struct
     else t + 1
   let (<) = (<)
 
-  (* Number of frame per seconds. *)
-  let frame_per_seconds = 60
-
   let of_seconds s =
-    Float.to_int (Float.round (s *. Float.of_int frame_per_seconds))
+    Float.to_int (Float.round (s *. Float.of_int frames_per_second))
 
 end
 type time = Time.t

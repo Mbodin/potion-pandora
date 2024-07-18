@@ -1,6 +1,9 @@
 (* This modules deals with storing the animation aspect (images, dynamics, etc.)
   of the displayed objects. *)
 
+(* Number of expected frame per seconds. *)
+val frames_per_second : int
+
 (* A static image, ready to be displayed. *)
 type image
 

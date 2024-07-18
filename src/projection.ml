@@ -1,4 +1,7 @@
 
+type screen_coords = int * int
+type game_coords = int * int
+
 (* A percentage for each level of how much pixels move compared to the base level.
   If the ratio is exactly 100, then pixels move the same way than in the base level.
   If 0, then pixels basically never move.

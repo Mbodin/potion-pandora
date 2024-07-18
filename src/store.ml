@@ -339,8 +339,7 @@ let remove store obj =
 let all_at_level a min_coords max_coords =
   let groups = Data.groups_between (Data.get_group min_coords) (Data.get_group max_coords) in
   let l = List.flatten (List.map (Data.get a) groups) in
-  let l = List.sort (fun o1 o2 -> Id.compare !o1.id !o2.id) l in
-  List.map (fun o -> (!o.position, !o.display)) l
+  List.sort (fun o1 o2 -> Id.compare !o1.id !o2.id) l
 
 let all store min_coords max_coords =
   let l =
