@@ -15,6 +15,7 @@
     + On arrive à la grotte où on se retrouve coincé.
          + On retrouve la chèvre.
          + Quand on s'approche de la chèvre, elle retourne à la maison toute seule (elle a l'habitude, il faut juste le lui rappeller).
+
 - Chapitre 2
     + Commence dans la grotte : on arrive au moment où on voit la potion.
     + Boire la potion nous fait sauter très haut / faire des wall jumps.
@@ -68,7 +69,7 @@
         + Il nous dit qu'on n'a rien à faire sur « son » chemin.
         + On essaye de lui expliquer que c'est le seul chemin qui nous reste, mais il ne veut rien savoir.
         + En le quittant, on voit qu'il y avait bien un panneau « Potion interdite » ici, mais on se dit que ça se sert à rien de le lui faire remarquer.
-    + On atteinds enfin la sortie.
+    + On atteint enfin la sortie.
 
 - Chapitre 7
     + On revient à la maison, après une ellipse.

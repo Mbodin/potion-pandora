@@ -137,7 +137,7 @@ let create_sequence shift skip restart s state (_image, action) =
           let reaction =
             if skip then
               let (time, state') = Event.fetch action e in
-              if time = Time.zero && state' <> state then
+              if time = Time.zero && state' <> state (* FIXME: This looks doubtful. Shouldn't it be index instead? *) then
                 Some state'
               else None
             else None in

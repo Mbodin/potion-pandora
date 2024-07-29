@@ -43,6 +43,16 @@ module Biarray : sig
     If it is outside the allocated range, a new array is defined, invalidating the old one. *)
   val set : 'a t -> int -> 'a -> 'a t
 
+  (* Minimum and maximum coordinates at which an object is actually stored. *)
+  val min_arg : 'a t -> int
+  val max_arg : 'a t -> int
+
+  (* Apply a function to each elements of the biarray. *)
+  val map : ('a -> 'b) -> 'a t -> 'b t
+
+  (* Call a function to each elements of the biarray. *)
+  val iter : ('a -> unit) -> 'a t -> unit
+
 end = struct
 
   type 'a t = {
@@ -79,6 +89,19 @@ end = struct
       t'.(i) <- v ;
       set t'
     )
+
+  let min_arg a = 1 - Array.length a.negative
+  let max_arg a = Array.length a.positive - 1
+
+  let iter f a =
+    Array.iter f a.negative ;
+    Array.iter f a.positive
+
+  let map f a = {
+    default = f a.default ;
+    negative = Array.map f a.negative ;
+    positive = Array.map f a.positive
+  }
 
 end
 
@@ -144,6 +167,13 @@ module Data : sig
   (* If the stored data is a list, this function adds an element in front of it. *)
   val add_to_list : 'a list t -> group -> 'a -> 'a list t
 
+  (* Smallest and largest x-coordinate at which an object is in practice stored. *)
+  val smallest_x : 'a t -> int
+  val largest_x : 'a t -> int
+
+  (* Iter through all the objects whose coordinate is within the group of the x-coordinate provided. *)
+  val iter_at_x : ('a -> unit) -> 'a t -> int -> unit
+
 end = struct
 
   let group_size = 16
@@ -160,7 +190,6 @@ end = struct
       divg group_size = divg (group_size + 1) ;
       divg group_size <> divg (group_size - 1) ;
       divg (-1) <> divg 0 ;
-      divg (-group_size) <> divg (1 - group_size) ;
       divg (-group_size) <> divg group_size
     ]
 
@@ -214,6 +243,19 @@ end = struct
   let add_to_list a ij e =
     map_at a ij (fun l -> e :: l)
 
+  let smallest_x a =
+    let g = Biarray.min_arg a in
+    g * group_size
+
+  let largest_x a =
+    let g = Biarray.max_arg a in
+    g * group_size
+
+  let iter_at_x f a x =
+    let (i, _j) = get_group (x, 0) in
+    let ax = Biarray.get a i in
+    Biarray.iter f ax
+
 end
 
 (* The objects stored. *)
@@ -252,14 +294,14 @@ module GroupSet =
 type store = {
   data : obj list Data.t IMap.t (* The actual store data, for each level. *) ;
   moving : GroupSet.t ref IMap.t ; (* The groups containing moving objects. *)
-  wind : int list (* The groups where there is currently wind *)
+  wind : int list (* The x-coordinates where there is currently wind. *)
 }
 
 (* Return all the groups between the provided screen coordinates at this level. *)
 let all_groups_within level min_coord max_coord =
   let min_coord = Projection.from_screen level min_coord in
   let max_coord = Projection.from_screen level max_coord in
-  [Data.get_group min_coord; Data.get_group max_coord] (* TODO *)
+  Data.groups_between (Data.get_group min_coord) (Data.get_group max_coord)
 
 (* Given an object, return the list of all cell groups covered by its image. *)
 let covered_cells obj =
@@ -341,12 +383,23 @@ let all_at_level a min_coords max_coords =
   let l = List.flatten (List.map (Data.get a) groups) in
   List.sort (fun o1 o2 -> Id.compare !o1.id !o2.id) l
 
-let all store min_coords max_coords =
+(* Similar to the all function without a level argument. *)
+let all_raw store min_coords max_coords =
   let l =
     IMap.fold (fun level a acc ->
       let p = Projection.from_screen level in
       all_at_level a (p min_coords) (p max_coords) :: acc) !store.data [] in
   List.concat l
+
+let all store ?level min_coords max_coords =
+  match level with
+  | None -> all_raw store min_coords max_coords
+  | Some level ->
+    let p = Projection.from_screen level in
+    match IMap.find_opt level !store.data with
+    | None -> []
+    | Some a ->
+      all_at_level a (p min_coords) (p max_coords)
 
 (* An internal version of send that only updates the object, without any check. *)
 let send_direct obj e =
@@ -437,9 +490,13 @@ let rec remove_obj obj = function
   | obj' :: l when !obj.id = !obj'.id -> l
   | obj' :: l -> obj' :: remove_obj obj l
 
+(* Speed of the wind, in screen pixels. *)
+let wind_speed = 12
+
+(* Average separation between two wind wave. *)
+let wind_separation = 30
+
 let step store min_screen max_screen =
-  (* TODO: Move wind, and trigger its associated events. *)
-  (* TODO: Create new wind, as well as the randomly occuring events. *)
   (* Send a moving event to the moving objects, as well as moving them. *)
   let data =
     IMap.fold (fun level m data ->
@@ -479,5 +536,28 @@ let step store min_screen max_screen =
             if !obj.move <> None then m := GroupSet.union gs_after_set !m ;
             (a, ())) gs a () in
       IMap.add level a data) !store.moving !store.data in
-  store := { !store with data }
+  store := { !store with data } ;
+  (* Move wind, and trigger its associated events. *)
+  List.iter (fun wind_x ->
+    IMap.iter (fun level a ->
+      Data.iter_at_x (List.iter (fun obj ->
+        send_direct obj Event.Wind)) a wind_x) !store.data) !store.wind ;
+  let wind =
+    let max_x =
+      IMap.fold (fun level a max_x ->
+        max max_x (Data.largest_x a)) !store.data 0 in
+    List.filter_map (fun wind_x ->
+      if wind_x > max_x then None
+      else Some (wind_x + wind_speed)) !store.wind in
+  store := { !store with wind } ;
+  (* Create new wind. *)
+  let () =
+    if Random.int wind_separation = 0 then (
+      let min_x =
+        IMap.fold (fun level a min_x ->
+          min min_x (Data.smallest_x a)) !store.data 0 in
+      store := { !store with wind = min_x :: !store.wind }
+    ) in
+  (* TODO: trigger randomly occurring events. *)
+  ()
 

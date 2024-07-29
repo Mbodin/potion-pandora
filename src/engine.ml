@@ -54,7 +54,7 @@ module Engine (D : Display) (I : Interface.T) = struct
     let* interface in
     (* The display coordinates. *)
     let min_coords = (fst screen_coords - D.width / 2, snd screen_coords - D.height / 2) in
-    let max_coords = (fst min_coords + D.width - 1, snd min_coords + D.height - 1) in
+    let max_coords = (fst min_coords + D.width, snd min_coords + D.height) in
     Store.step !level min_coords max_coords ;
     let* () =
       iter_

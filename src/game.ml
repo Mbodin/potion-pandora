@@ -19,17 +19,22 @@ module Launch (I : Interface.T) = struct
     true: to the left, false: to the right. *)
   let screen_direction = ref false
 
+  (* Ratio of the screen where the player character is placed. *)
+  let focus_ratio = 25
+  (* Acceptable error around the previous value (as a percentage of the screen dimension). *)
+  let dist_ratio = 7
+
   (* First step: prepare the levels. *)
-  let level =
+  let level_store =
     let store = Store.create () in
     (* TODO: Load levels created from an editor, not this placeholder made by hand. *)
     (* TODO: It seems that the images of this plant don't have the same size. *)
     (*ignore (Store.add store World.plante1_tres_sombre (-13, 0)) ;
     ignore (Store.add store World.plante1_sombre (-10, 0)) ;
     ignore (Store.add store World.plante1 (-7, 0)) ;*)
-    ignore (Store.add store World.buisson (-3, 0)) ;
-    ignore (Store.add store World.fleur1 (3, 0)) ;
-    ignore (Store.add store World.fleur2 (6, 0)) ;
+    ignore (Store.add store World.buisson (-7, 0)) ;
+    ignore (Store.add store World.fleur1 (7, 0)) ;
+    ignore (Store.add store World.fleur2 (14, 0)) ;
     let player = Store.add store World.Perso.perso (0, 0) in
     (player, store)
 
@@ -85,11 +90,12 @@ module Launch (I : Interface.T) = struct
               let (screen_low_x, screen_low_y) =
                 (center_x - Display.width / 2, center_y - Display.height / 2) in
               let screen_focus_x =
-                if !screen_direction then (screen_low_x + (2 * Display.width) / 3)
-                else (screen_low_x + Display.width / 3) in
+                if !screen_direction then
+                  (screen_low_x + (Display.width * (100 - focus_ratio)) / 100)
+                else (screen_low_x + (Display.width * focus_ratio) / 100) in
               let screen_focus_y = screen_low_y + Display.height / 3 + 3 in
-              let dist_x = Display.width / 8 in
-              let dist_y = Display.height / 8 in
+              let dist_x = (Display.width * dist_ratio) / 100 in
+              let dist_y = (Display.height * dist_ratio) / 100 in
               ((screen_focus_x - dist_x, screen_focus_y - dist_y),
                (screen_focus_x + dist_x, screen_focus_y + dist_y)) in
             let player_center =
@@ -114,7 +120,7 @@ module Launch (I : Interface.T) = struct
 
   let _ : unit I.m =
     let* interface = E.interface in
-    let* () = play_level level in
+    let* () = play_level level_store in
     return ()
 
 end

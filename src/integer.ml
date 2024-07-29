@@ -10,6 +10,13 @@ let div a b =
   ) else (
     (* They have opposite signs, so we need to compute back the euclidean division. *)
     let d = a / b in
-    d - 1
+    if a mod b = 0 then d
+    else (d - 1)
   )
+
+let%test "div simple" =
+  div 10 2 = 5
+
+let%test "div negative" =
+  div (-10) 2 = -5
 

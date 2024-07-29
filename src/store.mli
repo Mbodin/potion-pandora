@@ -21,8 +21,9 @@ val remove : t -> obj -> unit
 
 (* Given two screen coordinates, return all the objects that are within (or touching)
   the associated rectangle.
-  The objects will be listed in topological order. *)
-val all : t -> Projection.screen_coords -> Projection.screen_coords -> obj list
+  The objects will be listed in topological order.
+  If a level is provided, only the objects from this specific level are returned. *)
+val all : t -> ?level:int -> Projection.screen_coords -> Projection.screen_coords -> obj list
 
 (* Given an object, return its coordinates. *)
 val get_coords : t -> obj -> Projection.game_coords
