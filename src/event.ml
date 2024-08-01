@@ -14,8 +14,15 @@ type t =
   | RandomFrequent
   | RandomFlicker
   | Tau
-  [@@deriving enum]
-(* Note: the deriving above shadows min and max. *)
+  [@@deriving enum, show] (* Generate of_enum, to_enum, min, max, and show. *)
+
+let print = show
+
+let all =
+  List.init (max + 1) (fun i ->
+    match of_enum i with
+    | None -> assert false
+    | Some e -> e)
 
 let compare e1 e2 =
   compare (to_enum e1) (to_enum e2)

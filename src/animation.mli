@@ -38,6 +38,9 @@ val send : t -> Event.t -> t
   getting this event. *)
 val listen : t -> Event.t -> bool
 
+(* For debugging purposes, print-out a GraphViz visualisation of the automaton. *)
+val print : t -> string
+
 (* An animation sequence, composed of subimages associated with a time (in seconds). *)
 type sequence = (image * float) list
 

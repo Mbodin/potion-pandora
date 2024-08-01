@@ -28,6 +28,12 @@ type t =
 (* Comparison function. *)
 val compare : t -> t -> int
 
+(* A list containing all the events. *)
+val all : t list
+
+(* For debugging purposes: printing an event. *)
+val print : t -> string
+
 (* A total map from events to something. *)
 type 'a map
 

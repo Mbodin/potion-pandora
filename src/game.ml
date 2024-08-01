@@ -28,14 +28,22 @@ module Launch (I : Interface.T) = struct
   let level_store =
     let store = Store.create () in
     (* TODO: Load levels created from an editor, not this placeholder made by hand. *)
-    (* TODO: It seems that the images of this plant don't have the same size. *)
-    (*ignore (Store.add store World.plante1_tres_sombre (-13, 0)) ;
-    ignore (Store.add store World.plante1_sombre (-10, 0)) ;
-    ignore (Store.add store World.plante1 (-7, 0)) ;*)
+    ignore (Store.add store World.cerf_volant (0, 40)) ;
+    ignore (Store.add store World.potion (-40, 0)) ;
+    ignore (Store.add store World.petite_potion (-60, 0)) ;
+    ignore (Store.add store World.plante1_tres_sombre (49, 0)) ;
+    ignore (Store.add store World.plante1_sombre (21, 0)) ;
+    ignore (Store.add store World.plante1 (-21, 0)) ;
     ignore (Store.add store World.buisson (-7, 0)) ;
     ignore (Store.add store World.fleur1 (7, 0)) ;
-    ignore (Store.add store World.fleur2 (14, 0)) ;
+    ignore (Store.add store World.fleur2 (0, 0)) ;
+    ignore (Store.add store World.arbre1 (70, 0)) ;
+    ignore (Store.add store World.arbre2 (90, 0)) ;
+    ignore (Store.add store World.arbre3 (110, 0)) ;
+    ignore (Store.add store World.chemin1 (125, 0)) ;
+    ignore (Store.add store World.enfant (170, 0)) ;
     let player = Store.add store World.Perso.perso (0, 0) in
+    ignore (Store.add store World.arbre1_tres_sombre (130, -25)) ;
     (player, store)
 
   (* Given coordinates and a direction, move the coordinate in the direction by step. *)

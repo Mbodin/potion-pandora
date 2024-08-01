@@ -18,18 +18,18 @@ let rectangle pattern (width, height) =
   fill_pattern true pattern img width height (0, 0) ;
   img
 
-let decolor ~pattern img =
-  let img = Image.create_rgb ~alpha:true img.Image.width img.Image.height in
+let decolor ~pattern original =
+  let destination = Image.create_rgb ~alpha:true original.Image.width original.Image.height in
   let (pattern_width, pattern_height) = Animation.image_dimensions pattern in
-  for x = 0 to img.Image.width - 1 do
-    for y = 0 to img.Image.height - 1 do
+  for x = 0 to original.Image.width - 1 do
+    for y = 0 to original.Image.height - 1 do
       let (pr, pg, pb, pa) =
         Animation.read_image pattern (x mod pattern_width, y mod pattern_height) in
-      Image.read_rgba img x y (fun _r _g _b a ->
-        Image.write_rgba img x y pr pg pb (min a pa))
+      Image.read_rgba original x y (fun _r _g _b a ->
+        Image.write_rgba destination x y pr pg pb (min a pa))
     done
   done ;
-  img
+  destination
 
 let curve ifl (width, height) =
   let img = Image.create_rgb ~alpha:true width height in

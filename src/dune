@@ -8,11 +8,12 @@
       ppx_inline_test
       lwt_ppx
       tyxml-ppx
-      ppx_deriving.enum))
+      ppx_deriving.enum
+      ppx_deriving.show))
 	(modules_without_implementation
     interface)
   (inline_tests)
-  (flags (:standard -warn-error -A)))
+  (flags (:standard -warn-error -A -g)))
 
 (rule
 	(targets images_coords.ml all.png)

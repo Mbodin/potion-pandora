@@ -491,10 +491,10 @@ let rec remove_obj obj = function
   | obj' :: l -> obj' :: remove_obj obj l
 
 (* Speed of the wind, in screen pixels. *)
-let wind_speed = 12
+let wind_speed = 4
 
 (* Average separation between two wind wave. *)
-let wind_separation = 30
+let wind_separation = 200
 
 let step store min_screen max_screen =
   (* Send a moving event to the moving objects, as well as moving them. *)

@@ -14,8 +14,8 @@ let image_dimensions img =
 
 let make_subimage ?(bundle = Bundled_image.image) width height position =
   assert (fst position >= 0 && snd position >= 0) ;
-  assert (fst position + width < bundle.Image.width) ;
-  assert (snd position + height < bundle.Image.height) ;
+  assert (fst position + width <= bundle.Image.width) ;
+  assert (snd position + height <= bundle.Image.height) ;
   { width ; height ; position ; picture = bundle }
 
 let read_image img (x, y) =
@@ -25,11 +25,17 @@ let read_image img (x, y) =
   Image.read_rgba img.picture (x + px) (y + py) (fun r g b a -> (r, g, b, a))
 
 
+module IMap = Map.Make (Integer)
+module ISet = Set.Make (Integer)
 module EMap = Map.Make (Event)
 module ESet = Set.Make (Event)
-
-(* The representation of an object state. *)
-type state = int
+module ImageMap =
+  Map.Make (struct
+    type t = image
+    let compare i1 i2 =
+      let tuple i = (i.width, i.height, i.position) in
+      compare (tuple i1) (tuple i2)
+  end)
 
 (* Number of frames per second. *)
 let frames_per_second = 30
@@ -47,6 +53,9 @@ module Time : sig
   (* This converts a time in seconds into a time in number of frames. *)
   val of_seconds : float -> t
 
+  (* For debug purposes: print the number of frames. *)
+  val print : t -> string
+
 end = struct
 
   type t = int
@@ -60,8 +69,13 @@ end = struct
   let of_seconds s =
     Float.to_int (Float.round (s *. Float.of_int frames_per_second))
 
+  let print = string_of_int
+
 end
 type time = Time.t
+
+(* The representation of an object state. *)
+type state = int
 
 (* The internal automaton of an object.
   Each state is an array index.
@@ -89,14 +103,44 @@ let check_size t =
 let send t e =
   let (_image, next) = t.delta.(t.state) in
   let (time, st) = Event.fetch next e in
-  if e = Tau && Time.(t.time < time) then
-    { t with time = Time.incr t.time }
-  else { t with state = st ; time = Time.zero }
+  if e = Tau then
+    if Time.(t.time < time) then
+      { t with time = Time.incr t.time }
+    else { t with state = st ; time = Time.zero }
+  else
+    if Time.(t.time < time) then t
+    else {t with state = st }
 
 let listen t e =
   let (_image, next) = t.delta.(t.state) in
   let (time, st) = Event.fetch next e in
   (st <> t.state && not Time.(t.time < time))
+
+let print t =
+  let name_of_state =
+    let images = ref ImageMap.empty in
+    fun st ->
+      let (image, _next) = t.delta.(st) in
+      let nimage =
+        match ImageMap.find_opt image !images with
+        | Some n -> n
+        | None ->
+          let n = Char.chr (Char.code 'A' + ImageMap.cardinal !images) in
+          images := ImageMap.add image n !images ;
+          n in
+      Printf.sprintf "%c%i" nimage st in
+  let aux st =
+    let current = name_of_state st in
+    let (_image, next) = t.delta.(st) in
+    let l =
+      List.map (fun e ->
+          let (time, st') =  Event.fetch next e in
+          let label = Printf.sprintf "%s, %s" (Time.print time) (Event.print e) in
+          Printf.sprintf "%s -> %s [label = \"%s\"]\n" current (name_of_state st') label)
+        Event.all in
+    String.concat "" l in
+  Printf.sprintf "digraph {\n%s}\n"
+    (String.concat "" (List.init (Array.length t.delta) aux))
 
 type sequence = (image * float) list
 
