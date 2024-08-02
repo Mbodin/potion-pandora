@@ -45,15 +45,16 @@ let curve ifl (width, height) =
   done ;
   img
 
-let shimmer ?(quantity = 50) ?(amplitude = 5) ?(duration = 10) img =
-  let bundle = Image.create_rgb ~alpha:true (img.Image.width * duration) img.Image.height in
+let shimmer ?(quantity = 50) ?(amplitude = 5) ?(duration = 10) ?(direction = (0., 1.)) img =
+  let (width, height) = Animation.image_dimensions img in
+  let bundle = Image.create_rgb ~alpha:true (width * duration) height in
   (* First, copying the image as many times as the duration. *)
   for t = 0 to duration - 1 do
-    let shift = img.Image.width * t in
-    for x = 0 to img.Image.width - 1 do
-      for y = 0 to img.Image.height - 1 do
-        Image.read_rgba img x y (fun r g b a ->
-          Image.write_rgba bundle (shift + x) y r g b a)
+    let shift = width * t in
+    for x = 0 to width - 1 do
+      for y = 0 to height - 1 do
+        let (r, g, b, a) = Animation.read_image img (x, y) in
+        Image.write_rgba bundle (shift + x) y r g b a
       done
     done
   done ;
@@ -62,31 +63,60 @@ let shimmer ?(quantity = 50) ?(amplitude = 5) ?(duration = 10) img =
   let power4 x = square (square x) in
   for _ = 0 to quantity - 1 do
     let start_t = Random.int duration in
-    let pos_x = Random.int img.Image.width in
-    let pos_y = Random.int img.Image.height in
+    let pos_x = Random.int (width + 2 * amplitude) - amplitude in
+    let pos_y = Random.int (height + 2 * amplitude) - amplitude in
     let max_t = max 1 (2 * amplitude) in
     for dt = 0 to max_t do
       let t = (start_t + dt) mod duration in
-      let shift = img.Image.width * t in
+      let shift = width * t in
       let len =
         let rel = Float.of_int dt /. Float.of_int max_t in
         Float.to_int (Float.of_int amplitude *. (1. -. power4 rel)) in
       assert (len >= 0) ;
       assert (len <= amplitude) ;
-      let pos_x = pos_x - dt / 2 in
-      let pos_y = pos_y - dt / 2 in
-      for x = max 0 pos_x to min img.Image.width (pos_x + len - 1) do
+      let pos_x = pos_x + Float.to_int (0.5 +. fst direction *. Float.of_int dt) in
+      let pos_y = pos_y + Float.to_int (0.5 +. snd direction *. Float.of_int dt) in
+      for x = pos_x to pos_x + len - 1 do
         let dy =
           let rel = Float.of_int (x - pos_x) /. Float.of_int len in
           let ampl = Float.of_int amplitude *. (1. -. square rel) in
           let relt = Float.of_int dt /. Float.of_int max_t in
           Float.to_int (ampl *. sin (relt *. 2. *. Float.pi)) in
-        Image.read_rgba img x (pos_y + dy) (fun r g b a ->
-          Image.write_rgba bundle (shift + x) pos_y r g b a)
+        if pos_y >= 0 && pos_y < height
+          && pos_y + dy >= 0 && pos_y + dy < height
+          && x >= 0 && x < width then (
+            assert (shift + x >= 0) ;
+            assert (shift + x < width * duration) ;
+            let (_r, _g, _b, a0) = Animation.read_image img (x, pos_y) in
+            let (r, g, b, a) = Animation.read_image img (x, pos_y + dy) in
+            if a0 <> 0 && a <> 0 then Image.write_rgba bundle (shift + x) pos_y r g b a
+        )
       done
     done
   done ;
   (* Finally, bundling the images. *)
   List.init duration (fun t ->
-    Animation.make_subimage ~bundle img.Image.width img.Image.height (img.Image.width * t, 0))
+    Animation.make_subimage ~bundle width height (width * t, 0))
+
+(* Given a function f converting original coordinates to new coordinates, change the position
+  of pixels in an image. *)
+let swap_coordinates f img =
+  let (width, height) = Animation.image_dimensions img in
+  let modified = Image.create_rgb ~alpha:true width height in
+  for x = 0 to width - 1 do
+    for y = 0 to height - 1 do
+      let (r, g, b, a) = Animation.read_image img (x, y) in
+      let (x', y') = f x y in
+      Image.write_rgba modified x' y' r g b a
+    done
+  done ;
+  Animation.make_image modified
+
+let flip_horizontally img =
+  let (width, _height) = Animation.image_dimensions img in
+  swap_coordinates (fun x y -> (width - 1 - x, y)) img
+
+let flip_vertically img =
+  let (_width, height) = Animation.image_dimensions img in
+  swap_coordinates (fun x y -> (x, height - 1 - y)) img
 

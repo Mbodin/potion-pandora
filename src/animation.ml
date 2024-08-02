@@ -18,6 +18,9 @@ let make_subimage ?(bundle = Bundled_image.image) width height position =
   assert (snd position + height <= bundle.Image.height) ;
   { width ; height ; position ; picture = bundle }
 
+let make_image img =
+  make_subimage ~bundle:img img.Image.width img.Image.height (0, 0)
+
 let read_image img (x, y) =
   assert (x >= 0 && y >= 0) ;
   assert (x < img.width && y < img.height) ;
@@ -67,7 +70,9 @@ end = struct
   let (<) = (<)
 
   let of_seconds s =
-    Float.to_int (Float.round (s *. Float.of_int frames_per_second))
+    let f = Float.round (s *. Float.of_int frames_per_second) in
+    if f >= Float.of_int infinity then infinity
+    else Float.to_int f
 
   let print = string_of_int
 

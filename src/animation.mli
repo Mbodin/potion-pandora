@@ -7,6 +7,9 @@ val frames_per_second : int
 (* A static image, ready to be displayed. *)
 type image
 
+(* Conversion of types of images. *)
+val make_image : Image.image -> image
+
 (* Given the width, height, and (x, y) position of the image part in the program data,
   store the corresponding subimage.
   The optional argument is there to extract an image from another image then the default

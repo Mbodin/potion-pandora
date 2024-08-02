@@ -6,8 +6,12 @@
   but it can also be a gradient pattern). *)
 val decolor : pattern:Animation.image -> Image.image -> Image.image
 
-(* From a static image, add a water-shimmering effect to it. *)
-val shimmer : ?quantity:int -> ?amplitude:int -> ?duration:int -> Image.image -> Animation.image list
+(* From a static image, add a water-shimmering effect to it.
+  The quantity represents the amount of waves in the animation.
+  The amplitude represents the size of the waves.
+  The duration is the total nomber of frame of the final animation.
+  The direction is the direction of travel of each wave. *)
+val shimmer : ?quantity:int -> ?amplitude:int -> ?duration:int -> ?direction:float*float -> Animation.image -> Animation.image list
 
 (* Given a list of pattern and height function, as well as dimensions, create an
   image with these dimensions following the patterns according to each function:
@@ -16,6 +20,10 @@ val shimmer : ?quantity:int -> ?amplitude:int -> ?duration:int -> Image.image ->
   the second, etc. *)
 val curve : (Animation.image * (int -> int)) list -> int * int -> Image.image
 
-(* Create a rectangle with this pattern. *)
+(* Create a rectangle filled with this pattern. *)
 val rectangle : Animation.image -> int * int -> Image.image
+
+(* Create an image like the provided image, but flipped. *)
+val flip_horizontally : Animation.image -> Animation.image
+val flip_vertically : Animation.image -> Animation.image
 

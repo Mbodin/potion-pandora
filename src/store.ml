@@ -463,7 +463,7 @@ let move_towards position target speed =
   let x' = closer (fst position) (fst target) in
   let y' = closer (snd position) (snd target) in
   let e =
-    if y' > snd position then Some Event.Fall
+    if y' < snd position then Some Event.Fall
     else if x' > fst position then Some Event.MoveRight
     else if x' < fst position then Some Event.MoveLeft
     else None in
@@ -512,8 +512,8 @@ let step store min_screen max_screen =
       let (a, ()) =
         fold_once_over_groups (fun a () obj ->
           send_direct obj Event.Tau ;
-          (* TODO: Actually check that this object touches a (non-ghost) moving object. *)
-          send_direct obj Event.Touch ;
+          (* TODO: Check that this object touches a (non-ghost) moving object:
+          send_direct obj Event.Touch ; *)
           match !obj.move with
           | None -> (a, ())
           | Some (tpos, speed, ghost) ->

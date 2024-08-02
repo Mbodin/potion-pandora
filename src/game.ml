@@ -28,22 +28,27 @@ module Launch (I : Interface.T) = struct
   let level_store =
     let store = Store.create () in
     (* TODO: Load levels created from an editor, not this placeholder made by hand. *)
-    ignore (Store.add store World.cerf_volant (0, 40)) ;
-    ignore (Store.add store World.potion (-40, 0)) ;
-    ignore (Store.add store World.petite_potion (-60, 0)) ;
-    ignore (Store.add store World.plante1_tres_sombre (49, 0)) ;
-    ignore (Store.add store World.plante1_sombre (21, 0)) ;
-    ignore (Store.add store World.plante1 (-21, 0)) ;
-    ignore (Store.add store World.buisson (-7, 0)) ;
-    ignore (Store.add store World.fleur1 (7, 0)) ;
-    ignore (Store.add store World.fleur2 (0, 0)) ;
-    ignore (Store.add store World.arbre1 (70, 0)) ;
-    ignore (Store.add store World.arbre2 (90, 0)) ;
-    ignore (Store.add store World.arbre3 (110, 0)) ;
-    ignore (Store.add store World.chemin1 (125, 0)) ;
-    ignore (Store.add store World.enfant (170, 0)) ;
-    let player = Store.add store World.Perso.perso (0, 0) in
-    ignore (Store.add store World.arbre1_tres_sombre (130, -25)) ;
+    ignore (Store.add store Items.cerf_volant (0, 40)) ;
+    ignore (Store.add store Items.potion (-40, 0)) ;
+    ignore (Store.add store Items.petite_potion (-60, 0)) ;
+    ignore (Store.add store Items.plante1_tres_sombre (49, 0)) ;
+    ignore (Store.add store Items.plante1_sombre (21, 0)) ;
+    ignore (Store.add store Items.plante1 (-21, 0)) ;
+    ignore (Store.add store Items.buisson (-7, 0)) ;
+    ignore (Store.add store Items.fleur1 (7, 0)) ;
+    ignore (Store.add store Items.fleur2 (0, 0)) ;
+    ignore (Store.add store Items.arbre1 (70, 0)) ;
+    ignore (Store.add store Items.arbre2 (90, 0)) ;
+    ignore (Store.add store Items.arbre3 (110, 0)) ;
+    ignore (Store.add store Items.chemin1 (125, 0)) ;
+    ignore (Store.add store Items.enfant (170, 0)) ;
+    for i = 0 to 10 do
+      ignore (Store.add store Items.epi_ble (200 + 3 * i, 0)) ;
+    done ;
+    ignore (Store.add store Items.lac (240, 0)) ;
+    ignore (Store.add store Items.mare (370, 0)) ;
+    let player = Store.add store Items.Perso.perso (0, 0) in
+    ignore (Store.add store Items.arbre1_tres_sombre (130, -25)) ;
     (player, store)
 
   (* Given coordinates and a direction, move the coordinate in the direction by step. *)
