@@ -31,6 +31,7 @@ module Launch (I : Interface.T) = struct
     ignore (Store.add store Items.cerf_volant (0, 40)) ;
     ignore (Store.add store Items.potion (-40, 0)) ;
     ignore (Store.add store Items.petite_potion (-60, 0)) ;
+    ignore (Store.add store Items.arbre4 (-100, 0)) ;
     ignore (Store.add store Items.plante1_tres_sombre (49, 0)) ;
     ignore (Store.add store Items.plante1_sombre (21, 0)) ;
     ignore (Store.add store Items.plante1 (-21, 0)) ;
