@@ -4,7 +4,9 @@
 (* Number of expected frame per seconds. *)
 val frames_per_second : int
 
-(* A static image, ready to be displayed. *)
+(* A static image, ready to be displayed.
+  Note that the (0, 0) coordinate of an image is on its top-left corner: y-coordinates are
+  not reversed like the rest of the program. *)
 type image
 
 (* Conversion of types of images. *)
@@ -32,6 +34,9 @@ val image : t -> image
 
 (* Check that all the images of the animation have the exact same size. *)
 val check_size : t -> bool
+
+(* Create a copy of the animation object in which all the images have the same size. *)
+val force_same_size : t -> t
 
 (* Respond to an event. *)
 val send : t -> Event.t -> t
@@ -69,4 +74,8 @@ val react : t -> Event.t list -> ?skip:bool -> ?restart:bool -> sequence -> t
   It then applies the sequence [s2] and goes back to its initial behavior. *)
 val switch : t -> Event.t list -> ?skip:bool -> sequence ->
              t -> Event.t list -> ?skip:bool -> sequence -> t
+
+(* Combine a list of automatons with an offset into a single automaton.
+  The predicate check_size must hold for each of the input automatons. *)
+val combine : (t * (int * int)) list -> t
 

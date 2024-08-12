@@ -1,11 +1,17 @@
 
+(* An entirely transparent image, useful to serve as a dummy pattern. *)
+let transparent =
+  let img = Image.create_rgb ~alpha:true 1 1 in
+  Image.fill_rgb ~alpha:0 img 0 0 0 ;
+  Animation.make_image img
+
 (* Fill a pattern on an image along the provided width and height from the provided coordinates.
   The opaque parameter states whether it should overwrite opaque pixels when the pattern is
   transparent. *)
 let fill_pattern opaque pattern image width height (x, y) =
   let (pattern_width, pattern_height) = Animation.image_dimensions pattern in
-  for x = x to min width image.Image.width - 1 do
-    for y = y to min height image.Image.height - 1 do
+  for x = x to min (x + width - 1) (image.Image.width - 1) do
+    for y = y to min (y + height - 1) (image.Image.height - 1) do
       let (r, g, b, a) =
         Animation.read_image pattern (x mod pattern_width, y mod pattern_height) in
       if a <> 0 || opaque then
@@ -34,16 +40,29 @@ let decolor ~pattern original =
 let curve ifl (width, height) =
   let img = Image.create_rgb ~alpha:true width height in
   Image.fill_rgb ~alpha:0 img 0 0 0 ;
-  for x = 0 to img.Image.width do
+  for x = 0 to width - 1 do
     let rec aux y = function
       | [] -> ()
       | (pattern, f) :: l ->
         let y' = f x in
+        assert (y' >= y) ;
         fill_pattern true pattern img 1 (y' - y) (x, y) ;
         aux y' l in
     aux 0 ifl
   done ;
   img
+
+let triangle_lower_left img size =
+  Animation.make_image (curve [
+    (transparent, (fun x -> size - 1 - x)) ;
+    (img, (fun _x -> size))
+  ] (size, size))
+
+let triangle_lower_right img size =
+  Animation.make_image (curve [
+    (transparent, (fun x -> x)) ;
+    (img, (fun _x -> size)) ;
+  ] (size, size))
 
 let shimmer ?(quantity = 50) ?(amplitude = 5) ?(duration = 10) ?(direction = (0., 1.)) img =
   let (width, height) = Animation.image_dimensions img in
@@ -120,3 +139,14 @@ let flip_vertically img =
   let (_width, height) = Animation.image_dimensions img in
   swap_coordinates (fun x y -> (x, height - 1 - y)) img
 
+(* This test is here and not in Animation to prevent a dependency cycle: it requires some
+  functions to create images, and Filter is the place containing most of them. *)
+let%test "Animation.force_same_size" =
+  List.for_all (fun t -> Animation.check_size (Animation.force_same_size t)) [
+    Animation.static (Animation.make_image (rectangle transparent (10, 12))) ;
+    Animation.loop [
+      (Animation.make_image (rectangle transparent (10, 12)), 0.1) ;
+      (Animation.make_image (rectangle transparent (1, 20)), 0.2) ;
+      (Animation.make_image (rectangle transparent (20, 1)), 0.3)
+    ] ;
+  ]

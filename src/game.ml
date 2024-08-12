@@ -32,6 +32,13 @@ module Launch (I : Interface.T) = struct
     ignore (Store.add store Items.potion (-40, 0)) ;
     ignore (Store.add store Items.petite_potion (-60, 0)) ;
     ignore (Store.add store Items.arbre4 (-100, 0)) ;
+    ignore (Store.add store Items.texture_mur1 (-290, 0)) ;
+    ignore (Store.add store Items.texture_mur1_toit_gauche (-250, 0)) ;
+    ignore (Store.add store Items.texture_mur1_toit_droit (-210, 0)) ;
+    ignore (Store.add store Items.potion_interdite (-180, 0)) ;
+    ignore (Store.add store Items.attention (-160, 0)) ;
+    ignore (Store.add store Items.attention_pietons (-140, 0)) ;
+    ignore (Store.add store Items.priorite_pieton (-120, 0)) ;
     ignore (Store.add store Items.plante1_tres_sombre (49, 0)) ;
     ignore (Store.add store Items.plante1_sombre (21, 0)) ;
     ignore (Store.add store Items.plante1 (-21, 0)) ;
@@ -78,7 +85,16 @@ module Launch (I : Interface.T) = struct
       I.on_key_pressed interface (function
         | None -> I.return ()
         | Some d ->
-          target_coords := Some (follow_direction ~step:3 (Store.get_coords store player) d) ;
+          let current_coords = Store.get_coords store player in
+          target_coords := Some (follow_direction ~step:3 current_coords d) ;
+          (* For now, we launch an explosion in the event of an up-key event. *)
+          if d = Interface.North then (
+            (* We launch the explosion in the middle of the feet. *)
+            let (dimx, _dimy) =
+              Animation.image_dimensions (Animation.image (Store.get_display store player)) in
+            let coords = (fst current_coords + dimx / 2, snd current_coords) in
+            Store.explode store coords 10
+          ) ;
           I.return ()) in
     let rec play () =
       let* () =

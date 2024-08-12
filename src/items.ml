@@ -31,6 +31,14 @@ let mk_sequence time mk min max =
   assert (max >= min) ;
   to_sequence time (List.init (1 + max - min) (fun i -> mk (i + min)))
 
+(* Build triangles from textures (useful for roofs). *)
+let triangle_left img =
+  let (dimx, _dimy) = Animation.image_dimensions img in
+  static (Filter.triangle_lower_left img dimx)
+let triangle_right img =
+  let (dimx, _dimy) = Animation.image_dimensions img in
+  static (Filter.triangle_lower_right img dimx)
+
 (* An object that only reacts to wind/explosions. *)
 let rwind img s =
   react (static img) Event.[Wind; Explode] s
@@ -228,23 +236,23 @@ let lampe_interne = static (from Images_coords.lampe_interne 0)
 let linge_chute =
   to_sequence 0.1 (fromlist Images_coords.linge_chute)
   @ [(from Images_coords.linge_chute 7, infinity)]
-let linge1 = (* TODO: linge1-5 are mixed with linge_chute, and don't have the same dimensions. *)
+let linge1 =
   let mk = from Images_coords.linge1 in
   let linge = rwind (mk 0) (mk_sequence 0.2 mk 1 2) in
-  react linge Event.[Fall] linge_chute
+  Animation.force_same_size (react linge Event.[Fall] linge_chute)
 let linge2 = static (from Images_coords.linge2 0)
 let linge3 =
   let mk = from Images_coords.linge3 in
   let linge = rwind (mk 0) (mk_sequence 0.2 mk 1 3) in
-  react linge Event.[Fall] linge_chute
+  Animation.force_same_size (react linge Event.[Fall] linge_chute)
 let linge4 =
   let mk = from Images_coords.linge4 in
   let linge = rwind (mk 0) (mk_sequence 0.2 mk 1 2) in
-  react linge Event.[Fall] linge_chute
+  Animation.force_same_size (react linge Event.[Fall] linge_chute)
 let linge5 =
   let mk = from Images_coords.linge5 in
   let linge = rwind (mk 0) (mk_sequence 0.2 mk 1 2) in
-  react linge Event.[Fall] linge_chute
+  Animation.force_same_size (react linge Event.[Fall] linge_chute)
 
 let planche =
   let mk = from Images_coords.planche in
@@ -565,15 +573,31 @@ let cedez_le_passage = static (from Images_coords.cedez_le_passage 0)
 
 let panneau_ville = static (from Images_coords.panneau_ville 0)
 
-let potion_interdite = static (from Images_coords.panneaux 0)
-let attention = static (from Images_coords.panneaux 1)
-let attention_pietons = static (from Images_coords.panneaux 2)
+  let support_panneau =
+    let mk = from Images_coords.support_panneau in
+    react (static (mk 0)) Event.[Explode] (to_sequence infinity [mk 1])
 
-let priorite_pieton = static (from Images_coords.priorite_pieton 0)
+(* Monte un panneau sur un support. *)
+let monter_panneau =
+  let support_panneau =
+    let mk = from Images_coords.support_panneau in
+    react (static (mk 0)) Event.[Explode] (to_sequence infinity [mk 1]) in
+  assert (Animation.check_size support_panneau) ;
+  let (dimx_support, _dimy_support) = Animation.image_dimensions (Animation.image support_panneau) in
+  (* Le panneau n'est pas centré sur l'image, d'où cette différence de 1. *)
+  let adhoc_offset = -1 in
+  fun img ->
+    let (dimx, dimy) = Animation.image_dimensions img in
+    Animation.combine [
+      (static img, (0, 0)) ;
+      (support_panneau, ((dimx - dimx_support) / 2 + adhoc_offset, dimy))
+    ]
 
-let support_panneau =
-  let mk = from Images_coords.support_panneau in
-  react (static (mk 0)) Event.[Explode] (to_sequence infinity [mk 1])
+let potion_interdite = monter_panneau (from Images_coords.panneaux 0)
+let attention = monter_panneau (from Images_coords.panneaux 1)
+let attention_pietons = monter_panneau (from Images_coords.panneaux 2)
+
+let priorite_pieton = monter_panneau (from Images_coords.priorite_pieton 0)
 
 (* * Toits *)
 
@@ -679,8 +703,14 @@ let mur_abime = static (from Images_coords.mur_abime 0)
 let texture_fond1 = static (from Images_coords.texture_fond1 0)
 let texture_fond2 = static (from Images_coords.texture_fond2 0)
 let texture_mur1 = static (from Images_coords.texture_mur1 0)
+let texture_mur1_toit_gauche = triangle_left (from Images_coords.texture_mur1 0)
+let texture_mur1_toit_droit = triangle_right (from Images_coords.texture_mur1 0)
 let texture_mur2 = static (from Images_coords.texture_mur2 0)
+let texture_mur2_toit_gauche = triangle_left (from Images_coords.texture_mur2 0)
+let texture_mur2_toit_droit = triangle_right (from Images_coords.texture_mur2 0)
 let texture_mur3 = static (from Images_coords.texture_mur3 0)
+let texture_mur3_toit_gauche = triangle_left (from Images_coords.texture_mur3 0)
+let texture_mur3_toit_droit = triangle_right (from Images_coords.texture_mur3 0)
 
 (* * Ciel *)
 
