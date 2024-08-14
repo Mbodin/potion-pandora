@@ -28,6 +28,14 @@ let read_image img (x, y) =
   Image.read_rgba img.picture (x + px) (y + py) (fun r g b a -> (r, g, b, a))
 
 
+(* This is a dummy image, useful for building automatons (see below), when one needs
+  an image that will be rewritten afterwards. *)
+let dummy_image =
+  let img = Image.create_rgb ~alpha:true 1 1 in
+  Image.fill_rgb ~alpha:0 img 0 0 0 ;
+  make_image img
+
+
 (* Create an image from the provided image of the provided dimensions.
   These dimensions must be larger than the image.
   The image will be centered. *)
@@ -182,14 +190,15 @@ let loop s =
     state = 0
   }
 
-let static i = loop [(i, 1.)]
+let static i = loop [(i, infinity)]
 
 (* Create an automaton part encoding a sequence [s].
   The shift represents the first state of the sequence (it is meant to be concatenated at
   the end of the automaton and thus starts its indexes there).
   The set [restart] is a set of event that restart the sequence.
   [state] represents the state targeted after the sequence ended, and the last argument is
-  [t.delta.(state)]: it is useful to tune the behaviour of [skip]. *)
+  [t.delta.(state)] where [t] is the automaton being constructed: it is useful to tune the
+  behaviour of [skip]. *)
 let create_sequence shift skip restart s state (_image, action) =
   let len = List.length s in
   Array.of_list (List.mapi (fun index (image, time) ->
@@ -206,7 +215,9 @@ let create_sequence shift skip restart s state (_image, action) =
           let reaction =
             if skip then
               let (time, state') = Event.fetch action e in
-              if time = Time.zero && state' <> state (* FIXME: This looks doubtful. Shouldn't it be index instead? *) then
+              if time = Time.zero && state' <> state then
+                (* In this case, [state] would directly jump into [state'] without waiting:
+                  as [skip] is true, we must jump there too. *)
                 Some state'
               else None
             else None in
@@ -232,6 +243,35 @@ let react t es ?(skip = false) ?(restart = false) s =
         sequence in
     { t with delta = automaton }
 
+let change_with t1 es ?(skip = false) s t2 =
+  let es = ESet.of_list es in
+  (* There are three portions of states in the new automaton:
+      - The states of t1.
+      - The states of t2 (shifted by [Array.length t1.delta]),
+      - The states to encode the sequence s. *)
+  let shift = Array.length t1.delta in
+  let shift_s = shift + Array.length t2.delta in
+  let delta1 =
+    Array.map (fun (image, next) ->
+      (image, Event.create_map (fun e ->
+        if ESet.mem e es then
+          if s = [] then (Time.zero, t2.state + shift)
+          else (Time.zero, shift_s)
+        else Event.fetch next e))) t1.delta in
+  let delta2 =
+    Array.map (fun (image, f) ->
+      (image, Event.create_map (fun e ->
+        let (time, state) = Event.fetch f e in
+        (time, state + shift)))) t2.delta in
+  let delta_s = create_sequence shift_s skip ESet.empty s (t2.state + shift) delta2.(t2.state) in
+  let automaton =
+    Array.concat [
+      delta1 ;
+      delta2 ;
+      delta_s
+    ] in
+  { t1 with delta = automaton }
+
 let switch t1 es1 ?(skip = false) s1 =
   let skip1 = skip in fun t2 es2 ?(skip = false) s2 ->
   let skip2 = skip in
@@ -249,18 +289,22 @@ let switch t1 es1 ?(skip = false) s1 =
     Array.map (fun (image, f) ->
       (image, Event.create_map (fun e ->
         if ESet.mem e es1 then
-          (Time.zero, shift_s1)
+          if s1 = [] then (Time.zero, t2.state + shift2)
+          else (Time.zero, shift_s1)
         else Event.fetch f e))) t1.delta in
   let delta2 =
     Array.map (fun (image, f) ->
       (image, Event.create_map (fun e ->
         if ESet.mem e es2 then
-          (Time.zero, shift_s2)
+          if s2 = [] then (Time.zero, t1.state)
+          else (Time.zero, shift_s2)
         else
           let (time, state) = Event.fetch f e in
           (time, state + shift2)))) t2.delta in
-  let delta_s1 = create_sequence shift_s1 skip1 ESet.empty s1 t2.state t2.delta.(t2.state) in
-  let delta_s2 = create_sequence shift_s2 skip2 ESet.empty s2 t1.state t1.delta.(t1.state) in
+  let delta_s1 =
+    create_sequence shift_s1 skip1 ESet.empty s1 (t2.state + shift2) delta2.(t2.state) in
+  let delta_s2 =
+    create_sequence shift_s2 skip2 ESet.empty s2 t1.state t1.delta.(t1.state) in
   let automaton =
     Array.concat [
       delta1 ;
@@ -287,17 +331,100 @@ let force_same_size t =
 
 (* Given a canvas size, a list of images and offsets (which must be positive), combine the images
   into a single image. *)
-let combine_images (width, height) imgl =
+let combine_images_raw (width, height) imgl =
   let result = Image.create_rgb ~alpha:true width height in
   Image.fill_rgb ~alpha:0 result 0 0 0 ;
   List.iter (fun (img, (dx, dy)) ->
     for x = 0 to img.width - 1 do
       for y = 0 to img.height - 1 do
         let (r, g, b, a) = read_image img (x, y) in
-        Image.write_rgba result (x + dx) (y + dy) r g b a
+        if a <> 0 then
+          Image.write_rgba result (x + dx) (y + dy) r g b a
       done
     done) imgl ;
   make_image result
+
+let combine_images imgl =
+  (* The dimension of the final image and the difference to the offset coordinates. *)
+  let (dim, d) =
+    let (min_x, min_y, max_x, max_y) =
+      List.fold_left (fun (min_x, min_y, max_x, max_y) (img, (dx, dy)) ->
+          (min min_x dx, min min_y dy, max max_x (dx + img.width - 1), max max_y (dy + img.height - 1)))
+        (0, 0, 0, 0) imgl in
+    ((1 + max_x - min_x, 1 + max_y - min_y), (-min_x, -min_y)) in
+  (* We apply the difference to the offsets. *)
+  let imgl = List.map (fun (img, (dx, dy)) -> (img, (dx + fst d, dy + snd d))) imgl in
+  combine_images_raw dim imgl
+
+let transitions (type t0) (init : t0) next =
+  let module MMap = Map.Make (struct type t = t0 let compare = compare end) in
+  (* The automaton is built step by step, for each encountered state.
+    Along the process, we carry the following:
+      - The current automaton array,
+      - A map storing for each visited state its corresponding position in this automaton array,
+      - A map storing the to-be-visited states, carrying a list of position (state and event) to
+        update once its value will have been found. *)
+  let rec aux delta visited to_be_visited =
+    match MMap.choose_opt to_be_visited with
+    | None -> delta
+    | Some (st, to_update) ->
+      let shift = Array.length delta in
+      let (s, nxt) = next st in
+      assert (s <> []) (* We need to be able to display at least one image. *) ;
+      (* We build all the sequences corresponding to all the calls to each event. *)
+      let (event_map, to_be_visited, _new_shift, deltas) =
+          List.fold_left (fun (event_map, to_be_visited, current_shift, deltas) e ->
+            let (s, st') = nxt e in
+            let index' =
+              match MMap.find_opt st' visited with
+              | Some index -> index
+              | None -> -1 (* This meant to be rewritten once the state will be implemented. *) in
+            let dummy =
+              (* This won't actually be read. *)
+              (dummy_image, Event.create_map (fun _ -> (Time.infinity, -1))) in
+            let sequence = create_sequence current_shift false ESet.empty s index' dummy in
+            let to_be_visited =
+              if MMap.mem st' visited then to_be_visited
+              else
+                let l =
+                  match MMap.find_opt st' to_be_visited with
+                  | Some l -> l
+                  | None -> [] in
+                let l = List.init (Array.length sequence) (fun i -> (current_shift + i, e)) @ l in
+                MMap.add st' l to_be_visited in
+            let event_map = EMap.add e (if s = [] then index' else current_shift) event_map in
+            (event_map, to_be_visited, current_shift + Array.length sequence, sequence :: deltas))
+          (EMap.empty, to_be_visited, shift + List.length s, []) Event.all in
+      let automaton_cell =
+        (fst (List.hd s), Event.create_map (fun e ->
+            match EMap.find_opt e event_map with
+            | None -> assert false
+            | Some state -> (Time.zero, state))) in
+      (* We finally build the looping sequence. *)
+      let sequence = create_sequence shift true ESet.empty s shift automaton_cell in
+      List.iter (fun (st, e) ->
+        assert (st < Array.length delta) ;
+        let (image, event_map) = delta.(st) in
+        let event_map =
+          Event.create_map (fun e' ->
+            let (time, st') = Event.fetch event_map e' in
+            if e = e' then (
+              assert (st' = -1) ;
+              (time, shift)
+            ) else (time, st')) in
+        delta.(st) <- (image, event_map)) to_update ;
+      let delta = Array.concat (delta :: sequence :: List.rev deltas) in
+      aux delta (MMap.add st shift visited) (MMap.remove st to_be_visited) in
+  let delta = aux [||] MMap.empty (MMap.singleton init []) in
+  assert (Array.for_all (fun (_image, event_map) ->
+    List.for_all (fun e ->
+      let (_time, st) = Event.fetch event_map e in
+      st >= 0) Event.all) delta) ;
+  {
+    delta ;
+    time = Time.zero ;
+    state = 0 (* The first picked-up state is necessarily the first. *)
+  }
 
 let combine tl =
   assert (List.for_all (fun (t, _dxy) -> check_size t) tl) ;
@@ -310,9 +437,9 @@ let combine tl =
     let (min_x, min_y, max_x, max_y) =
       List.fold_left (fun (min_x, min_y, max_x, max_y) (t, (dx, dy)) ->
           let (width, height) = dim_single t in
-          (min min_x dx, min min_y dy, max max_x (dx + width), max max_y (dy + height)))
+          (min min_x dx, min min_y dy, max max_x (dx + width - 1), max max_y (dy + height - 1)))
         (0, 0, 0, 0) tl in
-    ((max_x - min_x, max_y - min_y), (- min_x, - min_y)) in
+    ((1 + max_x - min_x, 1 + max_y - min_y), (-min_x, -min_y)) in
   (* We apply the difference to the offsets. *)
   let tl = List.map (fun (t, (dx, dy)) -> (t, (dx + fst d, dy + snd d))) tl in
   (* The number of states in the new automaton. *)
@@ -342,7 +469,7 @@ let combine tl =
     Array.init num_states (fun i ->
       let sl = state_from i in
       let image =
-        combine_images dim (List.map2 (fun (t, d) s ->
+        combine_images_raw dim (List.map2 (fun (t, d) s ->
           let (image, _next) = t.delta.(s) in
           (image, d)) tl sl) in
       let fetch_event e =
@@ -351,7 +478,6 @@ let combine tl =
             let (_image, next) = t.delta.(s) in
             let (_time, st) = Event.fetch next e in
             st) tl sl) in
-        (* TODO: It is really not clear which time we should associate to the combined state. *)
         let time =
           List.fold_left2 (fun n (t, _) s ->
             let (_image, next) = t.delta.(s) in

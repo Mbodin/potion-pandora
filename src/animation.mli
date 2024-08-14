@@ -24,6 +24,9 @@ val read_image : image -> (int * int) -> (int * int * int * int)
 (* Return the dimensions (width, height) of the image. *)
 val image_dimensions : image -> (int * int)
 
+(* Combine a list of images with an offset into a single image. *)
+val combine_images : (image * (int * int)) list -> image
+
 
 (* A representation of an object as an automaton.
   It can respond to events to update its internal image. *)
@@ -67,6 +70,10 @@ val loop : sequence -> t
   should restart the sequence. *)
 val react : t -> Event.t list -> ?skip:bool -> ?restart:bool -> sequence -> t
 
+(* This is similar to [react] expect that instead of going back into its initial state,
+  it jumps into another automaton and stays there. *)
+val change_with : t -> Event.t list -> ?skip:bool -> sequence -> t -> t
+
 (* Switch between two variant automatons for the same object, with events to go from
   one to the other.
   [switch t1 [e1] s1 t2 [e2] s2] behaves like [t1] until [e1] occurs.
@@ -74,6 +81,13 @@ val react : t -> Event.t list -> ?skip:bool -> ?restart:bool -> sequence -> t
   It then applies the sequence [s2] and goes back to its initial behavior. *)
 val switch : t -> Event.t list -> ?skip:bool -> sequence ->
              t -> Event.t list -> ?skip:bool -> sequence -> t
+
+(* Explicitely define an automaton as a transition system.
+  The first argument is the initial state (it can be any type, the (=) equality will be used on it),
+  the second is the transition function: given a state, return a looping sequence as well as a
+  function for its transitions. This function is such that given an event, return a sequence to be
+  played followed by its new state. *)
+val transitions : 'a -> ('a -> sequence * (Event.t -> sequence * 'a)) -> t
 
 (* Combine a list of automatons with an offset into a single automaton.
   The predicate check_size must hold for each of the input automatons. *)

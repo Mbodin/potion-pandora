@@ -1,5 +1,5 @@
 
-(* An entirely transparent image, useful to serve as a dummy pattern. *)
+(* An entirely transparent image, useful to serve as an empty pattern. *)
 let transparent =
   let img = Image.create_rgb ~alpha:true 1 1 in
   Image.fill_rgb ~alpha:0 img 0 0 0 ;

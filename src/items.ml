@@ -45,7 +45,7 @@ let rwind img s =
 
 (* An object that reacts to explosions. *)
 let rexplosions img s final =
-  react (static img) Event.[Explode] (s @ [(final, infinity)]) (* FIXME: This is kind of ugly. *)
+  change_with (static img) Event.[Explode] s (static final)
 
 (* The palette is an exception, as it is provided as a single image (with a single line).
   We here split it into several one-pixel images. *)
@@ -74,32 +74,52 @@ module Perso = struct
 
   let range a b = List.split (List.map mk (range a b))
 
-  let (normal_droit, normal_gauche) = mk 0
-  let (inspiration_droit, inspiration_gauche) = mk 1
-  let (dos_droit, dos_gauche) = mk 2
-  let (vent_droit, vent_gauche) = mk 3
-  let (regard_haut_droit, regard_haut_gauche) = mk 4
-  let (regard_bas_droit, regard_bas_gauche) = mk 5
-  let (clignement_droit, clignement_gauche) = mk 6
-  let (gratte_droit, gratte_gauche) = range 7 8
-  let (avance_droit, avance_gauche) = range 9 14
-  let (protection_droit, protection_gauche) = mk 15
-  let (chute_droit, chute_gauche) = range 16 17
-  let (atterissage_droit, atterissage_gauche) = mk 18
+  let normal = mk 0
+  let inspiration = mk 1
+  let dos = mk 2
+  let vent = mk 3
+  let regard_haut = mk 4
+  let regard_bas = mk 5
+  let clignement = mk 6
+  let gratte = range 7 8
+  let avance = range 9 14
+  let tourne_debut = mk 10
+  let tourne_fin = mk 11
+  let protection = mk 15
+  let chute = range 16 17
+  let atterissage = mk 18
 
   let perso =
-    let perso = static normal_droit in
-    let perso = react perso Event.[Wind] [(vent_droit, 0.3)] in
-    let perso = react perso Event.[RandomFrequent] [(inspiration_droit, 1.)] in
-    let perso = react perso Event.[RandomNormal] [(clignement_droit, 0.1)] in
-    let perso = react perso Event.[LookDown] [(regard_bas_droit, 1.)] in
-    let perso = react perso Event.[LookUp] [(regard_haut_droit, 1.)] in
-    let perso = react perso Event.[LookBehind] [(dos_droit, 1.)] in
-    let perso = react perso Event.[Explode] [(protection_droit, 0.8)] in
-    let perso = react ~skip:true perso Event.[MoveLeft] (to_sequence 0.05 avance_gauche @ [(normal_gauche, infinity)]) in
-    let perso = react ~skip:true perso Event.[MoveRight] (to_sequence 0.05 avance_droit) in
-    let perso = react ~restart:true perso Event.[Fall] (to_sequence 0.1 chute_droit @ [(atterissage_droit, 0.5)]) in
-    perso (* TODO: This can be improved. *)
+    let make b =
+      let f = if b then snd else fst in
+      let perso = static (f normal) in
+      let perso = react perso Event.[Wind] [(f vent, 0.3)] in
+      let perso = react perso Event.[RandomFrequent] [(f inspiration, 1.)] in
+      let perso = react perso Event.[RandomNormal] [(f clignement, 0.1)] in
+      let perso = react perso Event.[RandomRare] (to_sequence 0.5 (f gratte)) in
+      let perso = react perso Event.[LookDown] [(f regard_bas, 1.)] in
+      let perso = react perso Event.[LookUp] [(f regard_haut, 1.)] in
+      let perso = react perso Event.[LookBehind] [(f dos, 1.)] in
+      let perso = react perso Event.[Explode] [(f protection, 0.8)] in
+      let perso =
+        react ~restart:true perso Event.[Fall]
+          (to_sequence 0.1 (f chute) @ [(f atterissage, 0.5)]) in
+      perso in
+    let perso_droite =
+      let perso = make false in
+      let perso = react perso Event.[MoveRight] ~skip:true (to_sequence 0.05 (fst avance)) in
+      perso in
+    let perso_gauche =
+      let perso = make true in
+      let perso = react perso Event.[MoveLeft] ~skip:true (to_sequence 0.05 (snd avance)) in
+      perso in
+    let vers_droite = to_sequence 0.1 [fst tourne_debut; snd tourne_fin] in
+    let vers_gauche = to_sequence 0.1 [snd tourne_debut; fst tourne_fin] in
+    let perso =
+      Animation.switch
+        perso_droite Event.[MoveLeft] ~skip:true vers_gauche
+        perso_gauche Event.[MoveRight] ~skip:true vers_droite in
+    perso
 
 end
 
@@ -233,26 +253,28 @@ let fume =
 
 let lampe_interne = static (from Images_coords.lampe_interne 0)
 
-let linge_chute =
-  to_sequence 0.1 (fromlist Images_coords.linge_chute)
-  @ [(from Images_coords.linge_chute 7, infinity)]
+let chute_linge linge =
+  let linge_chute =
+    to_sequence 0.1 (fromlist Images_coords.linge_chute) in
+  Animation.force_same_size
+    (change_with linge Event.[Fall] linge_chute (static (from Images_coords.linge_chute 7)))
 let linge1 =
   let mk = from Images_coords.linge1 in
   let linge = rwind (mk 0) (mk_sequence 0.2 mk 1 2) in
-  Animation.force_same_size (react linge Event.[Fall] linge_chute)
+  chute_linge linge
 let linge2 = static (from Images_coords.linge2 0)
 let linge3 =
   let mk = from Images_coords.linge3 in
   let linge = rwind (mk 0) (mk_sequence 0.2 mk 1 3) in
-  Animation.force_same_size (react linge Event.[Fall] linge_chute)
+  chute_linge linge
 let linge4 =
   let mk = from Images_coords.linge4 in
   let linge = rwind (mk 0) (mk_sequence 0.2 mk 1 2) in
-  Animation.force_same_size (react linge Event.[Fall] linge_chute)
+  chute_linge linge
 let linge5 =
   let mk = from Images_coords.linge5 in
   let linge = rwind (mk 0) (mk_sequence 0.2 mk 1 2) in
-  Animation.force_same_size (react linge Event.[Fall] linge_chute)
+  chute_linge linge
 
 let planche =
   let mk = from Images_coords.planche in
@@ -384,8 +406,9 @@ let epi_ble =
   let mk = from Images_coords.epi_ble in
   let epi = static (mk 0) in
   let epi = react epi Event.[Wind; Touch] (mk_sequence 0.2 mk 1 3) in
-  let epi = react epi Event.[Explode] (mk_sequence 0.2 mk 1 2 @ mk_sequence 0.2 mk 4 6 @ [(mk 6, infinity)]) in
-  (* TODO: This infinity is an ugly fix. *)
+  let epi =
+    change_with epi Event.[Explode] (mk_sequence 0.05 mk 1 2 @ mk_sequence 0.05 mk 4 6)
+      (static (mk 6)) in
   epi
 
 let rosiers =
@@ -472,9 +495,20 @@ let fond_foret1 = static (from Images_coords.fond_foret 0)
 let fond_foret2 = static (Filter.flip_horizontally (from Images_coords.fond_foret 0))
 
 let lac =
-  let lac = from Images_coords.lac 0 in
-  let lac = Filter.shimmer ~quantity:150 ~amplitude:10 ~duration:35 ~direction:(-0.2, 1.) lac in
-  loop (List.map (fun img -> (img, 0.15)) lac)
+  let d = 14 in
+  (* TODO: Il semblerait que les deux images des sapins et du lac ne s'emboitent pas comme prévu. *)
+  let lac =
+    Animation.combine_images [
+        (from Images_coords.lac 0, (0, d)) ;
+        (from Images_coords.sapins 0, (0, 0))
+      ] in
+  let lac = Filter.shimmer ~quantity:180 ~amplitude:10 ~duration:35 ~direction:(-0.2, 1.) lac in
+  let lac = loop (List.map (fun img -> (img, 0.15)) lac) in
+  Animation.combine [
+      (lac, (0, 0)) ;
+      (sapins, (0, 0))
+    ]
+
 
 let mare =
   let mare = from Images_coords.mare 0 in
@@ -573,15 +607,11 @@ let cedez_le_passage = static (from Images_coords.cedez_le_passage 0)
 
 let panneau_ville = static (from Images_coords.panneau_ville 0)
 
-  let support_panneau =
-    let mk = from Images_coords.support_panneau in
-    react (static (mk 0)) Event.[Explode] (to_sequence infinity [mk 1])
-
 (* Monte un panneau sur un support. *)
 let monter_panneau =
   let support_panneau =
     let mk = from Images_coords.support_panneau in
-    react (static (mk 0)) Event.[Explode] (to_sequence infinity [mk 1]) in
+    rexplosions (mk 0) [] (mk 1) in
   assert (Animation.check_size support_panneau) ;
   let (dimx_support, _dimy_support) = Animation.image_dimensions (Animation.image support_panneau) in
   (* Le panneau n'est pas centré sur l'image, d'où cette différence de 1. *)
