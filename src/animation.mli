@@ -49,8 +49,9 @@ val send : t -> Event.t -> t
   getting this event. *)
 val listen : t -> Event.t -> bool
 
-(* For debugging purposes, print-out a GraphViz visualisation of the automaton. *)
-val print : t -> string
+(* For debugging purposes, print-out a GraphViz visualisation of the automaton.
+  The [quiet] option removes the labels on the vertices and the vertices with the same origin and target. *)
+val print : ?quiet:bool -> t -> string
 
 (* An animation sequence, composed of subimages associated with a time (in seconds). *)
 type sequence = (image * float) list
@@ -88,6 +89,10 @@ val switch : t -> Event.t list -> ?skip:bool -> sequence ->
   function for its transitions. This function is such that given an event, return a sequence to be
   played followed by its new state. *)
 val transitions : 'a -> ('a -> sequence * (Event.t -> sequence * 'a)) -> t
+
+(* Like [transitions], but non deterministic: at each step, we provide a list of sequence and possible
+  next state, along with an integer weight, to be chosen randomly. *)
+val nd_transitions : 'a -> ('a -> sequence * (Event.t -> (int * sequence * 'a) list)) -> t
 
 (* Combine a list of automatons with an offset into a single automaton.
   The predicate check_size must hold for each of the input automatons. *)

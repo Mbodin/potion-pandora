@@ -33,3 +33,7 @@ val triangle_lower_right : Animation.image -> int -> Animation.image
 val flip_horizontally : Animation.image -> Animation.image
 val flip_vertically : Animation.image -> Animation.image
 
+(* Create an image like the provided image, but flipped along the diagonal axes (x becomes y
+  and vice-versa). *)
+val flip_diagonally : Animation.image -> Animation.image
+

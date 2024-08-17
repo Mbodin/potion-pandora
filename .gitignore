@@ -2,6 +2,7 @@
 *~
 \#*\#
 
+debug/
 _esy/
 node_modules/
 _build/

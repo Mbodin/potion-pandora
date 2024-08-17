@@ -32,7 +32,7 @@ module Launch (I : Interface.T) = struct
     ignore (Store.add store Items.potion (-40, 0)) ;
     ignore (Store.add store Items.petite_potion (-60, 0)) ;
     ignore (Store.add store Items.arbre4 (-100, 0)) ;
-    ignore (Store.add store Items.texture_mur1 (-290, 0)) ;
+    ignore (Store.add store Items.texture_mur1a (-290, 0)) ;
     ignore (Store.add store Items.texture_mur1_toit_gauche (-250, 0)) ;
     ignore (Store.add store Items.texture_mur1_toit_droit (-210, 0)) ;
     ignore (Store.add store Items.potion_interdite (-180, 0)) ;
@@ -55,7 +55,7 @@ module Launch (I : Interface.T) = struct
     done ;
     ignore (Store.add store Items.lac (240, 0)) ;
     ignore (Store.add store Items.mare (370, 0)) ;
-    let player = Store.add store Items.Perso.perso (0, 0) in
+    let player = Store.add store Items.perso (0, 0) in
     ignore (Store.add store Items.arbre1_tres_sombre (130, -25)) ;
     (player, store)
 

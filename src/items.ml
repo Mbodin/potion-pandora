@@ -1,10 +1,12 @@
 
 (* Definitions of the objects and their associated animations for the game. *)
 
-open Animation
-
 let range a b =
   List.init (b - a + 1) (fun c -> c + a)
+
+(* These are the most use function from [Animation], and I prefer to avoid global opens. *)
+let static = Animation.static
+let loop = Animation.loop
 
 (* Converts the coordinates of Images_coords into an image. *)
 let from_coords ~bundle ((width, height), (x, y)) =
@@ -41,11 +43,16 @@ let triangle_right img =
 
 (* An object that only reacts to wind/explosions. *)
 let rwind img s =
-  react (static img) Event.[Wind; Explode] s
+  Animation.react (static img) Event.[Wind; Explode] s
 
 (* An object that reacts to explosions. *)
 let rexplosions img s final =
-  change_with (static img) Event.[Explode] s (static final)
+  Animation.change_with (static img) Event.[Explode] s (static final)
+
+(* Useful function to use [Animation.nd_transitions]: it only reacts to [Event.Tau]. *)
+let only_tau st l = function
+  | Event.Tau -> l
+  | _ -> [(1, [], st)]
 
 (* The palette is an exception, as it is provided as a single image (with a single line).
   We here split it into several one-pixel images. *)
@@ -90,6 +97,7 @@ module Perso = struct
   let atterissage = mk 18
 
   let perso =
+    let open Animation in
     let make b =
       let f = if b then snd else fst in
       let perso = static (f normal) in
@@ -123,6 +131,8 @@ module Perso = struct
 
 end
 
+let perso = Perso.perso
+
 let femme_fenetre =
   let mk = from Images_coords.femme_fenetre in
   loop (to_sequence 0.5 (List.map mk [0; 2; 0; 1]))
@@ -132,6 +142,7 @@ let personne_echelle =
   loop (to_sequence 0.5 (List.map mk [0; 2; 0; 1]))
 
 let mineur =
+  let open Animation in
   let mk = from Images_coords.mineur in
   let mineur = static (mk 0) in
   let mineur = react mineur Event.[RandomFrequent] [(mk 1, 1.)] in
@@ -152,24 +163,45 @@ let emmele_cable =
 
 let enfant =
   let mk = from Images_coords.enfant in
-  (* TODO: Faire une pause de durée aléatoire sur la position initiale.
-      Faire quelques aller/retour entre les deux premières positions. *)
-  loop ((mk 0, 1.) :: to_sequence 0.2 (fromlist Images_coords.enfant))
+  (* L'état indique soit [None] quand la séquence commence, ou [Some n] quand on va attendre
+    [n] aller/retours sur deux positions. *)
+  Animation.nd_transitions None (function
+    | None ->
+      (to_sequence 0.2 (fromlist Images_coords.enfant), only_tau None [
+        (2, [], None) ;
+        (2, [], Some 0) ;
+        (1, [], Some 3) ;
+        (1, [], Some 2)
+      ])
+    | Some n ->
+      let next =
+        if n = 0 then only_tau (Some n) [(1, [], None)]
+        else only_tau (Some n) [(1, [], Some (n - 1))] in
+      ([(mk 0, 0.5); (mk 8, 0.2)], next))
 
 let enfant_cache1 =
   let mk = from Images_coords.enfant_cache1 in
-  (* TODO: La pause initiale doit être aléatoire. *)
-  loop ((mk 0, 1.5) :: to_sequence 0.4 (List.map mk [1; 2; 1]))
+  Animation.nd_transitions () (fun () ->
+    ([(mk 0, 1.)], only_tau () [
+        (2, [], ()) ;
+        (1, [(mk 2, 0.6)], ())
+      ]))
 
 let enfant_cache2 =
   let mk = from Images_coords.enfant_cache2 in
-  (* TODO: Plus de diversité de mouvement ici. *)
-  loop ((mk 0, 1.5) :: to_sequence 0.4 (List.map mk [1; 2; 1]))
+  Animation.nd_transitions () (fun () ->
+    ([(mk 0, 1.1)], only_tau () [
+        (2, [], ()) ;
+        (1, [(mk 2, 0.5)], ())
+      ]))
 
 let enfant_cache3 =
   let mk = from Images_coords.enfant_cache3 in
-  (* TODO: Pause aléatoire. *)
-  loop ((mk 0, 1.5) :: to_sequence 0.4 (List.map mk [1; 2; 1]))
+  Animation.nd_transitions () (fun () ->
+    ([(mk 0, 0.9)], only_tau () [
+        (2, [], ()) ;
+        (1, [(mk 2, 0.4)], ())
+      ]))
 
 let enfant_cache_cache_compte =
   let mk = from Images_coords.enfant_cache_cache_compte in
@@ -208,7 +240,7 @@ let enfant_cerf_volant =
 let papillons =
   let mk = from Images_coords.papillons in
   (* TODO: Il faudrait ajouter des aller/retours dans l'animation. *)
-  react (static (mk 0)) Event.[Touch; Explode] (mk_sequence 0.1 mk 1 15)
+  Animation.react (static (mk 0)) Event.[Touch; Explode] (mk_sequence 0.1 mk 1 15)
 
 (* * Objets *)
 
@@ -257,7 +289,8 @@ let chute_linge linge =
   let linge_chute =
     to_sequence 0.1 (fromlist Images_coords.linge_chute) in
   Animation.force_same_size
-    (change_with linge Event.[Fall] linge_chute (static (from Images_coords.linge_chute 7)))
+    (Animation.change_with linge Event.[Fall] linge_chute
+      (static (from Images_coords.linge_chute 7)))
 let linge1 =
   let mk = from Images_coords.linge1 in
   let linge = rwind (mk 0) (mk_sequence 0.2 mk 1 2) in
@@ -278,7 +311,7 @@ let linge5 =
 
 let planche =
   let mk = from Images_coords.planche in
-  react (static (mk 0)) Event.[Touch] [(mk 1, 0.5)]
+  Animation.react (static (mk 0)) Event.[Touch] [(mk 1, 0.5)]
 
 let tronconeuse = static (from Images_coords.tronconeuse 0)
 
@@ -405,9 +438,9 @@ let champignon4 = static (from Images_coords.champignons 3)
 let epi_ble =
   let mk = from Images_coords.epi_ble in
   let epi = static (mk 0) in
-  let epi = react epi Event.[Wind; Touch] (mk_sequence 0.2 mk 1 3) in
+  let epi = Animation.react epi Event.[Wind; Touch] (mk_sequence 0.2 mk 1 3) in
   let epi =
-    change_with epi Event.[Explode] (mk_sequence 0.05 mk 1 2 @ mk_sequence 0.05 mk 4 6)
+    Animation.change_with epi Event.[Explode] (mk_sequence 0.05 mk 1 2 @ mk_sequence 0.05 mk 4 6)
       (static (mk 6)) in
   epi
 
@@ -439,10 +472,10 @@ let pierre9 = static (from Images_coords.pierres 8)
 
 let pierre_bouge1 =
   let mk = from Images_coords.pierres_bougent in
-  react (static (mk 0)) Event.[Touch; Explode] (mk_sequence 0.1 mk 1 3)
+  Animation.react (static (mk 0)) Event.[Touch; Explode] (mk_sequence 0.1 mk 1 3)
 let pierre_bouge2 =
   let mk = from Images_coords.pierres_bougent in
-  react (static (mk 4)) Event.[Touch; Explode] (mk_sequence 0.1 mk 5 6)
+  Animation.react (static (mk 4)) Event.[Touch; Explode] (mk_sequence 0.1 mk 5 6)
 
 let roche = static (from Images_coords.roche 0)
 
@@ -502,7 +535,7 @@ let lac =
         (from Images_coords.lac 0, (0, d)) ;
         (from Images_coords.sapins 0, (0, 0))
       ] in
-  let lac = Filter.shimmer ~quantity:180 ~amplitude:10 ~duration:35 ~direction:(-0.2, 1.) lac in
+  let lac = Filter.shimmer ~quantity:220 ~amplitude:10 ~duration:45 ~direction:(-0.2, 1.) lac in
   let lac = loop (List.map (fun img -> (img, 0.15)) lac) in
   Animation.combine [
       (lac, (0, 0)) ;
@@ -685,7 +718,7 @@ let climatiseur = loop (to_sequence 0.1 (fromlist Images_coords.climatiseur))
 
 let fenetre =
   let mk = from Images_coords.fenetre in
-  react (static (mk 0)) Event.[RandomFlicker] (to_sequence 0.05 [mk 1])
+  Animation.react (static (mk 0)) Event.[RandomFlicker] (to_sequence 0.05 [mk 1])
 
 let fenetre_cote_gauche =
   let mk = from Images_coords.fenetre_cote in
@@ -732,13 +765,16 @@ let mur_abime = static (from Images_coords.mur_abime 0)
 
 let texture_fond1 = static (from Images_coords.texture_fond1 0)
 let texture_fond2 = static (from Images_coords.texture_fond2 0)
-let texture_mur1 = static (from Images_coords.texture_mur1 0)
+let texture_mur1a = static (from Images_coords.texture_mur1 0)
+let texture_mur1b = static (Filter.flip_vertically (from Images_coords.texture_mur1 0))
 let texture_mur1_toit_gauche = triangle_left (from Images_coords.texture_mur1 0)
 let texture_mur1_toit_droit = triangle_right (from Images_coords.texture_mur1 0)
-let texture_mur2 = static (from Images_coords.texture_mur2 0)
+let texture_mur2a = static (from Images_coords.texture_mur2 0)
+let texture_mur2b = static (Filter.flip_vertically (from Images_coords.texture_mur2 0))
 let texture_mur2_toit_gauche = triangle_left (from Images_coords.texture_mur2 0)
 let texture_mur2_toit_droit = triangle_right (from Images_coords.texture_mur2 0)
-let texture_mur3 = static (from Images_coords.texture_mur3 0)
+let texture_mur3a = static (from Images_coords.texture_mur3 0)
+let texture_mur3b = static (Filter.flip_horizontally (from Images_coords.texture_mur3 0))
 let texture_mur3_toit_gauche = triangle_left (from Images_coords.texture_mur3 0)
 let texture_mur3_toit_droit = triangle_right (from Images_coords.texture_mur3 0)
 
@@ -746,24 +782,24 @@ let texture_mur3_toit_droit = triangle_right (from Images_coords.texture_mur3 0)
 
 let etoile =
   let mk = from Images_coords.etoile in
-  react (static (mk 0)) Event.[RandomFlicker] (to_sequence 0.05 (List.map mk [2; 1; 2]))
+  Animation.react (static (mk 0)) Event.[RandomFlicker] (to_sequence 0.05 (List.map mk [2; 1; 2]))
 
 let nuage1 = static (from Images_coords.nuage 0)
 let nuage2 = static (from Images_coords.nuage 1)
 
 let soleil =
   let mk = from Images_coords.soleil in
-  react (static (mk 0)) Event.[RandomRare] (mk_sequence 0.05 mk 1 3)
+  Animation.react (static (mk 0)) Event.[RandomRare] (mk_sequence 0.05 mk 1 3)
 
 (* * Interface *)
 
 (* TODO: Générer ces buttons à partir des boutons de l'interface, avec une animation qui appuie sur la touche. *)
 let touche_droite = static (from Images_coords.touche_droite 0)
 
-(* Interface buttons are expressed as Animation.image and not Animation.t for convenience. *)
-
 let bouton_fleche_droite = from Images_coords.boutons 0
 let bouton_fleche_gauche = Filter.flip_horizontally bouton_fleche_droite
+let bouton_fleche_haut = Filter.flip_diagonally bouton_fleche_droite
+let bouton_fleche_bas = Filter.flip_vertically bouton_fleche_droite
 let bouton_ajout = from Images_coords.boutons 1
 let bouton_supprimer = from Images_coords.boutons 2
 let bouton_enregistrer = from Images_coords.boutons 3

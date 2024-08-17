@@ -119,9 +119,9 @@ let shimmer ?(quantity = 50) ?(amplitude = 5) ?(duration = 10) ?(direction = (0.
 
 (* Given a function f converting original coordinates to new coordinates, change the position
   of pixels in an image. *)
-let swap_coordinates f img =
+let change_coordinates new_width new_height f img =
   let (width, height) = Animation.image_dimensions img in
-  let modified = Image.create_rgb ~alpha:true width height in
+  let modified = Image.create_rgb ~alpha:true new_width new_height in
   for x = 0 to width - 1 do
     for y = 0 to height - 1 do
       let (r, g, b, a) = Animation.read_image img (x, y) in
@@ -132,15 +132,20 @@ let swap_coordinates f img =
   Animation.make_image modified
 
 let flip_horizontally img =
-  let (width, _height) = Animation.image_dimensions img in
-  swap_coordinates (fun x y -> (width - 1 - x, y)) img
+  let (width, height) = Animation.image_dimensions img in
+  change_coordinates width height (fun x y -> (width - 1 - x, y)) img
 
 let flip_vertically img =
-  let (_width, height) = Animation.image_dimensions img in
-  swap_coordinates (fun x y -> (x, height - 1 - y)) img
+  let (width, height) = Animation.image_dimensions img in
+  change_coordinates width height (fun x y -> (x, height - 1 - y)) img
+
+let flip_diagonally img =
+  let (width, height) = Animation.image_dimensions img in
+  change_coordinates height width (fun x y -> (y, x)) img
 
 (* This test is here and not in Animation to prevent a dependency cycle: it requires some
   functions to create images, and Filter is the place containing most of them. *)
+(* TODO: Move the function operating only on Animation.image into a separate module MImage.t. *)
 let%test "Animation.force_same_size" =
   List.for_all (fun t -> Animation.check_size (Animation.force_same_size t)) [
     Animation.static (Animation.make_image (rectangle transparent (10, 12))) ;
@@ -150,3 +155,4 @@ let%test "Animation.force_same_size" =
       (Animation.make_image (rectangle transparent (20, 1)), 0.3)
     ] ;
   ]
+
