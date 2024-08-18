@@ -13,6 +13,9 @@ module Id : sig
   (* The comparison function for identifiers. *)
   val compare : t -> t -> int
 
+  (* Print the identifier, for debuging purposes. *)
+  val print : t -> string
+
 end = struct
 
   include Integer
@@ -23,6 +26,8 @@ end = struct
       let ret = !available in
       incr available ;
       ret
+
+  let print = string_of_int
 
 end
 
@@ -258,6 +263,61 @@ end = struct
 
 end
 
+(* A counter for random events: we only flip the coin once to know when the event
+  will occur, then we decrement the counter each time. *)
+module Randomness : sig
+  type t
+
+  (* Check whether the event is ready to be fired. *)
+  val fire : t -> bool
+
+  (* Check whether it is ticking. *)
+  val ticking : t -> bool
+
+  (* Let time pass.
+    Warning: if the event was ready to be fired, it won't ever after that, unless resetted. *)
+  val step : t -> t
+
+  (* Set the counter to fire again in about the provided number. *)
+  val reset : int -> t
+
+  (* A counter that won't ever fire. *)
+  val clear : t
+end = struct
+
+  type t = int
+
+  let fire n = n = 0
+
+  let ticking n = n >= 0
+
+  let step = function
+    | -1 -> -1
+    | n -> n - 1
+
+  let reset max = Random.int (2 * max)
+
+  let clear = -1
+
+end
+
+type randomness_counter = Randomness.t
+
+(* We have to store for each frequency such a random counter. *)
+type randomness = {
+  rare : randomness_counter ;
+  normal : randomness_counter ;
+  frequent : randomness_counter ;
+  flicker : randomness_counter
+}
+
+let clear_randomness = Randomness.{
+  rare = clear ;
+  normal = clear ;
+  frequent = clear ;
+  flicker = clear
+}
+
 (* The objects stored. *)
 type obj_store = {
   id : Id.t (* A unique identifier. *) ;
@@ -265,7 +325,8 @@ type obj_store = {
   level : int (* Its level (this is redundant information but it makes processing easier). *) ;
   display : Animation.t (* Its animation automaton. *) ;
   move : ((int * int) * int * bool) option (* When the object is moving, this is its target
-    position, speed (in pixel per turn, always positive), and ghostness. *)
+    position, speed (in pixel per turn, always positive), and ghostness. *) ;
+  random : randomness
 }
 
 (* We store a direct reference to the object within the cell list: this enables us to directly
@@ -352,7 +413,8 @@ let add store anim ?(level = 0) pos =
       position = pos ;
       level ;
       display = anim ;
-      move = None
+      move = None ;
+      random = clear_randomness
     } in
   let a = IMap.find level !store.data in
   let a =
@@ -512,6 +574,17 @@ let step store min_screen max_screen =
       let (a, ()) =
         fold_once_over_groups (fun a () obj ->
           send_direct obj Event.Tau ;
+          let trigger_random e deciseconds value set =
+            if Randomness.fire value then send_direct obj e ;
+            let value = Randomness.step value in
+            obj := { !obj with random = (set !obj.random value) } ;
+            if Animation.listen (!obj.display) e then
+              let value = Randomness.reset ((deciseconds * Animation.frames_per_second) / 10) in
+              obj := { !obj with random = (set !obj.random value) } in
+          trigger_random Event.RandomRare 300 !obj.random.rare (fun r v -> { r with rare = v }) ;
+          trigger_random Event.RandomNormal 50 !obj.random.normal (fun r v -> { r with normal = v }) ;
+          trigger_random Event.RandomFrequent 10 !obj.random.frequent (fun r v -> { r with frequent = v }) ;
+          trigger_random Event.RandomFlicker 2 !obj.random.flicker (fun r v -> { r with flicker = v }) ;
           (* TODO: Check that this object touches a (non-ghost) moving object:
           send_direct obj Event.Touch ; *)
           match !obj.move with
@@ -558,6 +631,5 @@ let step store min_screen max_screen =
           min min_x (Data.smallest_x a)) !store.data 0 in
       store := { !store with wind = min_x :: !store.wind }
     ) in
-  (* TODO: trigger randomly occurring events. *)
   ()
 

@@ -103,7 +103,7 @@ module Perso = struct
       let perso = static (f normal) in
       let perso = react perso Event.[Wind] [(f vent, 0.3)] in
       let perso = react perso Event.[RandomFrequent] [(f inspiration, 1.)] in
-      let perso = react perso Event.[RandomNormal] [(f clignement, 0.1)] in
+      let perso = react perso Event.[RandomNormal] [(f clignement, 0.05)] in
       let perso = react perso Event.[RandomRare] (to_sequence 0.5 (f gratte)) in
       let perso = react perso Event.[LookDown] [(f regard_bas, 1.)] in
       let perso = react perso Event.[LookUp] [(f regard_haut, 1.)] in
@@ -210,7 +210,6 @@ let enfant_cache_cache_compte =
 
 let enfant_cerf_volant =
   let mk = from Images_coords.enfant_cerf_volant in
-  (* TODO: Plus de diversité de mouvement ici. *)
   loop (to_sequence 0.3 (List.map mk [0; 1; 2]))
 
 (* TODO: aveugle *)
@@ -542,15 +541,25 @@ let lac =
       (sapins, (0, 0))
     ]
 
-
 let mare =
   let mare = from Images_coords.mare 0 in
   let mare = Filter.shimmer ~quantity:40 ~amplitude:3 ~duration:20 ~direction:(-0.2, 1.) mare in
   loop (List.map (fun img -> (img, 0.3)) mare)
 
 let ruisseau =
-  (* TODO: Ajouter de l'aléatoire de temps en temps. *)
-  loop (to_sequence 0.1 (fromlist Images_coords.ruisseau))
+  let seq_from =
+    let rec aux s n =
+      match s, n with
+      | s, 0 -> s
+      | _ :: s, n -> aux s (n - 1)
+      | _, _ -> assert false in
+    aux (to_sequence 0.1 (fromlist Images_coords.ruisseau)) in
+  Animation.nd_transitions () (fun () ->
+    (seq_from 0, only_tau () [
+        (5, [], ()) ;
+        (1, seq_from 1, ()) ;
+        (1, seq_from 2, ())
+      ]))
 
 let puit = static (from Images_coords.puit 0)
 let rail_stop = static (from Images_coords.rail_stop 0)

@@ -55,6 +55,16 @@ module Launch (I : Interface.T) = struct
     done ;
     ignore (Store.add store Items.lac (240, 0)) ;
     ignore (Store.add store Items.mare (370, 0)) ;
+    ignore (Store.add store Items.ruisseau (410, 0)) ;
+    ignore (Store.add store Items.emmele_cable (0, -50)) ;
+    ignore (Store.add store Items.mineur (50, -50)) ;
+    ignore (Store.add store Items.personne_echelle (90, -50)) ;
+    ignore (Store.add store Items.femme_fenetre (120, -50)) ;
+    (*ignore (Store.add store Items.fumeur (160, -50)) ;*) (* TODO: Il semblerait que la taille ne correspond pas. *)
+    ignore (Store.add store Items.fume (200, -50)) ;
+    ignore (Store.add store Items.enfant_cache1 (260, -50)) ;
+    ignore (Store.add store Items.enfant_cache2 (290, -50)) ;
+    ignore (Store.add store Items.enfant_cache3 (310, -50)) ;
     let player = Store.add store Items.perso (0, 0) in
     ignore (Store.add store Items.arbre1_tres_sombre (130, -25)) ;
     (player, store)

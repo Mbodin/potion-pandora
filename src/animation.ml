@@ -426,7 +426,7 @@ let nd_transitions (type t0) (init : t0) next =
   let next st =
     match MMap.find_opt st cache with
     | None -> assert false
-    | Some (_size, s, event_map) -> (s, Event.fetch event_map) in
+    | Some (size, s, event_map) -> (size, s, Event.fetch event_map) in
   (* The idea here is do duplicate a state as many times as its size.
     We thus use [t0 * int] as a new state, the integer being its index,
     with a random index each time we want to map the old one. *)
@@ -435,7 +435,7 @@ let nd_transitions (type t0) (init : t0) next =
     | None -> assert false
     | Some (size, _s, _event_map) -> (old_state, Random.int size) in
   transitions (new_state init) (fun (st, index) ->
-    let (s, nxt) = next st in
+    let (size, s, nxt) = next st in
     (s, fun e ->
       let l = nxt e in
       (* We avoid calling useless randomlessness to avoid overloading the engine. *)
@@ -443,15 +443,19 @@ let nd_transitions (type t0) (init : t0) next =
         if e = Event.RandomFlicker then new_state
         else fun old_state ->
           if old_state = st then
-            (* Having the same state makes the engine consider that it won't listen
-              to this particular event, and thus won't make the engine work for it. *)
-            (st, index)
+            if e = Event.Tau then
+              (* This ensures that the generated automaton is connex. *)
+              (st, (index + 1) mod size)
+            else
+              (* Having the same state makes the engine consider that it won't listen
+                to this particular event, and thus won't make the engine work for it. *)
+              (st, index)
           else new_state old_state in
       let rec pick i = function
         | [] -> assert false
         | (weight, s, st') :: l ->
           let i' = i - weight in
-          if i' <= 0 then (s, st')
+          if i' < 0 then (s, st')
           else pick i' l in
       let sum = List.fold_left (fun sum (w, _, _) -> sum + w) 0 l in
       let (s, st') = pick (index mod sum) l in
