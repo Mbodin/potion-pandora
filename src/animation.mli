@@ -1,31 +1,7 @@
-(* This modules deals with storing the animation aspect (images, dynamics, etc.)
-  of the displayed objects. *)
+(* This module deals with storing the animation aspect of the displayed objects. *)
 
 (* Number of expected frame per seconds. *)
 val frames_per_second : int
-
-(* A static image, ready to be displayed.
-  Note that the (0, 0) coordinate of an image is on its top-left corner: y-coordinates are
-  not reversed like the rest of the program. *)
-type image
-
-(* Conversion of types of images. *)
-val make_image : Image.image -> image
-
-(* Given the width, height, and (x, y) position of the image part in the program data,
-  store the corresponding subimage.
-  The optional argument is there to extract an image from another image then the default
-  bundle for Bundled_image. *)
-val make_subimage : ?bundle:Image.image -> int -> int -> (int * int) -> image
-
-(* Given an image, reads its (r, g, b, a) values at the provided coordinate. *)
-val read_image : image -> (int * int) -> (int * int * int * int)
-
-(* Return the dimensions (width, height) of the image. *)
-val image_dimensions : image -> (int * int)
-
-(* Combine a list of images with an offset into a single image. *)
-val combine_images : (image * (int * int)) list -> image
 
 
 (* A representation of an object as an automaton.
@@ -33,7 +9,7 @@ val combine_images : (image * (int * int)) list -> image
 type t
 
 (* The current image of the object. *)
-val image : t -> image
+val image : t -> Subimage.t
 
 (* Check that all the images of the animation have the exact same size. *)
 val check_size : t -> bool
@@ -54,10 +30,10 @@ val listen : t -> Event.t -> bool
 val print : ?quiet:bool -> t -> string
 
 (* An animation sequence, composed of subimages associated with a time (in seconds). *)
-type sequence = (image * float) list
+type sequence = (Subimage.t * float) list
 
 (* An object with a single image, never changing. *)
-val static : image -> t
+val static : Subimage.t -> t
 
 (* An object doing a single looping sequence. *)
 val loop : sequence -> t

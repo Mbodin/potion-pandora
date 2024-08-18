@@ -1,72 +1,7 @@
-
-(* In this program, most images are bundled up into a single large image.
-  Thus, any part is actually a subpart of this image.
-  This type stores the corresponding coordinates. *)
-type image = {
-  width : int ;
-  height : int ;
-  position : int * int ;
-  picture : Image.image (* The larger picture from which this image is taken from. *)
-}
-
-let image_dimensions img =
-  (img.width, img.height)
-
-let make_subimage ?(bundle = Bundled_image.image) width height position =
-  assert (fst position >= 0 && snd position >= 0) ;
-  assert (fst position + width <= bundle.Image.width) ;
-  assert (snd position + height <= bundle.Image.height) ;
-  { width ; height ; position ; picture = bundle }
-
-let make_image img =
-  make_subimage ~bundle:img img.Image.width img.Image.height (0, 0)
-
-let read_image img (x, y) =
-  assert (x >= 0 && y >= 0) ;
-  assert (x < img.width && y < img.height) ;
-  let (px, py) = img.position in
-  Image.read_rgba img.picture (x + px) (y + py) (fun r g b a -> (r, g, b, a))
-
-
-(* This is a dummy image, useful for building automatons (see below), when one needs
-  an image that will be rewritten afterwards. *)
-let dummy_image =
-  let img = Image.create_rgb ~alpha:true 1 1 in
-  Image.fill_rgb ~alpha:0 img 0 0 0 ;
-  make_image img
-
-
-(* Create an image from the provided image of the provided dimensions.
-  These dimensions must be larger than the image.
-  The image will be centered. *)
-let enlarge img (width, height) =
-  assert (img.width <= width && img.height <= height) ;
-  let (basex, basey) =
-    let center = (width / 2, height / 2) in
-    let center_img = (img.width / 2, img.height / 2) in
-    (fst center - fst center_img, snd center - snd center_img) in
-  let result = Image.create_rgb ~alpha:true width height in
-  Image.fill_rgb ~alpha:0 result 0 0 0 ;
-  for x = 0 to img.width - 1 do
-    for y = 0 to img.height - 1 do
-      let (r, g, b, a) = read_image img (x, y) in
-      Image.write_rgba result (x + basex) (y + basey) r g b a
-    done
-  done ;
-  make_image result
-
-
 module IMap = Map.Make (Integer)
 module ISet = Set.Make (Integer)
 module EMap = Map.Make (Event)
 module ESet = Set.Make (Event)
-module ImageMap =
-  Map.Make (struct
-    type t = image
-    let compare i1 i2 =
-      let tuple i = (i.width, i.height, i.position) in
-      compare (tuple i1) (tuple i2)
-  end)
 
 (* Number of frames per second. *)
 let frames_per_second = 30
@@ -114,7 +49,7 @@ type state = int
   Each state is an array index.
   It then stores the associated image, as well as the next step for each event.
   The next state is itself associated *)
-type automaton = (image * (time * state) Event.map) array
+type automaton = (Subimage.t * (time * state) Event.map) array
 
 type t = {
   state : state (* The current state of the automaton. *) ;
@@ -127,11 +62,9 @@ let image t =
   image
 
 let check_size t =
-  let dim =
-    let image = image t in
-    (image.width, image.height) in
+  let dim = Subimage.dimensions (image t) in
   Array.for_all (fun (image, _next) ->
-    dim = (image.width, image.height)) t.delta
+    dim = Subimage.dimensions image) t.delta
 
 let send t e =
   let (_image, next) = t.delta.(t.state) in
@@ -150,6 +83,7 @@ let listen t e =
   (st <> t.state && not Time.(t.time < time))
 
 let print ?(quiet = true) t =
+  let module ImageMap = Map.Make (struct type t = Subimage.t let compare = compare end) in
   let name_of_state =
     let images = ref ImageMap.empty in
     fun st ->
@@ -193,7 +127,7 @@ let print ?(quiet = true) t =
   Printf.sprintf "digraph {\n%s}\n"
     (String.concat "" (List.init (Array.length t.delta) aux))
 
-type sequence = (image * float) list
+type sequence = (Subimage.t * float) list
 
 let loop s =
   let len = List.length s in
@@ -214,10 +148,12 @@ let static i = loop [(i, infinity)]
   The shift represents the first state of the sequence (it is meant to be concatenated at
   the end of the automaton and thus starts its indexes there).
   The set [restart] is a set of event that restart the sequence.
-  [state] represents the state targeted after the sequence ended, and the last argument is
-  [t.delta.(state)] where [t] is the automaton being constructed: it is useful to tune the
-  behaviour of [skip]. *)
-let create_sequence shift skip restart s state (_image, action) =
+  [state] represents the state targeted after the sequence ended.
+  The last argument is to tune a skipping behavior: if it is [None], then this sequence won't
+  skip on any event.
+  If it is [Some t.delta.(st)] (typically with [st = state]), then it will mimick the provided
+  state: if this state immediately reacts on an event, so will the sequence. *)
+let create_sequence shift restart s state skip =
   let len = List.length s in
   Array.of_list (List.mapi (fun index (image, time) ->
     let self = shift + index in
@@ -231,14 +167,15 @@ let create_sequence shift skip restart s state (_image, action) =
         else
           (* Reaction of the state after the sequence to this event. *)
           let reaction =
-            if skip then
+            match skip with
+            | None -> None
+            | Some (_image, action) ->
               let (time, state') = Event.fetch action e in
               if time = Time.zero && state' <> state then
                 (* In this case, [state] would directly jump into [state'] without waiting:
                   as [skip] is true, we must jump there too. *)
                 Some state'
-              else None
-            else None in
+              else None in
           match reaction with
           | None -> (Time.infinity, self)
           | Some next -> (Time.zero, next)))) s)
@@ -251,7 +188,8 @@ let react t es ?(skip = false) ?(restart = false) s =
     let shift = Array.length t.delta in
     let sequence =
       let restart = if restart then es else ESet.empty in
-      create_sequence shift skip restart s t.state t.delta.(t.state) in
+      create_sequence shift restart s t.state
+        (if skip then Some t.delta.(t.state) else None) in
     let automaton =
       Array.append
         (Array.map (fun (image, next) ->
@@ -281,7 +219,9 @@ let change_with t1 es ?(skip = false) s t2 =
       (image, Event.create_map (fun e ->
         let (time, state) = Event.fetch f e in
         (time, state + shift)))) t2.delta in
-  let delta_s = create_sequence shift_s skip ESet.empty s (t2.state + shift) delta2.(t2.state) in
+  let delta_s =
+    create_sequence shift_s ESet.empty s (t2.state + shift)
+      (if skip then Some delta2.(t2.state) else None) in
   let automaton =
     Array.concat [
       delta1 ;
@@ -320,9 +260,11 @@ let switch t1 es1 ?(skip = false) s1 =
           let (time, state) = Event.fetch f e in
           (time, state + shift2)))) t2.delta in
   let delta_s1 =
-    create_sequence shift_s1 skip1 ESet.empty s1 (t2.state + shift2) delta2.(t2.state) in
+    create_sequence shift_s1 ESet.empty s1 (t2.state + shift2)
+      (if skip1 then Some delta2.(t2.state) else None) in
   let delta_s2 =
-    create_sequence shift_s2 skip2 ESet.empty s2 t1.state t1.delta.(t1.state) in
+    create_sequence shift_s2 ESet.empty s2 t1.state
+      (if skip2 then Some t1.delta.(t1.state) else None) in
   let automaton =
     Array.concat [
       delta1 ;
@@ -335,44 +277,19 @@ let switch t1 es1 ?(skip = false) s1 =
 let force_same_size t =
   let size =
     Array.fold_left (fun (sizex, sizey) (image, _next) ->
-      (max sizex image.width, max sizey image.height)) (0, 0) t.delta in
+      let (width, height) = Subimage.dimensions image in
+      (max sizex width, max sizey height)) (0, 0) t.delta in
   let delta =
     Array.map (fun (image, next) ->
       let image =
-        if (image.width, image.height) = size then image
+        if Subimage.dimensions image = size then image
         else (
-          assert (image.width <= fst size && image.height <= snd size) ;
-          enlarge image size
+          let (width, height) = Subimage.dimensions image in
+          assert (width <= fst size && height <= snd size) ;
+          Subimage.enlarge image size
         ) in
       (image, next)) t.delta in
   { t with delta }
-
-(* Given a canvas size, a list of images and offsets (which must be positive), combine the images
-  into a single image. *)
-let combine_images_raw (width, height) imgl =
-  let result = Image.create_rgb ~alpha:true width height in
-  Image.fill_rgb ~alpha:0 result 0 0 0 ;
-  List.iter (fun (img, (dx, dy)) ->
-    for x = 0 to img.width - 1 do
-      for y = 0 to img.height - 1 do
-        let (r, g, b, a) = read_image img (x, y) in
-        if a <> 0 then
-          Image.write_rgba result (x + dx) (y + dy) r g b a
-      done
-    done) imgl ;
-  make_image result
-
-let combine_images imgl =
-  (* The dimension of the final image and the difference to the offset coordinates. *)
-  let (dim, d) =
-    let (min_x, min_y, max_x, max_y) =
-      List.fold_left (fun (min_x, min_y, max_x, max_y) (img, (dx, dy)) ->
-          (min min_x dx, min min_y dy, max max_x (dx + img.width - 1), max max_y (dy + img.height - 1)))
-        (0, 0, 0, 0) imgl in
-    ((1 + max_x - min_x, 1 + max_y - min_y), (-min_x, -min_y)) in
-  (* We apply the difference to the offsets. *)
-  let imgl = List.map (fun (img, (dx, dy)) -> (img, (dx + fst d, dy + snd d))) imgl in
-  combine_images_raw dim imgl
 
 let transitions (type t0) (init : t0) next =
   let module MMap = Map.Make (struct type t = t0 let compare = compare end) in
@@ -428,11 +345,7 @@ let transitions (type t0) (init : t0) next =
               match MMap.find_opt st' visited with
               | Some index -> index
               | None -> dummy_state in
-            let dummy =
-              (* This won't actually be read, as the [skip] argument of [create_sequence] below
-                is unset. *) (* TODO: This calls for an option-type as an argument. *)
-              (dummy_image, Event.create_map (fun _ -> (Time.infinity, dummy_state))) in
-            let sequence = create_sequence current_shift false ESet.empty s index' dummy in
+            let sequence = create_sequence current_shift ESet.empty s index' None in
             let to_be_visited =
               if Array.length sequence > 0 then
                 add_to_be_visited to_be_visited st'
@@ -454,7 +367,7 @@ let transitions (type t0) (init : t0) next =
             | None -> assert false
             | Some state -> (Time.zero, state))) in
       (* We finally build the main looping sequence. *)
-      let sequence = create_sequence shift true ESet.empty s shift automaton_cell in
+      let sequence = create_sequence shift ESet.empty s shift (Some automaton_cell) in
       let delta = Array.concat (delta :: sequence :: List.rev deltas) in
       assert (Array.length delta = new_shift) ;
       aux delta visited (MMap.remove st to_be_visited) in
@@ -546,20 +459,6 @@ let nd_transitions (type t0) (init : t0) next =
 
 let combine tl =
   assert (List.for_all (fun (t, _dxy) -> check_size t) tl) ;
-  (* The dimension of a single automaton. *)
-  let dim_single t =
-    let image = image t in
-    (image.width, image.height) in
-  (* The dimension of the final image and the difference to the offset coordinates. *)
-  let (dim, d) =
-    let (min_x, min_y, max_x, max_y) =
-      List.fold_left (fun (min_x, min_y, max_x, max_y) (t, (dx, dy)) ->
-          let (width, height) = dim_single t in
-          (min min_x dx, min min_y dy, max max_x (dx + width - 1), max max_y (dy + height - 1)))
-        (0, 0, 0, 0) tl in
-    ((1 + max_x - min_x, 1 + max_y - min_y), (-min_x, -min_y)) in
-  (* We apply the difference to the offsets. *)
-  let tl = List.map (fun (t, (dx, dy)) -> (t, (dx + fst d, dy + snd d))) tl in
   (* The number of states in the new automaton. *)
   let num_states = List.fold_left (fun n (t, _) -> n * Array.length t.delta) 1 tl in
   (* Given in which state all the automatons in t are, return the corresponding state in the
@@ -587,7 +486,8 @@ let combine tl =
     Array.init num_states (fun i ->
       let sl = state_from i in
       let image =
-        combine_images_raw dim (List.map2 (fun (t, d) s ->
+        (* LATER: We might want to cache the result here to avoid recreating the same image twice. *)
+        Subimage.combine (List.map2 (fun (t, d) s ->
           let (image, _next) = t.delta.(s) in
           (image, d)) tl sl) in
       let fetch_event e =

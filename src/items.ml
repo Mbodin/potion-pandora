@@ -10,16 +10,16 @@ let loop = Animation.loop
 
 (* Converts the coordinates of Images_coords into an image. *)
 let from_coords ~bundle ((width, height), (x, y)) =
-  Animation.make_subimage ~bundle width height (x, y)
+  Subimage.make ~bundle width height (x, y)
 
 (* Call the above conversion function on the nth element of a list of coordinates,
   as given in Images_coords. *)
-let from ?(bundle = Bundled_image.image) coords i : Animation.image =
+let from ?(bundle = Bundled_image.image) coords i : Subimage.t =
   assert (i < List.length coords) ;
   from_coords ~bundle (List.nth coords i)
 
 (* Directly converts a list. *)
-let fromlist ?(bundle = Bundled_image.image) coords : Animation.image list =
+let fromlist ?(bundle = Bundled_image.image) coords : Subimage.t list =
   List.map (from_coords ~bundle) coords
 
 (* Convert a list of images into a sequence staying that time per picture. *)
@@ -35,10 +35,10 @@ let mk_sequence time mk min max =
 
 (* Build triangles from textures (useful for roofs). *)
 let triangle_left img =
-  let (dimx, _dimy) = Animation.image_dimensions img in
+  let (dimx, _dimy) = Subimage.dimensions img in
   static (Filter.triangle_lower_left img dimx)
 let triangle_right img =
-  let (dimx, _dimy) = Animation.image_dimensions img in
+  let (dimx, _dimy) = Subimage.dimensions img in
   static (Filter.triangle_lower_right img dimx)
 
 (* An object that only reacts to wind/explosions. *)
@@ -531,7 +531,7 @@ let lac =
   let d = 14 in
   (* TODO: Il semblerait que les deux images des sapins et du lac ne s'emboitent pas comme prévu. *)
   let lac =
-    Animation.combine_images [
+    Subimage.combine [
         (from Images_coords.lac 0, (0, d)) ;
         (from Images_coords.sapins 0, (0, 0))
       ] in
@@ -646,11 +646,11 @@ let monter_panneau =
     let mk = from Images_coords.support_panneau in
     rexplosions (mk 0) [] (mk 1) in
   assert (Animation.check_size support_panneau) ;
-  let (dimx_support, _dimy_support) = Animation.image_dimensions (Animation.image support_panneau) in
+  let (dimx_support, _dimy_support) = Subimage.dimensions (Animation.image support_panneau) in
   (* Le panneau n'est pas centré sur l'image, d'où cette différence de 1. *)
   let adhoc_offset = -1 in
   fun img ->
-    let (dimx, dimy) = Animation.image_dimensions img in
+    let (dimx, dimy) = Subimage.dimensions img in
     Animation.combine [
       (static img, (0, 0)) ;
       (support_panneau, ((dimx - dimx_support) / 2 + adhoc_offset, dimy))

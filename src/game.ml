@@ -91,7 +91,7 @@ module Launch (I : Interface.T) = struct
           if d = Interface.North then (
             (* We launch the explosion in the middle of the feet. *)
             let (dimx, _dimy) =
-              Animation.image_dimensions (Animation.image (Store.get_display store player)) in
+              Subimage.dimensions (Animation.image (Store.get_display store player)) in
             let coords = (fst current_coords + dimx / 2, snd current_coords) in
             Store.explode store coords 10
           ) ;
@@ -131,7 +131,7 @@ module Launch (I : Interface.T) = struct
             let player_center =
               let (x, y) = Store.get_coords store player in
               let (dim_x, dim_y) =
-                Animation.image_dimensions (Animation.image (Store.get_display store player)) in
+                Subimage.dimensions (Animation.image (Store.get_display store player)) in
               (x + dim_x / 2, y + dim_y / 2) in
             let move_camera target_min target_max current v =
               if v < target_min then current - 1

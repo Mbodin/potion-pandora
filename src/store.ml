@@ -307,7 +307,7 @@ let all_groups_within level min_coord max_coord =
 let covered_cells obj =
   let (posx, posy) = !obj.position in
   let max_pos =
-    let (dimx, dimy) = Animation.image_dimensions (Animation.image !obj.display) in
+    let (dimx, dimy) = Subimage.dimensions (Animation.image !obj.display) in
     (posx + dimx - 1, posy + dimy - 1) in
   all_groups_within !obj.level (posx, posy) max_pos
 

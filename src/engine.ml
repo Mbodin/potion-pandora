@@ -34,7 +34,7 @@ module Engine (D : Display) (I : Interface.T) = struct
     The interface coordinates and the image coordinates (0 is up) are different
     from the game coordinates (0 is down), so some computations have to take place. *)
   let display_image img (coord_x, coord_y) =
-    let (dim_x, dim_y) = Animation.image_dimensions img in
+    let (dim_x, dim_y) = Subimage.dimensions img in
     let min_x = max 0 (-coord_x) in
     let max_x = min (dim_x - 1) (D.width - coord_x - 1) in
     let min_y = max 0 (dim_y + coord_y - D.height) in
@@ -43,7 +43,7 @@ module Engine (D : Display) (I : Interface.T) = struct
     let* interface in
     for_ min_x max_x (fun x ->
       for_ min_y max_y (fun y ->
-        let (r, g, b, a) = Animation.read_image img (x, y) in
+        let (r, g, b, a) = Subimage.read img (x, y) in
         match a with
         | 0 -> return ()
         | 255 -> I.write interface (r, g, b) (coord_x + x, D.height - dim_y - coord_y + y)
