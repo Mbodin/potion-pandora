@@ -26,12 +26,17 @@ let fromlist ?(bundle = Bundled_image.image) coords : Subimage.t list =
 let to_sequence time l =
   List.map (fun i -> (i, time)) l
 
+(* Given a function [mk] building an image and a list of arguments for [mk], build
+  the corresponding sequence. *)
+let mk_sequence time mk l =
+  to_sequence time (List.map mk l)
+
 (* Build a sequence from the time between frame, a function [mk] building the nth image,
   and the minimum and maximum values that should be provided to this function to build
   the sequence. *)
-let mk_sequence time mk min max =
+let mk_sequence_range time mk min max =
   assert (max >= min) ;
-  to_sequence time (List.init (1 + max - min) (fun i -> mk (i + min)))
+  mk_sequence time mk (List.init (1 + max - min) (fun i -> i + min))
 
 (* Build triangles from textures (useful for roofs). *)
 let triangle_left img =
@@ -49,10 +54,18 @@ let rwind img s =
 let rexplosions img s final =
   Animation.change_with (static img) Event.[Explode] s (static final)
 
-(* Useful function to use [Animation.nd_transitions]: it only reacts to [Event.Tau]. *)
+(* Useful function to use [Animation.nd_transitions]: given the current state and a list of
+   weighed next transitions, it only reacts to [Event.Tau]. *)
 let only_tau st l = function
   | Event.Tau -> l
   | _ -> [(1, [], st)]
+
+(* Extract all the elements of a sequence from a provided index. *)
+let rec seq_from s n =
+  match s, n with
+  | s, 0 -> s
+  | _ :: s, n -> seq_from s (n - 1)
+  | _, _ -> assert false
 
 (* The palette is an exception, as it is provided as a single image (with a single line).
   We here split it into several one-pixel images. *)
@@ -102,7 +115,7 @@ module Perso = struct
       let f = if b then snd else fst in
       let perso = static (f normal) in
       let perso = react perso Event.[Wind] [(f vent, 0.3)] in
-      let perso = react perso Event.[RandomFrequent] [(f inspiration, 1.)] in
+      let perso = react perso Event.[RandomFrequent] [(f inspiration, 0.5)] in
       let perso = react perso Event.[RandomNormal] [(f clignement, 0.05)] in
       let perso = react perso Event.[RandomRare] (to_sequence 0.5 (f gratte)) in
       let perso = react perso Event.[LookDown] [(f regard_bas, 1.)] in
@@ -135,11 +148,11 @@ let perso = Perso.perso
 
 let femme_fenetre =
   let mk = from Images_coords.femme_fenetre in
-  loop (to_sequence 0.5 (List.map mk [0; 2; 0; 1]))
+  loop (mk_sequence 0.5 mk [0; 2; 0; 1])
 
 let personne_echelle =
   let mk = from Images_coords.personne_echelle in
-  loop (to_sequence 0.5 (List.map mk [0; 2; 0; 1]))
+  loop (mk_sequence 0.5 mk [0; 2; 0; 1])
 
 let mineur =
   let open Animation in
@@ -147,19 +160,19 @@ let mineur =
   let mineur = static (mk 0) in
   let mineur = react mineur Event.[RandomFrequent] [(mk 1, 1.)] in
   let mineur =
-    let s = mk_sequence 0.25 mk 2 6 in
+    let s = mk_sequence_range 0.18 mk 2 6 in
     react mineur Event.[RandomNormal] (s @ List.rev s) in
   mineur
 
 let fumeur =
   let mk = from Images_coords.fumeur in
-  loop (to_sequence 0.3 (List.map mk [0; 1; 0; 2]))
+  loop (mk_sequence 0.3 mk [0; 1; 0; 2])
 
 let crash = loop (to_sequence 0.7 (fromlist Images_coords.crash))
 
 let emmele_cable =
   let mk = from Images_coords.emmele_cable in
-  loop (to_sequence 0.4 (List.map mk [0; 1; 2; 1]))
+  loop (mk_sequence 0.4 mk [0; 1; 2; 1])
 
 let enfant =
   let mk = from Images_coords.enfant in
@@ -205,12 +218,26 @@ let enfant_cache3 =
 
 let enfant_cache_cache_compte =
   let mk = from Images_coords.enfant_cache_cache_compte in
-  (* TODO: Plus de diversité de mouvement ici. *)
-  loop (to_sequence 1. (List.map mk [0; 1; 2; 0; 1; 2]) @ to_sequence 0.2 (List.map mk [3; 4]))
+  Animation.nd_transitions 0 (function
+    | 0 ->
+      ((mk 1, 1.) :: mk_sequence 0.3 mk [4; 3], only_tau 0 [
+        (1, [], 13) ;
+        (1, [], 10) ;
+        (1, [], 7)
+      ])
+    | n ->
+      (mk_sequence 0.5 mk [0; 1; 2], only_tau n [
+        (1, [], (n - 1))
+      ]))
 
 let enfant_cerf_volant =
-  let mk = from Images_coords.enfant_cerf_volant in
-  loop (to_sequence 0.3 (List.map mk [0; 1; 2]))
+  let sfrom = seq_from (to_sequence 0.3 (fromlist Images_coords.enfant_cerf_volant)) in
+  Animation.nd_transitions () (fun () ->
+    (sfrom 0, only_tau () [
+        (3, [], ()) ;
+        (1, sfrom 1, ()) ;
+        (1, sfrom 2, ())
+      ]))
 
 (* TODO: aveugle *)
 (* TODO: chauffard *)
@@ -231,15 +258,18 @@ let enfant_cerf_volant =
 
 (* TODO: merle *)
 (* TODO: pie *)
-(* TODO: oiseau - à animer et renommer. *)
 (* TODO: papillon *)
 (* TODO: poissons *)
 (* TODO: rouge_gorge *)
 
+let oiseau =
+  (* TODO: oiseau - à animer et renommer. *)
+  static (from Images_coords.oiseau 0)
+
 let papillons =
   let mk = from Images_coords.papillons in
   (* TODO: Il faudrait ajouter des aller/retours dans l'animation. *)
-  Animation.react (static (mk 0)) Event.[Touch; Explode] (mk_sequence 0.1 mk 1 15)
+  Animation.react (static (mk 0)) Event.[Touch; Explode] (mk_sequence_range 0.1 mk 1 15)
 
 (* * Objets *)
 
@@ -292,20 +322,20 @@ let chute_linge linge =
       (static (from Images_coords.linge_chute 7)))
 let linge1 =
   let mk = from Images_coords.linge1 in
-  let linge = rwind (mk 0) (mk_sequence 0.2 mk 1 2) in
+  let linge = rwind (mk 0) (mk_sequence_range 0.2 mk 1 2) in
   chute_linge linge
 let linge2 = static (from Images_coords.linge2 0)
 let linge3 =
   let mk = from Images_coords.linge3 in
-  let linge = rwind (mk 0) (mk_sequence 0.2 mk 1 3) in
+  let linge = rwind (mk 0) (mk_sequence_range 0.2 mk 1 3) in
   chute_linge linge
 let linge4 =
   let mk = from Images_coords.linge4 in
-  let linge = rwind (mk 0) (mk_sequence 0.2 mk 1 2) in
+  let linge = rwind (mk 0) (mk_sequence_range 0.2 mk 1 2) in
   chute_linge linge
 let linge5 =
   let mk = from Images_coords.linge5 in
-  let linge = rwind (mk 0) (mk_sequence 0.2 mk 1 2) in
+  let linge = rwind (mk 0) (mk_sequence_range 0.2 mk 1 2) in
   chute_linge linge
 
 let planche =
@@ -372,43 +402,43 @@ let fleurs = static (from Images_coords.fleurs 0)
 
 let arbre1 =
   let mk = from Images_coords.arbre1 in
-  rwind (mk 0) (mk_sequence 0.2 mk 1 5)
+  rwind (mk 0) (mk_sequence_range 0.2 mk 1 5)
 let arbre1_sombre =
   let mk = from ~bundle:vert_fonce Images_coords.arbre1 in
-  rwind (mk 0) (mk_sequence 0.2 mk 1 5)
+  rwind (mk 0) (mk_sequence_range 0.2 mk 1 5)
 let arbre1_tres_sombre =
   let mk = from ~bundle:vert_tres_fonce Images_coords.arbre1 in
-  rwind (mk 0) (mk_sequence 0.2 mk 1 5)
+  rwind (mk 0) (mk_sequence_range 0.2 mk 1 5)
 
 let arbre2 =
   let mk = from Images_coords.arbre2 in
-  rwind (mk 0) (mk_sequence 0.2 mk 1 3)
+  rwind (mk 0) (mk_sequence_range 0.2 mk 1 3)
 let arbre2_sombre =
   let mk = from ~bundle:vert_fonce Images_coords.arbre2 in
-  rwind (mk 0) (mk_sequence 0.2 mk 1 3)
+  rwind (mk 0) (mk_sequence_range 0.2 mk 1 3)
 let arbre2_tres_sombre =
   let mk = from ~bundle:vert_tres_fonce Images_coords.arbre2 in
-  rwind (mk 0) (mk_sequence 0.2 mk 1 3)
+  rwind (mk 0) (mk_sequence_range 0.2 mk 1 3)
 
 let arbre3 =
   let mk = from Images_coords.arbre3 in
-  rwind (mk 0) (mk_sequence 0.2 mk 1 4)
+  rwind (mk 0) (mk_sequence_range 0.2 mk 1 4)
 let arbre3_sombre =
   let mk = from ~bundle:vert_fonce Images_coords.arbre3 in
-  rwind (mk 0) (mk_sequence 0.2 mk 1 4)
+  rwind (mk 0) (mk_sequence_range 0.2 mk 1 4)
 let arbre3_tres_sombre =
   let mk = from ~bundle:vert_tres_fonce Images_coords.arbre3 in
-  rwind (mk 0) (mk_sequence 0.2 mk 1 4)
+  rwind (mk 0) (mk_sequence_range 0.2 mk 1 4)
 
 let arbre4 =
   let mk = from Images_coords.arbre4 in
-  rwind (mk 0) (mk_sequence 0.2 mk 1 6)
+  rwind (mk 0) (mk_sequence_range 0.2 mk 1 6)
 let arbre4_sombre =
   let mk = from ~bundle:vert_fonce Images_coords.arbre4 in
-  rwind (mk 0) (mk_sequence 0.2 mk 1 6)
+  rwind (mk 0) (mk_sequence_range 0.2 mk 1 6)
 let arbre4_tres_sombre =
   let mk = from ~bundle:vert_tres_fonce Images_coords.arbre4 in
-  rwind (mk 0) (mk_sequence 0.2 mk 1 6)
+  rwind (mk 0) (mk_sequence_range 0.2 mk 1 6)
 
 let arbre_loin1 = static (from Images_coords.arbre_loin 0)
 let arbre_loin2 = static (from Images_coords.arbre_loin 1)
@@ -437,15 +467,15 @@ let champignon4 = static (from Images_coords.champignons 3)
 let epi_ble =
   let mk = from Images_coords.epi_ble in
   let epi = static (mk 0) in
-  let epi = Animation.react epi Event.[Wind; Touch] (mk_sequence 0.2 mk 1 3) in
+  let epi = Animation.react epi Event.[Wind; Touch] (mk_sequence_range 0.2 mk 1 3) in
   let epi =
-    Animation.change_with epi Event.[Explode] (mk_sequence 0.05 mk 1 2 @ mk_sequence 0.05 mk 4 6)
+    Animation.change_with epi Event.[Explode] (mk_sequence_range 0.05 mk 1 2 @ mk_sequence_range 0.05 mk 4 6)
       (static (mk 6)) in
   epi
 
 let rosiers =
   let mk = from Images_coords.rosiers in
-  rwind (mk 0) (to_sequence 0.2 (List.map mk [1; 2; 3; 2; 1]))
+  rwind (mk 0) (mk_sequence 0.2 mk [1; 2; 3; 2; 1])
 
 (* * Minéraux *)
 
@@ -471,10 +501,10 @@ let pierre9 = static (from Images_coords.pierres 8)
 
 let pierre_bouge1 =
   let mk = from Images_coords.pierres_bougent in
-  Animation.react (static (mk 0)) Event.[Touch; Explode] (mk_sequence 0.1 mk 1 3)
+  Animation.react (static (mk 0)) Event.[Touch; Explode] (mk_sequence_range 0.1 mk 1 3)
 let pierre_bouge2 =
   let mk = from Images_coords.pierres_bougent in
-  Animation.react (static (mk 4)) Event.[Touch; Explode] (mk_sequence 0.1 mk 5 6)
+  Animation.react (static (mk 4)) Event.[Touch; Explode] (mk_sequence_range 0.1 mk 5 6)
 
 let roche = static (from Images_coords.roche 0)
 
@@ -535,7 +565,7 @@ let lac =
         (from Images_coords.sapins 0, (0, 0))
       ] in
   let lac = Filter.shimmer ~quantity:220 ~amplitude:10 ~duration:45 ~direction:(-0.2, 1.) lac in
-  let lac = loop (List.map (fun img -> (img, 0.15)) lac) in
+  let lac = loop (to_sequence 0.15 lac) in
   Animation.combine [
       (lac, (0, 0)) ;
       (sapins, (0, 0))
@@ -544,21 +574,15 @@ let lac =
 let mare =
   let mare = from Images_coords.mare 0 in
   let mare = Filter.shimmer ~quantity:40 ~amplitude:3 ~duration:20 ~direction:(-0.2, 1.) mare in
-  loop (List.map (fun img -> (img, 0.3)) mare)
+  loop (to_sequence 0.3 mare)
 
 let ruisseau =
-  let seq_from =
-    let rec aux s n =
-      match s, n with
-      | s, 0 -> s
-      | _ :: s, n -> aux s (n - 1)
-      | _, _ -> assert false in
-    aux (to_sequence 0.1 (fromlist Images_coords.ruisseau)) in
+  let sfrom = seq_from (to_sequence 0.1 (fromlist Images_coords.ruisseau)) in
   Animation.nd_transitions () (fun () ->
-    (seq_from 0, only_tau () [
+    (sfrom 0, only_tau () [
         (5, [], ()) ;
-        (1, seq_from 1, ()) ;
-        (1, seq_from 2, ())
+        (1, sfrom 1, ()) ;
+        (1, sfrom 2, ())
       ]))
 
 let puit = static (from Images_coords.puit 0)
@@ -586,7 +610,7 @@ let poteau = static (from Images_coords.poteau 0)
 
 let barriere_travaux =
   let mk = from Images_coords.barriere_travaux in
-  rwind (mk 0) (mk_sequence 0.25 mk 1 4)
+  rwind (mk 0) (mk_sequence_range 0.25 mk 1 4)
 
 let arceau_velo = static (from Images_coords.arceau 0)
 
@@ -617,7 +641,7 @@ let bac_a_sable = static (from Images_coords.bac_a_sable 0)
 
 let balancoire =
   let mk = from Images_coords.balancoire in
-  rwind (mk 0) (mk_sequence 0.3 mk 1 4)
+  rwind (mk 0) (mk_sequence_range 0.3 mk 1 4)
 
 let balancoire_ressort = static (from Images_coords.balancoire_ressort 0)
 
@@ -706,7 +730,7 @@ let toit_tuile_pignon = static (from Images_coords.toit_tuile_pignon 0)
 
 let antenne =
   let mk = from Images_coords.antenne in
-  rwind (mk 0) (mk_sequence 0.2 mk 1 2)
+  rwind (mk 0) (mk_sequence_range 0.2 mk 1 2)
 
 let chemine = static (from Images_coords.chemine 0)
 let chemines = static (from Images_coords.chemines 0)
@@ -760,7 +784,7 @@ let porte_services = static (from Images_coords.porte_services 0)
 
 let store_terrasse =
   let mk = from Images_coords.store_terrasse in
-  rwind (mk 0) (mk_sequence 0.2 mk 1 4)
+  rwind (mk 0) (mk_sequence_range 0.2 mk 1 4)
 
 (* * Murs *)
 
@@ -791,14 +815,14 @@ let texture_mur3_toit_droit = triangle_right (from Images_coords.texture_mur3 0)
 
 let etoile =
   let mk = from Images_coords.etoile in
-  Animation.react (static (mk 0)) Event.[RandomFlicker] (to_sequence 0.05 (List.map mk [2; 1; 2]))
+  Animation.react (static (mk 0)) Event.[RandomFlicker] (mk_sequence 0.05 mk [2; 1; 2])
 
 let nuage1 = static (from Images_coords.nuage 0)
 let nuage2 = static (from Images_coords.nuage 1)
 
 let soleil =
   let mk = from Images_coords.soleil in
-  Animation.react (static (mk 0)) Event.[RandomRare] (mk_sequence 0.05 mk 1 3)
+  Animation.react (static (mk 0)) Event.[RandomRare] (mk_sequence_range 0.05 mk 1 3)
 
 (* * Interface *)
 

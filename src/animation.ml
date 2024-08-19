@@ -75,7 +75,7 @@ let send t e =
     else { t with state = st ; time = Time.zero }
   else
     if Time.(t.time < time) then t
-    else {t with state = st }
+    else { t with state = st }
 
 let listen t e =
   let (_image, next) = t.delta.(t.state) in

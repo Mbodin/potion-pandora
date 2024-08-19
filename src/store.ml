@@ -295,7 +295,7 @@ end = struct
     | -1 -> -1
     | n -> n - 1
 
-  let reset max = Random.int (2 * max)
+  let reset target = Random.int (max 2 (2 * target))
 
   let clear = -1
 
@@ -556,40 +556,98 @@ let rec remove_obj obj = function
 let wind_speed = 4
 
 (* Average separation between two wind wave. *)
-let wind_separation = 200
+let wind_separation = 400
 
 let step store min_screen max_screen =
+  let module GroupMap = Map.Make (struct type t = Data.group let compare = compare end) in
+  let module I2Set = Set.Make (struct type t = int * int let compare = compare end) in
   (* Send a moving event to the moving objects, as well as moving them. *)
   let data =
-    IMap.fold (fun level m data ->
+    IMap.fold (fun level moving data ->
       let a =
         match IMap.find_opt level data with
         | Some a -> a
         | None -> assert false in
-      let gs = !m in
+      let gs = !moving in
+      (* All the coordinates touched by a moving object.
+        For efficiency reasons, we split the map with groups first. *)
+      let touched_pixels =
+        let (_a, m) =
+          fold_once_over_groups (fun a m obj ->
+            match !obj.move with
+            | None -> (a, m)
+            | Some (_target, _speed, true) -> (a, m)
+            | Some (_target, _speed, false) ->
+              let m =
+                let img = Animation.image !obj.display in
+                let (dimx, dimy) = Subimage.dimensions img in
+                let (posx, posy) = !obj.position in
+                let id v = v in
+                List.fold_left (fun m x ->
+                  List.fold_left (fun m y ->
+                    let (_r, _g, _b, a) = Subimage.read img (x, y) in
+                    if a > 0 then (
+                      let pos = (x + posx, y + posy) in
+                      let g = Data.get_group pos in
+                      let mm =
+                        match GroupMap.find_opt g m with
+                        | None -> I2Set.empty
+                        | Some mm -> mm in
+                      let mm = I2Set.add pos mm in
+                      GroupMap.add g mm m
+                    ) else m) m (List.init dimy id)) m (List.init dimx id) in
+              (a, m)) gs a GroupMap.empty in
+        m in
+      let read_touched_pixels pos =
+        let g = Data.get_group pos in
+        match GroupMap.find_opt g touched_pixels with
+        | Some mm -> I2Set.mem pos mm
+        | None -> false in
+      (* All the groups that we are going to consider this turn. *)
       let gs =
-        (* TODO: We might want to add some size to the screen. *)
+        let add delta (x, y) = (x + delta, y + delta) in
+        let delta = 20 in
+        let min_screen = add (-delta) min_screen in
+        let max_screen = add delta max_screen in
         GroupSet.union gs (GroupSet.of_list (all_groups_within level min_screen max_screen)) in
-      m := GroupSet.empty ;
+      moving := GroupSet.empty ;
       let (a, ()) =
         fold_once_over_groups (fun a () obj ->
           send_direct obj Event.Tau ;
           let trigger_random e deciseconds value set =
-            if Randomness.fire value then send_direct obj e ;
-            let value = Randomness.step value in
-            obj := { !obj with random = (set !obj.random value) } ;
-            if Animation.listen (!obj.display) e then
-              let value = Randomness.reset ((deciseconds * Animation.frames_per_second) / 10) in
-              obj := { !obj with random = (set !obj.random value) } in
+            if Randomness.ticking value then (
+              if Randomness.fire value then send_direct obj e ;
+              let value = Randomness.step value in
+              obj := { !obj with random = (set !obj.random value) }
+            ) else (
+              if Animation.listen (!obj.display) e then
+                let value = Randomness.reset ((deciseconds * Animation.frames_per_second) / 10) in
+                obj := { !obj with random = (set !obj.random value) }
+            ) in
           trigger_random Event.RandomRare 300 !obj.random.rare (fun r v -> { r with rare = v }) ;
           trigger_random Event.RandomNormal 50 !obj.random.normal (fun r v -> { r with normal = v }) ;
           trigger_random Event.RandomFrequent 10 !obj.random.frequent (fun r v -> { r with frequent = v }) ;
           trigger_random Event.RandomFlicker 2 !obj.random.flicker (fun r v -> { r with flicker = v }) ;
-          (* TODO: Check that this object touches a (non-ghost) moving object:
-          send_direct obj Event.Touch ; *)
+          (* Check that this object touches a (non-ghost) moving object.
+            Note that this includes the current object itself: moving objects should generally avoid
+            reacting to [Event.Touch]. *)
+          let touched =
+            if not (Animation.listen (!obj.display) Event.Touch) then false
+            else (
+              let img = Animation.image !obj.display in
+              let (dimx, dimy) = Subimage.dimensions img in
+              let (posx, posy) = !obj.position in
+              let id v = v in
+              List.exists (fun x ->
+                List.exists (fun y ->
+                  let (_r, _g, _b, a) = Subimage.read img (x, y) in
+                  if a > 0 then read_touched_pixels (x + posx, y + posy)
+                  else false) (List.init dimy id)) (List.init dimx id)
+            ) in
+          if touched then send_direct obj Event.Touch ;
           match !obj.move with
           | None -> (a, ())
-          | Some (tpos, speed, ghost) ->
+          | Some (tpos, speed, _ghost) ->
             let gs_before = covered_cells obj in
             let (position, e) = move_towards !obj.position tpos speed in
             Option.iter (send_direct obj) e ;
@@ -606,18 +664,18 @@ let step store min_screen max_screen =
               List.fold_left (fun a g -> Data.map_at a g (remove_obj obj)) a gs_before_only in
             let a =
               List.fold_left (fun a g -> Data.add_to_list a g obj) a gs_after_only in
-            if !obj.move <> None then m := GroupSet.union gs_after_set !m ;
+            if !obj.move <> None then moving := GroupSet.union gs_after_set !moving ;
             (a, ())) gs a () in
       IMap.add level a data) !store.moving !store.data in
   store := { !store with data } ;
   (* Move wind, and trigger its associated events. *)
   List.iter (fun wind_x ->
-    IMap.iter (fun level a ->
+    IMap.iter (fun _level a ->
       Data.iter_at_x (List.iter (fun obj ->
         send_direct obj Event.Wind)) a wind_x) !store.data) !store.wind ;
   let wind =
     let max_x =
-      IMap.fold (fun level a max_x ->
+      IMap.fold (fun _level a max_x ->
         max max_x (Data.largest_x a)) !store.data 0 in
     List.filter_map (fun wind_x ->
       if wind_x > max_x then None
@@ -627,7 +685,7 @@ let step store min_screen max_screen =
   let () =
     if Random.int wind_separation = 0 then (
       let min_x =
-        IMap.fold (fun level a min_x ->
+        IMap.fold (fun _level a min_x ->
           min min_x (Data.smallest_x a)) !store.data 0 in
       store := { !store with wind = min_x :: !store.wind }
     ) in

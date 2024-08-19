@@ -63,8 +63,10 @@ module Launch (I : Interface.T) = struct
     (*ignore (Store.add store Items.fumeur (160, -50)) ;*) (* TODO: Il semblerait que la taille ne correspond pas. *)
     ignore (Store.add store Items.fume (200, -50)) ;
     ignore (Store.add store Items.enfant_cache1 (260, -50)) ;
-    ignore (Store.add store Items.enfant_cache2 (290, -50)) ;
-    ignore (Store.add store Items.enfant_cache3 (310, -50)) ;
+    ignore (Store.add store Items.enfant_cache2 (280, -50)) ;
+    ignore (Store.add store Items.enfant_cache3 (300, -50)) ;
+    ignore (Store.add store Items.enfant_cache_cache_compte (320, -50)) ;
+    ignore (Store.add store Items.enfant_cerf_volant (350, -50)) ;
     let player = Store.add store Items.perso (0, 0) in
     ignore (Store.add store Items.arbre1_tres_sombre (130, -25)) ;
     (player, store)
