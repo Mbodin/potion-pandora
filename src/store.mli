@@ -19,6 +19,13 @@ val add : t -> Animation.t -> ?level:int -> Projection.game_coords -> obj
 (* Remove an object from the store. *)
 val remove : t -> obj -> unit
 
+(* Add bird animations to be picked from when spawning. *)
+val add_birds : t -> Animation.t list -> unit
+
+(* Add a location for birds to stand.
+  Bird will occasionnally get to one of these. *)
+val add_bird_location : t -> ?level:int -> Projection.game_coords -> unit
+
 (* Given two screen coordinates, return all the objects that are within (or touching)
   the associated rectangle.
   The objects will be listed in topological order.

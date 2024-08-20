@@ -349,13 +349,22 @@ module GroupSet =
     let compare = compare
   end)
 
+(* A map for game coordinates. *)
+module CoordMap =
+  Map.Make (struct
+    type t = Projection.game_coords
+    let compare = compare
+  end)
+
 (* The store maps each level to an array of objects.
   Note that objects are present several times within the data: one for each
   cell in which it is present. *)
 type store = {
   data : obj list Data.t IMap.t (* The actual store data, for each level. *) ;
-  moving : GroupSet.t ref IMap.t ; (* The groups containing moving objects. *)
-  wind : int list (* The x-coordinates where there is currently wind. *)
+  moving : GroupSet.t ref IMap.t (* The groups containing moving objects, for each level. *) ;
+  wind : int list (* The x-coordinates where there is currently wind. *) ;
+  birds : Animation.t array (* All the available birds. *) ;
+  bird_locations : obj option CoordMap.t IMap.t (* For each bird standing point (level and coordinate), the bird going there, if any. *)
 }
 
 (* Return all the groups between the provided screen coordinates at this level. *)
@@ -378,8 +387,21 @@ let create () =
   ref {
     data = IMap.empty ;
     moving = IMap.empty ;
-    wind = []
+    wind = [] ;
+    birds = [||] ;
+    bird_locations = IMap.empty
   }
+
+let add_birds store birds =
+  store := { !store with birds = Array.append !store.birds (Array.of_list birds) }
+
+let add_bird_location store ?(level = 0) coord =
+  let m =
+    match IMap.find_opt level !store.bird_locations with
+    | None -> CoordMap.empty
+    | Some m -> m in
+  let m = CoordMap.add coord None m in
+  store := { !store with bird_locations = IMap.add level m !store.bird_locations }
 
 (* Force the creation of the provided level, if not present. *)
 let create_level store level =
@@ -546,21 +568,27 @@ let fold_once_over_groups f gs a acc =
         f a acc obj
       )) (a, acc) objs) gs (a, acc)
 
-(* Remove an object from a list, assuming the object is present exactly once in the list. *)
+(* Remove an object from a list. *)
 let rec remove_obj obj = function
-  | [] -> assert false
+  | [] -> []
   | obj' :: l when !obj.id = !obj'.id -> l
   | obj' :: l -> obj' :: remove_obj obj l
 
 (* Speed of the wind, in screen pixels. *)
 let wind_speed = 4
 
-(* Average separation between two wind wave. *)
+(* Average separation between two wind waves. *)
 let wind_separation = 400
+
+(* Speed of birds, in screen pixels. *)
+let bird_speed = 2
+
+(* Average separation between two birds. *)
+let bird_spawning = 100
 
 let step store min_screen max_screen =
   let module GroupMap = Map.Make (struct type t = Data.group let compare = compare end) in
-  let module I2Set = Set.Make (struct type t = int * int let compare = compare end) in
+  let module CoordSet = Set.Make (struct type t = int * int let compare = compare end) in
   (* Send a moving event to the moving objects, as well as moving them. *)
   let data =
     IMap.fold (fun level moving data ->
@@ -591,9 +619,9 @@ let step store min_screen max_screen =
                       let g = Data.get_group pos in
                       let mm =
                         match GroupMap.find_opt g m with
-                        | None -> I2Set.empty
+                        | None -> CoordSet.empty
                         | Some mm -> mm in
-                      let mm = I2Set.add pos mm in
+                      let mm = CoordSet.add pos mm in
                       GroupMap.add g mm m
                     ) else m) m (List.init dimy id)) m (List.init dimx id) in
               (a, m)) gs a GroupMap.empty in
@@ -601,8 +629,39 @@ let step store min_screen max_screen =
       let read_touched_pixels pos =
         let g = Data.get_group pos in
         match GroupMap.find_opt g touched_pixels with
-        | Some mm -> I2Set.mem pos mm
+        | Some mm -> CoordSet.mem pos mm
         | None -> false in
+      (* Whether an object touches a moving object. *)
+      let touched obj =
+        let img = Animation.image !obj.display in
+        let (dimx, dimy) = Subimage.dimensions img in
+        let (posx, posy) = !obj.position in
+        let id v = v in
+        List.exists (fun x ->
+          List.exists (fun y ->
+            let (_r, _g, _b, a) = Subimage.read img (x, y) in
+            if a > 0 then read_touched_pixels (x + posx, y + posy)
+            else false) (List.init dimy id)) (List.init dimx id) in
+      (* Considering the birds of this level. *)
+      let gs =
+        let birds =
+          match IMap.find_opt level !store.bird_locations with
+          | None -> CoordMap.empty
+          | Some m -> m in
+        CoordMap.fold (fun _coord o gs ->
+          match o with
+          | Some obj ->
+              if touched obj then ( (* TODO: Currently this will always be the case as the bird is itself moving… *)
+              (* This bird will fly away. *)
+              let target =
+                let max_x = Data.largest_x a in
+                let (x, y) = !obj.position in
+                let target_x = x + 2 * (max_x - x) in
+                (target_x, y + (target_x - x) / 3) in
+              obj := { !obj with move = Some (target, bird_speed, false) } ;
+              GroupSet.add (Data.get_group !obj.position) gs
+            ) else gs
+          | None -> gs) birds gs in
       (* All the groups that we are going to consider this turn. *)
       let gs =
         let add delta (x, y) = (x + delta, y + delta) in
@@ -611,6 +670,7 @@ let step store min_screen max_screen =
         let max_screen = add delta max_screen in
         GroupSet.union gs (GroupSet.of_list (all_groups_within level min_screen max_screen)) in
       moving := GroupSet.empty ;
+      (* Considering all the objects in the relevant area of this level. *)
       let (a, ()) =
         fold_once_over_groups (fun a () obj ->
           send_direct obj Event.Tau ;
@@ -631,20 +691,8 @@ let step store min_screen max_screen =
           (* Check that this object touches a (non-ghost) moving object.
             Note that this includes the current object itself: moving objects should generally avoid
             reacting to [Event.Touch]. *)
-          let touched =
-            if not (Animation.listen (!obj.display) Event.Touch) then false
-            else (
-              let img = Animation.image !obj.display in
-              let (dimx, dimy) = Subimage.dimensions img in
-              let (posx, posy) = !obj.position in
-              let id v = v in
-              List.exists (fun x ->
-                List.exists (fun y ->
-                  let (_r, _g, _b, a) = Subimage.read img (x, y) in
-                  if a > 0 then read_touched_pixels (x + posx, y + posy)
-                  else false) (List.init dimy id)) (List.init dimx id)
-            ) in
-          if touched then send_direct obj Event.Touch ;
+          if Animation.listen !obj.display Event.Touch && touched obj then
+            send_direct obj Event.Touch ;
           match !obj.move with
           | None -> (a, ())
           | Some (tpos, speed, _ghost) ->
@@ -668,26 +716,64 @@ let step store min_screen max_screen =
             (a, ())) gs a () in
       IMap.add level a data) !store.moving !store.data in
   store := { !store with data } ;
+  (* Minimum and maximum coordinates with something. *)
+  let (min_x, max_x) =
+    IMap.fold (fun _level a (min_x, max_x) ->
+      (min min_x (Data.smallest_x a), max max_x (Data.largest_x a))) !store.data (0, 0) in
   (* Move wind, and trigger its associated events. *)
   List.iter (fun wind_x ->
     IMap.iter (fun _level a ->
       Data.iter_at_x (List.iter (fun obj ->
         send_direct obj Event.Wind)) a wind_x) !store.data) !store.wind ;
   let wind =
-    let max_x =
-      IMap.fold (fun _level a max_x ->
-        max max_x (Data.largest_x a)) !store.data 0 in
     List.filter_map (fun wind_x ->
       if wind_x > max_x then None
       else Some (wind_x + wind_speed)) !store.wind in
   store := { !store with wind } ;
   (* Create new wind. *)
   let () =
-    if Random.int wind_separation = 0 then (
-      let min_x =
-        IMap.fold (fun _level a min_x ->
-          min min_x (Data.smallest_x a)) !store.data 0 in
-      store := { !store with wind = min_x :: !store.wind }
+    if Random.int wind_separation = 0 then
+      store := { !store with wind = min_x :: !store.wind } in
+  (* Removing birds getting too far away. *)
+  let () =
+    let bird_locations =
+      IMap.map (fun m ->
+        CoordMap.map (fun o ->
+          match o with
+          | Some obj ->
+            let pos = !obj.position in
+            if fst pos > max_x - 30 then (
+              remove store obj ;
+              None
+            ) else Some obj
+          | None -> None) m) !store.bird_locations in
+    store := { !store with bird_locations } in
+  (* Creating new birds. *)
+  let () =
+    if Array.length !store.birds > 0 && Random.int bird_spawning = 0 then (
+      let i = Random.int (Array.length !store.birds) in
+      let bird = !store.birds.(i) in
+      let bindings = Array.of_list (IMap.bindings !store.bird_locations) in
+      if Array.length bindings > 0 then (
+        let i = Random.int (Array.length bindings) in
+        let (level, m) = bindings.(i) in
+        let bindings = Array.of_list (CoordMap.bindings m) in
+        if Array.length bindings > 0 then (
+          let i = Random.int (Array.length bindings) in
+          let (coord, o) = bindings.(i) in
+          match o with
+          | Some _ -> () (* There is already a bird for this place. *)
+          | None ->
+            let start =
+              let (x, y) = coord in
+              let min_x = min_x + 30 in (* This ad hoc constant avoid the reallocation of the data. *)
+              (min_x, y + (x - min_x) / 3) in
+            let obj = add store bird ~level start in
+            obj := { !obj with move = Some (coord, bird_speed, false) } ;
+            let m = CoordMap.add coord (Some obj) m in
+            store := { !store with bird_locations = IMap.add level m !store.bird_locations }
+        )
+      )
     ) in
   ()
 
