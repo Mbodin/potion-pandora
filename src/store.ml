@@ -588,7 +588,6 @@ let bird_spawning = 100
 
 let step store min_screen max_screen =
   let module GroupMap = Map.Make (struct type t = Data.group let compare = compare end) in
-  let module CoordSet = Set.Make (struct type t = int * int let compare = compare end) in
   (* Send a moving event to the moving objects, as well as moving them. *)
   let data =
     IMap.fold (fun level moving data ->
@@ -598,6 +597,8 @@ let step store min_screen max_screen =
         | None -> assert false in
       let gs = !moving in
       (* All the coordinates touched by a moving object.
+        We associate [true] or [false] depending on whether several objects
+        touches this pixel or not.
         For efficiency reasons, we split the map with groups first. *)
       let touched_pixels =
         let (_a, m) =
@@ -619,28 +620,35 @@ let step store min_screen max_screen =
                       let g = Data.get_group pos in
                       let mm =
                         match GroupMap.find_opt g m with
-                        | None -> CoordSet.empty
+                        | None -> CoordMap.empty
                         | Some mm -> mm in
-                      let mm = CoordSet.add pos mm in
+                      let mm = CoordMap.add pos (CoordMap.mem pos mm) mm in
                       GroupMap.add g mm m
                     ) else m) m (List.init dimy id)) m (List.init dimx id) in
               (a, m)) gs a GroupMap.empty in
         m in
-      let read_touched_pixels pos =
+      (* The [strong] argument is there to indicate that the object itself
+        is moving, and thus that at least two object (itself and another one)
+        much touches this pixel for it to be considered touched. *)
+      let read_touched_pixels ?(strong = false) pos =
         let g = Data.get_group pos in
         match GroupMap.find_opt g touched_pixels with
-        | Some mm -> CoordSet.mem pos mm
-        | None -> false in
+        | None -> false
+        | Some mm ->
+          match CoordMap.find_opt pos mm with
+          | Some twice -> if strong then twice else true
+          | None -> false in
       (* Whether an object touches a moving object. *)
       let touched obj =
         let img = Animation.image !obj.display in
         let (dimx, dimy) = Subimage.dimensions img in
         let (posx, posy) = !obj.position in
+        let strong = !obj.move <> None in
         let id v = v in
         List.exists (fun x ->
           List.exists (fun y ->
             let (_r, _g, _b, a) = Subimage.read img (x, y) in
-            if a > 0 then read_touched_pixels (x + posx, y + posy)
+            if a > 0 then read_touched_pixels ~strong (x + posx, y + posy)
             else false) (List.init dimy id)) (List.init dimx id) in
       (* Considering the birds of this level. *)
       let gs =

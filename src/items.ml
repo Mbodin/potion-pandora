@@ -262,9 +262,60 @@ let enfant_cerf_volant =
 (* TODO: poissons *)
 (* TODO: rouge_gorge *)
 
+(* Intermediary type to describe flight *)
+type ('flying, 'standing) flight =
+  | InFlight of 'flying
+  | Landing of 'flying
+  | Standing of 'standing
+  | TakingOff
+
+(* Useful function to deal with [Animaux.nd_transitions] in flight. *)
+let event_flight st lflight lstanding e =
+  assert (lflight <> [] && lstanding <> []) ;
+  match st, e with
+  | InFlight _, Event.Tau ->
+    List.map (fun vflight -> (1, [], Landing vflight)) lflight
+  | (InFlight _ | Landing _ | TakingOff), Event.(MoveLeft | MoveRight | Fall) ->
+    List.map (fun vflight -> (1, [], InFlight vflight)) lflight
+  | Standing _, Event.(MoveLeft | MoveRight | Fall) -> [(1, [], TakingOff)]
+  | InFlight _, _ ->
+    List.map (fun vflight -> (1, [], Landing vflight)) lflight
+  | Standing _, _ ->
+    List.map (fun vstanding -> (1, [], Standing vstanding)) lstanding
+  | _, _ -> [(1, [], st)]
+
 let oiseau =
   (* TODO: oiseau - à animer et renommer. *)
   static (from Images_coords.oiseau 0)
+
+let papillon =
+  let mk = from Images_coords.papillon in
+  let index_st = function
+    | 0 -> [0; 1]
+    | 1 -> [2; 3]
+    | 2 -> [4; 5]
+    | 3 -> [0; 1; 0]
+    | 4 -> [2; 3; 2]
+    | 5 -> [4; 5; 4]
+    | _ -> assert false in
+  let t = 0.1 in
+  let seq_st m = mk_sequence t mk (index_st m) in
+  let full = [0; 1; 2; 3; 4; 5] in
+  let taking_off = [(1, 3); (2, 3); (2, 0)] in
+  let rec combine l1 = function
+    | [] -> []
+    | x2 :: l2 -> List.map (fun x1 -> (x1, x2)) l1 @ combine l1 l2 in
+  (* Dans les paires [(n, m)], [m] indique l'état (0, 1, ou 2) et [n] sa répétition. *)
+  Animation.nd_transitions (InFlight (2, 0)) (fun st ->
+    match st with
+    | InFlight (0, m) ->
+      (seq_st m, event_flight st (combine [1; 2; 3; 5] full) [()])
+    | InFlight (n, m) ->
+      (seq_st m, event_flight st [(n - 1, m)] [()])
+    | Landing (_, (0 | 3 | 5)) | TakingOff ->
+      (seq_st 1, event_flight st taking_off [()])
+    | Landing (_, _) | Standing () ->
+      ([(mk 3, t)], event_flight st taking_off [()]))
 
 let papillons =
   let mk = from Images_coords.papillons in
