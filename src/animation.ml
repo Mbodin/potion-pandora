@@ -82,7 +82,7 @@ let listen t e =
   let (time, st) = Event.fetch next e in
   (st <> t.state && not Time.(t.time < time))
 
-let print ?(quiet = true) t =
+let print ?(quiet = true) ?event t =
   let module ImageMap = Map.Make (struct type t = Subimage.t let compare = compare end) in
   let name_of_state =
     let images = ref ImageMap.empty in
@@ -114,7 +114,16 @@ let print ?(quiet = true) t =
           let label =
             if quiet then None
             else Some (Printf.sprintf {|label = "%s, %s"|} (Time.print time) (Event.print e)) in
-          let style = if e = Event.Tau then None else Some {|style = "dashed"|} in
+          let style =
+            let l =
+              (match e with
+               | Event.Tau -> ["dashed"]
+               | Event.(MoveLeft | MoveRight | Fall) -> ["bold"]
+               | Event.(RandomRare | RandomNormal | RandomFrequent | RandomFlicker) -> ["dotted"]
+               | _ -> [])
+              @ (if event = Some e then ["red"] else []) in
+            if l = [] then None else
+              Some (Printf.sprintf {|style = "%s"|} (String.concat "," l)) in
           let l = List.filter_map (fun o -> o) [label ; style] in
           let options =
             if l = [] then ""
@@ -230,6 +239,9 @@ let change_with t1 es ?(skip = false) s t2 =
     ] in
   { t1 with delta = automaton }
 
+let prefix s t =
+  change_with t Event.all s t
+
 let switch t1 es1 ?(skip = false) s1 =
   let skip1 = skip in fun t2 es2 ?(skip = false) s2 ->
   let skip2 = skip in
@@ -300,15 +312,15 @@ let transitions (type t0) (init : t0) next =
       - The current automaton array,
       - A map storing for each visited state its corresponding position in this automaton array,
       - A map storing the to-be-visited states, carrying a list of position (state and event) to
-        update once its value will have been found. *)
+        update once its value will have been assigned. *)
   let rec aux delta visited to_be_visited =
     match MMap.choose_opt to_be_visited with
     | None -> delta
     | Some (st, to_update) ->
       let shift = Array.length delta in
       (* We know that we will place the current state at the end of the the current array.
-        As its associated sequence has at least one element, it will indeed be associated
-        a place within the automaton. *)
+        As its associated sequence has at least one element, it will indeed be assigned a
+        place within the automaton. *)
       let visited = MMap.add st shift visited in
       (* Now that we have allocated a location for this state, we can update all the location
         that depended on it. *)
@@ -392,7 +404,7 @@ let nd_transitions (type t0) (init : t0) next =
   let module MMap = Map.Make (MO) in
   let module MSet = Set.Make (MO) in
   (* First, we cache all the results of [next] to know the size of each state,
-    as these will need to be doubled at call time. *)
+    as these will need to be duplicated for each call. *)
   let cache =
     let rec aux to_be_visited m =
       match MSet.choose_opt to_be_visited with
@@ -440,6 +452,8 @@ let nd_transitions (type t0) (init : t0) next =
       let l = nxt e in
       (* We avoid calling useless randomlessness to avoid overloading the engine. *)
       let new_state =
+        (* TODO: Determine which event among RandomFlicker..RandomRare is most relevant for this
+          automaton. *)
         if e = Event.RandomFlicker then new_state
         else fun old_state ->
           if old_state = st then
@@ -513,4 +527,19 @@ let combine tl =
     time = List.fold_left (fun n (t, _) -> max n t.time) Time.zero tl ;
     delta
   }
+
+let decolor ~pattern t =
+  { t with delta = Array.map (fun (i, ev) -> (Filter.decolor ~pattern i, ev)) t.delta }
+
+(* This test is here and not in Subimage to prevent a dependency cycle: it requires some
+  functions to create images, and Filter is the place containing most of them. *)
+let%test "Animation.force_same_size" =
+  List.for_all (fun t -> check_size (force_same_size t)) [
+    static Filter.(rectangle transparent (10, 12)) ;
+    loop Filter.[
+      (rectangle transparent (10, 12), 0.1) ;
+      (rectangle transparent (1, 20), 0.2) ;
+      (rectangle transparent (20, 1), 0.3)
+    ] ;
+  ]
 

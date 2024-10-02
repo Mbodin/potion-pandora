@@ -26,8 +26,9 @@ val send : t -> Event.t -> t
 val listen : t -> Event.t -> bool
 
 (* For debugging purposes, print-out a GraphViz visualisation of the automaton.
-  The [quiet] option removes the labels on the vertices and the vertices with the same origin and target. *)
-val print : ?quiet:bool -> t -> string
+  The [quiet] option removes the labels on the vertices and the vertices with the same origin and target.
+  The [event] option marks a particular event with a special color, to help visualising. *)
+val print : ?quiet:bool -> ?event:Event.t -> t -> string
 
 (* An animation sequence, composed of subimages associated with a time (in seconds). *)
 type sequence = (Subimage.t * float) list
@@ -37,6 +38,9 @@ val static : Subimage.t -> t
 
 (* An object doing a single looping sequence. *)
 val loop : sequence -> t
+
+(* Plays a sequence, then stays in the other animation. *)
+val prefix : sequence -> t -> t
 
 (* Like its first argument except when one of the provided event is fired:
   it then plays the sequence then goes back to its initial state.
@@ -73,4 +77,9 @@ val nd_transitions : 'a -> ('a -> sequence * (Event.t -> (int * sequence * 'a) l
 (* Combine a list of automatons with an offset into a single automaton.
   The predicate check_size must hold for each of the input automatons. *)
 val combine : (t * (int * int)) list -> t
+
+(* Force all the opaque pixels of an animation to follow a provided pattern
+  (typically a single pixel image to fully decolorise the image into this color,
+  but it can also be a gradient pattern). *)
+val decolor : pattern:Subimage.t -> t -> t
 

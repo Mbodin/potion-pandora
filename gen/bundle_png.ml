@@ -102,6 +102,8 @@ let all_images, image_map =
 let max_width =
   List.fold_left (fun w (_id, i) -> max w i.Image.width) 1 all_images
 
+let bundle_width = max_width
+
 (* Set and get coordinates for a specific name and index (which paired forms their identifier). *)
 let set_coordinates, get_coordinates =
   let coordinates =
@@ -129,7 +131,7 @@ let () =
       let index = index + 1 in
       if get_coordinates id <> None
          || image.Image.height > max_height
-         || angle_x + image.Image.width > max_width then
+         || angle_x + image.Image.width > bundle_width then
         (* The current image has actually already been placed or it is too big. *)
         build_from index angle_x angle_y max_height
       else (
@@ -161,7 +163,7 @@ let () =
   assert (List.for_all (fun (id, i) ->
     match get_coordinates id with
     | None -> false
-    | Some (x, _y) -> x + i.Image.width <= max_width) all_images)
+    | Some (x, _y) -> x + i.Image.width <= bundle_width) all_images)
 
 let max_height =
   List.fold_left (fun v (id, i) ->
@@ -172,7 +174,7 @@ let max_height =
     max v v') 1 all_images
 
 let full_image =
-  let image = Image.create_rgb ~alpha:true max_width max_height in
+  let image = Image.create_rgb ~alpha:true bundle_width max_height in
   Image.fill_rgb ~alpha:0 image 0 0 0 ;
   List.iter (fun (id, i) ->
     let (x, y) =

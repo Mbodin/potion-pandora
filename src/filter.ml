@@ -1,5 +1,4 @@
 
-(* An entirely transparent image, useful to serve as an empty pattern. *)
 let transparent =
   let img = Image.create_rgb ~alpha:true 1 1 in
   Image.fill_rgb ~alpha:0 img 0 0 0 ;
@@ -25,17 +24,17 @@ let rectangle pattern (width, height) =
   Subimage.from_image img
 
 let decolor ~pattern original =
-  let destination = Image.create_rgb ~alpha:true original.Image.width original.Image.height in
+  let (width, height) = Subimage.dimensions original in
+  let destination = Image.create_rgb ~alpha:true width height in
   let (pattern_width, pattern_height) = Subimage.dimensions pattern in
-  for x = 0 to original.Image.width - 1 do
-    for y = 0 to original.Image.height - 1 do
-      let (pr, pg, pb, pa) =
-        Subimage.read pattern (x mod pattern_width, y mod pattern_height) in
-      Image.read_rgba original x y (fun _r _g _b a ->
-        Image.write_rgba destination x y pr pg pb (min a pa))
+  for x = 0 to width - 1 do
+    for y = 0 to height - 1 do
+      let (pr, pg, pb, pa) = Subimage.read pattern (x mod pattern_width, y mod pattern_height) in
+      let (_r, _g, _b, a) = Subimage.read original (x, y) in
+      Image.write_rgba destination x y pr pg pb (min a pa)
     done
   done ;
-  destination
+  Subimage.from_image destination
 
 let curve ifl (width, height) =
   let img = Image.create_rgb ~alpha:true width height in
@@ -143,16 +142,4 @@ let flip_vertically img =
 let flip_diagonally img =
   let (width, height) = Subimage.dimensions img in
   change_coordinates height width (fun x y -> (y, x)) img
-
-(* This test is here and not in Subimage to prevent a dependency cycle: it requires some
-  functions to create images, and Filter is the place containing most of them. *)
-let%test "Animation.force_same_size" =
-  List.for_all (fun t -> Animation.check_size (Animation.force_same_size t)) [
-    Animation.static (rectangle transparent (10, 12)) ;
-    Animation.loop [
-      (rectangle transparent (10, 12), 0.1) ;
-      (rectangle transparent (1, 20), 0.2) ;
-      (rectangle transparent (20, 1), 0.3)
-    ] ;
-  ]
 

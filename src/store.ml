@@ -544,14 +544,42 @@ let move_towards position target speed =
   let closer x tx =
     if x > tx then max (x - speed) tx
     else min (x + speed) tx in
-  let x' = closer (fst position) (fst target) in
-  let y' = closer (snd position) (snd target) in
+  let (tx, ty) = target in
+  let (x, y) = position in
+  let (x', y') =
+    let x' = closer x tx in
+    let y' = closer y ty in
+    let (pos'1, pos'2, pos'3) = ((x', y), (x, y'), (x', y')) in
+    let slope (x, y) = Float.of_int (x - tx) /. Float.of_int (y - ty) in
+    let slope_init = slope position in
+    let better pos1 pos2 =
+      let d1 = Float.abs (slope pos1 -. slope_init) in
+      let d2 = Float.abs (slope pos2 -. slope_init) in
+      if d1 < d2 then pos1 else pos2 in
+    if x = x' || y = y' then (x', y')
+    else better pos'1 (better pos'2 pos'3) in
   let e =
-    if y' < snd position then Some Event.Fall
-    else if x' > fst position then Some Event.MoveRight
-    else if x' < fst position then Some Event.MoveLeft
+    if y' < y then Some Event.Fall
+    else if x' > x then Some Event.MoveRight
+    else if x' < x then Some Event.MoveLeft
     else None in
   ((x', y'), e)
+
+let%test "move_towards" =
+  List.for_all (fun (position, target) ->
+    List.for_all (fun speed ->
+      let (pos', _) = move_towards position target speed in
+      if position = target then
+        pos' = target
+      else pos' <> position) [1; 2; 3]) [
+        ((1, 1), (0, 0)) ;
+        ((10, 10), (0, 0)) ;
+        ((10, 10), (-10, -10)) ;
+        ((0, 1), (0, -1)) ;
+        ((1, -1), (1, -1)) ;
+        ((8, -12), (7, 5)) ;
+        ((9, -12), (7, 6))
+    ]
 
 (* Fold over all the objects in a list of groups, but only once per object.
   The f function might update the bidirectionnal array of data along the way:

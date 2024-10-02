@@ -32,6 +32,7 @@ module Launch (I : Interface.T) = struct
     ignore (Store.add store Items.potion (-40, 0)) ;
     ignore (Store.add store Items.petite_potion (-60, 0)) ;
     ignore (Store.add store Items.arbre4 (-100, 0)) ;
+    ignore (Store.add store Items.arbre5 (-350, 0)) ;
     ignore (Store.add store Items.texture_mur1a (-290, 0)) ;
     ignore (Store.add store Items.texture_mur1_toit_gauche (-250, 0)) ;
     ignore (Store.add store Items.texture_mur1_toit_droit (-210, 0)) ;
@@ -60,8 +61,8 @@ module Launch (I : Interface.T) = struct
     ignore (Store.add store Items.mineur (50, -50)) ;
     ignore (Store.add store Items.personne_echelle (90, -50)) ;
     ignore (Store.add store Items.femme_fenetre (120, -50)) ;
-    (*ignore (Store.add store Items.fumeur (160, -50)) ;*) (* TODO: Il semblerait que la taille ne correspond pas. *)
-    ignore (Store.add store Items.fume (200, -50)) ;
+    ignore (Store.add store Items.fume (172, -28)) ;
+    ignore (Store.add store Items.fumeur (160, -50)) ;
     ignore (Store.add store Items.enfant_cache1 (260, -50)) ;
     ignore (Store.add store Items.enfant_cache2 (280, -50)) ;
     ignore (Store.add store Items.enfant_cache3 (300, -50)) ;
@@ -69,7 +70,7 @@ module Launch (I : Interface.T) = struct
     ignore (Store.add store Items.enfant_cerf_volant (350, -50)) ;
     let player = Store.add store Items.perso (0, 0) in
     ignore (Store.add store Items.arbre1_tres_sombre (130, -25)) ;
-    Store.add_birds store [Items.oiseau; Items.papillon] ;
+    Store.add_birds store [Items.canard; Items.papillon] ;
     Store.add_bird_location store (130, 10) ;
     Store.add_bird_location store (110, 30) ;
     Store.add_bird_location store (90, 50) ;

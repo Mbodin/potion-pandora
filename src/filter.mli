@@ -3,7 +3,7 @@
 (* Force all the opaque pixels of an image to follow a provided pattern
   (typically a single pixel image to fully decolorise the image into this color,
   but it can also be a gradient pattern). *)
-val decolor : pattern:Subimage.t -> Image.image -> Image.image
+val decolor : pattern:Subimage.t -> Subimage.t -> Subimage.t
 
 (* From a static image, add a water-shimmering effect to it.
   The quantity represents the amount of waves in the animation.
@@ -35,4 +35,7 @@ val flip_vertically : Subimage.t -> Subimage.t
 (* Create an image like the provided image, but flipped along the diagonal axes (x becomes y
   and vice-versa). *)
 val flip_diagonally : Subimage.t -> Subimage.t
+
+(* An entirely transparent image (with only pixel), useful to serve as an empty pattern. *)
+val transparent : Subimage.t
 
