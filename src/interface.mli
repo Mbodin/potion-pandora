@@ -25,15 +25,16 @@ module type T = sig
   val ( let* ) : 'a m -> ('a -> 'b m) -> 'b m
 
   (* Initialise the interface of a given width and height.
-    To be called only once at the very beginning. *)
+    To be called only once, and at the very beginning. *)
   val init : int -> int -> t m
 
   (* Invalidate all objects created with this interface.
-    To be called once at the very end. *)
+    To be called once, and at the very end. *)
   val quit : t -> unit m
 
   (* Display the (r, g, b) pixel at position (x, y).
-    The position (0, 0) represents by convention the upper left pixel. *)
+    The position (0, 0) represents by convention the upper left pixel
+    (this is later reversed by the Engine module for the game). *)
   val write : t -> (int * int * int) -> (int * int) -> unit m
 
   (* Flushes the interface to actually display all the pixels to the user.
@@ -54,7 +55,7 @@ module type T = sig
     Otherwise, the callback function only receives None. *)
   val on_key_pressed : t -> (direction option -> unit m) -> unit m
 
-  (* Called when the game window was closed.
+  (* Called when the game window is closed.
     Note that this will not automatically call the quit function above. *)
   val on_quit : t -> (unit -> unit m) -> unit m
 
