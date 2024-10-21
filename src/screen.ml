@@ -22,7 +22,7 @@ module SplitVertical (I : Interface.T) = struct
     shift_y : int (* By how much this screen is shifted up. *) ;
     width : int (* How many pixels are reserved after the shift. *) ;
     height : int ;
-    event_functions : event_functions ref
+    event_functions : event_functions
   }
 
   (* A state, waiting for both [Up.init] and [Down.init] to be called. *)
@@ -32,15 +32,80 @@ module SplitVertical (I : Interface.T) = struct
     | WaitingUp of (int * int) (* Only [Down.init] has been called. *)
     | State of I.t * half_state * half_state (* Both has been called and the canvas are ready. *)
 
+  (* We then build a state monad with this state. *)
+  type 'a m = state -> ('a * state) I.m
+  type 'a monad = 'a m
+
+  let return (type t) (a : t) : t m = fun st -> I.return (a, st)
+  let ( let* ) (type u v) (x : u m) (f : u -> v m) : v m =
+    fun st ->
+      let open I in
+      let* (x, st) = x st in
+      f x st
+
+  let get_states : (I.t * half_state * half_state) m = function
+    | State (t, st_up, st_down) as st -> I.return ((t, st_up, st_down), st)
+    | _ -> failwith "SplitVertical.get_states: not ready."
+
+  let wait (type t) (time : int) (f : unit -> t m) : t m = function
+    | State (t, _, _) as st -> I.wait t time (fun () -> f () st)
+    | _ -> failwith "SplitVertical.wait: not ready."
+
   (* Execute a continuation on an event function if present. *)
-  let run_if_event e k =
-    match e with
-    | None -> I.return ()
-    | Some f -> k f
+
+  (* Call the relevant [I.on_*], typically when changing any event. *)
+  let setup_on_events : unit m =
+    let* (t, st_up, st_down) = get_states in
+    fun st ->
+      let open I in
+      let run_if_event e k =
+        match e with
+        | None -> return ()
+        | Some f -> k f in
+      let* () =
+        on_click t (fun (x, y) ->
+            if y < st_up.height then
+              run_if_event st_up.event_functions.event_click
+                (fun f ->
+                  let x = x - st_up.shift_x in
+                  if x >= 0 && x <= st_up.width then f (x, y)
+                  else return ())
+            else
+              run_if_event st_down.event_functions.event_click
+                (fun f ->
+                  let x = x - st_down.shift_x in
+                  if x >= 0 && x <= st_down.width then f (x, y - st_up.height)
+                  else return ())
+          ) in
+      let* () =
+        on_move t (fun (x_start, y_start) (x_end, y_end) ->
+            if y_start < st_up.height && y_end < st_up.height
+            && x_start >= st_up.shift_x && x_end >= st_up.shift_x
+            && x_start - st_up.shift_x < st_up.width
+            && x_end - st_up.shift_x < st_up.width then
+              run_if_event st_up.event_functions.event_move
+                (fun f ->
+                  f (x_start - st_up.shift_x, y_start)
+                    (x_end - st_up.shift_x, y_end))
+            else if y_start >= st_up.height && y_end >= st_up.height
+                 && x_start >= st_down.shift_x && x_end >= st_down.shift_x
+                 && x_start - st_down.shift_x < st_down.width
+                 && x_end - st_down.shift_x < st_down.width then
+              run_if_event st_down.event_functions.event_move
+                (fun f ->
+                  f (x_start - st_down.shift_x, y_start - st_up.height)
+                    (x_end - st_down.shift_x, y_end - st_up.height))
+            else return ()
+          ) in
+      let* () =
+        on_key_pressed t (fun d ->
+          let* () = run_if_event st_up.event_functions.event_key_pressed (fun f -> f d) in
+          let* () = run_if_event st_down.event_functions.event_key_pressed (fun f -> f d) in
+          return ()) in
+      return ((), st)
 
   (* Build a [State _] from both up and down dimensions. *)
   let make_state (x_up, y_up) (x_down, y_down) =
-    let open I in
     let dim_x = max x_up x_down in
     let* t = init dim_x (y_up + y_down) in
     let setup shift_y (x, y) = {
@@ -52,42 +117,20 @@ module SplitVertical (I : Interface.T) = struct
     } in
     let st_up = setup 0 (x_up, y_up) in
     let st_down = setup y_up (x_down, y_down) in
-    let* () =
-      I.on_click t (fun (x, y) ->
-          if y < y_up then
-            run_if_event !(st_up.event_functions).event_click (fun f -> f (x, y))
-          else
-            run_if_event !(st_down.event_functions).event_click (fun f -> f (x, y - y_up))
-        ) in
-    let* () =
-      I.on_move t (fun (x_start, y_start) (x_end, y_end) ->
-          if y_start < y_up && y_end < y_up then
-            run_if_event !(st_up.event_functions).event_move
-              (fun f -> f (x_start, y_start) (x_end, y_end))
-          else if y_start >= y_up && y_end >= y_up then
-            run_if_event !(st_down.event_functions).event_move
-              (fun f -> f (x_start, y_start - y_up) (x_end, y_end - y_up))
-          else I.return ()
-        ) in
-    let* () =
-      I.on_key_pressed t (fun d ->
-        let* () = run_if_event !(st_up.event_functions).event_key_pressed (fun f -> f d) in
-        let* () = run_if_event !(st_down.event_functions).event_key_pressed (fun f -> f d) in
-        return ()) in
     return (State (t, st_up, st_down))
 
   (* Given the setting of [Up.init] and the current state, build the new state. *)
   let set_state_up (width, height) =
     let dim_up = (width, height) in function
     | WaitingBoth -> I.return (WaitingDown dim_up)
-    | WaitingDown _ | State _ -> failwith "SplitVertical: setting Up.init twice."
+    | WaitingDown _ | State _ -> failwith "SplitVertical.set_state_up: setting Up.init twice."
     | WaitingUp dim_down -> make_state dim_up dim_down
 
   (* Same than for [Down.init]. *)
   let set_state_down (width, height) =
     let dim_down = (width, height) in function
     | WaitingBoth -> I.return (WaitingUp dim_down)
-    | WaitingUp _ | State _ -> failwith "SplitVertical: setting Down.init twice."
+    | WaitingUp _ | State _ -> failwith "SplitVertical.set_state_down: setting Down.init twice."
     | WaitingDown dim_up -> make_state dim_up dim_down
 
   (* Call a function [f] taking as arguments:
@@ -96,17 +139,17 @@ module SplitVertical (I : Interface.T) = struct
     - Other arguments, returning within the monad [I.m]. *)
   let call proj f = function
     | State (t, st_up, st_down) -> f t (proj (st_up, st_down))
-    | _ -> failwith "SplitVertical: waiting for an I.init function."
+    | _ -> failwith "SplitVertical.call: waiting for an I.init function."
 
   module Make (P : sig val proj : 'a * 'a -> 'a end) = struct
     open P
 
-    type t = state
+    type t = unit
 
-    type 'a m = 'a I.m
-    let return = I.return
-    let ( let* ) = I.( let* )
-    let wait = I.wait
+    type 'a m = 'a monad
+    let return = return
+    let ( let* ) = ( let* )
+    let wait () = wait
 
     let init = proj (set_state_up, set_state_down)
 
@@ -120,7 +163,7 @@ module SplitVertical (I : Interface.T) = struct
         let* () = run st_up in
         let* () = run st_down in
         I.quit t
-      | _ -> failwith "SplitVertical: calling Up.quit before the initialisation finished."
+      | _ -> failwith "SplitVertical.quit_up: calling Up.quit before the initialisation finished."
 
     let quit = proj (quit_up, fun _ -> return ())
 
