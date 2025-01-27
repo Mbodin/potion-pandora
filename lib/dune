@@ -1,0 +1,9 @@
+
+(library
+	(public_name save)
+  (name main)
+	(libraries imagelib)
+	(modules_without_implementation save)
+  (inline_tests)
+  (flags (:standard -warn-error -A -g)))
+
