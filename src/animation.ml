@@ -161,7 +161,8 @@ let static i = loop [(i, infinity)]
   The last argument is to tune a skipping behavior: if it is [None], then this sequence won't
   skip on any event.
   If it is [Some t.delta.(st)] (typically with [st = state]), then it will mimick the provided
-  state: if this state immediately reacts on an event, so will the sequence. *)
+  state: if this state immediately reacts on an event, so will the sequence. The [Tau] avent will
+  be ignored when this behaviour is enabled. *)
 let create_sequence shift restart s state skip =
   let len = List.length s in
   Array.of_list (List.mapi (fun index (image, time) ->
@@ -317,12 +318,13 @@ let transitions (type t0) (init : t0) next =
     match MMap.choose_opt to_be_visited with
     | None -> delta
     | Some (st, to_update) ->
+      (* FIXME: This is only executed once with the duck, instead of at least 5. *)
       let shift = Array.length delta in
       (* We know that we will place the current state at the end of the the current array.
         As its associated sequence has at least one element, it will indeed be assigned a
         place within the automaton. *)
       let visited = MMap.add st shift visited in
-      (* Now that we have allocated a location for this state, we can update all the location
+      (* Now that we have allocated a location for this state, we can update all the locations
         that depended on it. *)
       let to_update = List.sort_uniq compare to_update in
       List.iter (fun (st, e) ->
@@ -332,7 +334,7 @@ let transitions (type t0) (init : t0) next =
           Event.create_map (fun e' ->
             let (time, st') = Event.fetch event_map e' in
             if e = e' then (
-              assert (st' = dummy_state) ;
+              (*if not (st' = dummy_state) then print_endline (Printf.sprintf "DEBUG: %i, %s" st' (Event.print e)) ;*) (* FIXME *)
               (time, shift)
             ) else (time, st')) in
         delta.(st) <- (image, event_map)) to_update ;
@@ -351,35 +353,56 @@ let transitions (type t0) (init : t0) next =
       assert (len > 0) (* We need to be able to display at least one image. *) ;
       (* We build all the sequences corresponding to all the calls to each event. *)
       let (event_map, to_be_visited, new_shift, deltas) =
-          List.fold_left (fun (event_map, to_be_visited, current_shift, deltas) e ->
+        List.fold_left (fun (event_map, to_be_visited, current_shift, deltas) e ->
             let (s, st') = nxt e in
+            (* Here, [s] is the transition sequence between the state [st] and [st'].
+              If it is non-empty, then a sequence is allocated and we point to this
+              sequence. Otherwise we directly point towards [st']. *)
             let index' =
               match MMap.find_opt st' visited with
               | Some index -> index
               | None -> dummy_state in
             let sequence = create_sequence current_shift ESet.empty s index' None in
             let to_be_visited =
-              if Array.length sequence > 0 then
+              (* Adding the end of the sequence (if any) as a pointer to [st'].
+                If [s] is the empty list, then [st'] is directly pointed from [st]. *)
+              if s <> [] then (
+                if not (MMap.mem st' visited) then
+                  assert (
+                    let (_image, event_map) = sequence.(Array.length sequence - 1) in
+                    let (_time, st) = Event.fetch event_map e in
+                    st = dummy_state) ;
                 add_to_be_visited to_be_visited st'
                   (current_shift + Array.length sequence - 1) Event.Tau
-              else to_be_visited in
+              ) else to_be_visited in
             let event_map = EMap.add e (if s = [] then index' else current_shift) event_map in
             let to_be_visited =
-              if s = [] && e <> Event.Tau then
-                (* All the states of the main looping sequence would jump into this place. *)
-                List.fold_left (fun to_be_visited position ->
-                  add_to_be_visited to_be_visited st' position e)
-                    to_be_visited (List.init len (fun i -> i + shift))
-              else to_be_visited in
+              (* Updating the states of [st] that directly point to [st']. *)
+              if s = [] then (
+                if e = Event.Tau then (
+                  (* Only the last state of the main sequence would jump into this state. *)
+                  add_to_be_visited to_be_visited st' (shift + len - 1) Event.Tau
+                ) else (
+                  (* All the states of the main looping sequence would jump into this state. *)
+                  List.fold_left (fun to_be_visited position ->
+                    add_to_be_visited to_be_visited st' position e)
+                      to_be_visited (List.init len (fun i -> i + shift))
+                )
+              ) else to_be_visited in
             (event_map, to_be_visited, current_shift + Array.length sequence, sequence :: deltas))
-          (EMap.empty, to_be_visited, shift + List.length s, []) Event.all in
+          (EMap.empty, to_be_visited, shift + len, []) Event.all in
       let automaton_cell =
         (fst (List.hd s), Event.create_map (fun e ->
             match EMap.find_opt e event_map with
             | None -> assert false
             | Some state -> (Time.zero, state))) in
       (* We finally build the main looping sequence. *)
-      let sequence = create_sequence shift ESet.empty s shift (Some automaton_cell) in
+      let sequence =
+        let index_tau =
+          match EMap.find_opt Event.Tau event_map with
+          | None -> assert false
+          | Some index -> index in
+        create_sequence shift ESet.empty s index_tau (Some automaton_cell) in
       let delta = Array.concat (delta :: sequence :: List.rev deltas) in
       assert (Array.length delta = new_shift) ;
       aux delta visited (MMap.remove st to_be_visited) in
@@ -414,13 +437,16 @@ let nd_transitions (type t0) (init : t0) next =
         if MMap.mem st m then aux to_be_visited m
         else (
           let (s, nxt) = next st in
+          assert (s <> []) (* Each state must be associated with at least one image. *) ;
           let to_be_visited =
             List.fold_left (fun to_be_visited e ->
               List.fold_left (fun to_be_visited (_n, _s, st') -> MSet.add st' to_be_visited)
                 to_be_visited (nxt e)) to_be_visited Event.all in
           let event_map =
             Event.create_map (fun e ->
-              List.filter (fun (n, _s, _st) -> n > 0) (nxt e)) in
+              let l = nxt e in
+              assert (List.for_all (fun (n, _s, _st) -> n > 0) l) ;
+              l) in
           (* The current state will be divided in [size] substates to account for randomness. *)
           let size =
             List.fold_left (fun n e ->

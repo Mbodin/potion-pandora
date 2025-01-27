@@ -66,8 +66,12 @@ val switch : t -> Event.t list -> ?skip:bool -> sequence ->
 (* Explicitely define an automaton as a transition system.
   The first argument is the initial state (it can be any type, the (=) equality will be used on it),
   the second is the transition function: given a state, return a looping sequence as well as a
-  function for its transitions. This function is such that given an event, return a sequence to be
-  played followed by its new state. *)
+  function for its transitions. This function is such that given an event, it returns a sequence to
+  be played followed by its new state.
+  The looping sequence of a state can't be empty.
+  The case for the [Event.Tau] transition is special: if it goes into the same state, then it is
+  ignored, otherwise if it jumps into a separate state, then the main sequence is no longer looping,
+  taking this transition afterwards. *)
 val transitions : 'a -> ('a -> sequence * (Event.t -> sequence * 'a)) -> t
 
 (* Like [transitions], but non deterministic: at each step, we provide a list of sequence and possible

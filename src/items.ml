@@ -949,12 +949,27 @@ let explosion_potion =
 (* TODO: Générer ces buttons à partir des boutons de l'interface, avec une animation qui appuie sur la touche. *)
 let touche_droite = static_unique Images_coords.touche_droite
 
-let bouton_fleche_droite = from Images_coords.boutons 0
+let bouton_fleche_droite = from Images_coords.boutons 1
 let bouton_fleche_gauche = Filter.flip_horizontally bouton_fleche_droite
 let bouton_fleche_haut = Filter.flip_diagonally bouton_fleche_droite
 let bouton_fleche_bas = Filter.flip_vertically bouton_fleche_droite
-let bouton_ajout = from Images_coords.boutons 1
+
+let bouton_fleche_double_droite = from Images_coords.boutons 5
+let bouton_fleche_double_gauche = Filter.flip_horizontally bouton_fleche_double_droite
+let bouton_fleche_double_haut = Filter.flip_diagonally bouton_fleche_double_droite
+let bouton_fleche_double_bas = Filter.flip_vertically bouton_fleche_double_droite
+
+let bouton_ajout = from Images_coords.boutons 0
 let bouton_supprimer = from Images_coords.boutons 2
-let bouton_enregistrer = from Images_coords.boutons 3
+let bouton_enregistrer = from Images_coords.boutons 8
 let bouton_deplacer = from Images_coords.boutons 4
+let bouton_modifier = from Images_coords.boutons 6
+let bouton_animer = from Images_coords.boutons 9
+let bouton_etage = from Images_coords.boutons 10
+let bouton_automatique = from Images_coords.boutons 7
+let bouton_valider = from Images_coords.boutons 5
+let bouton_copier = from Images_coords.boutons 13
+
+let bouton_menu_points = from Images_coords.boutons 11
+let bouton_menu_lignes = from Images_coords.boutons 12
 
