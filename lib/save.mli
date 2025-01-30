@@ -7,10 +7,11 @@ type 'a t =
   | Unit : unit t
   | Bool : bool t
   | Int : int t
-  | Float : float t
   | String : string t
   | Seq : 'a t * 'b t -> ('a * 'b) t
   | List : 'a t -> 'a list t
   | Array : 'a t -> 'a array t
   | Image : (palette * Image.image) t
+  | Base64 : 'a t -> 'a t
+  | Compress : 'a t -> 'a t
 

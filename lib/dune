@@ -1,9 +1,10 @@
 
 (library
-	(public_name save)
-  (name main)
-	(libraries imagelib)
+  (public_name potion-pandora.libsave)
+  (name libsave)
+	(libraries imagelib base64 decompress.zl bigstringaf)
 	(modules_without_implementation save)
+	(preprocess (pps ppx_inline_test))
   (inline_tests)
   (flags (:standard -warn-error -A -g)))
 

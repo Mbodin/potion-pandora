@@ -6,7 +6,7 @@ license: "CC-BY-4.0"
 homepage: "https://github.com/Mbodin/potion-pandora"
 bug-reports: "https://github.com/Mbodin/potion-pandora/issues"
 depends: [
-  "dune" {>= "3.11"}
+  "dune" {>= "3.17"}
   "odoc" {with-doc}
 ]
 build: [

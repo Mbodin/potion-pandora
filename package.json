@@ -17,7 +17,7 @@
 	},
 	"dependencies": {
 		"ocaml": "~4.13",
-		"@opam/dune": "~3.11",
+		"@opam/dune": "~3.17",
 		"@opam/ocamlfind": "1.9.3",
 		"@opam/ocamlbuild": "0.14.2",
 		"@opam/js_of_ocaml": "~5.4",
@@ -30,6 +30,9 @@
 		"@opam/js_of_ocaml-tyxml": "*",
 		"@opam/ppx_inline_test": "*",
 		"@opam/imagelib": "*",
+		"@opam/decompress": "*",
+		"@opam/bigstringaf": "*",
+		"@opam/base64": "*",
 		"@opam/ppx_deriving": "*",
 		"@opam/ocamlsdl2": "*"
 	},

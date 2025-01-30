@@ -10,7 +10,7 @@ The native graphical output depends on the system package libsdl2-dev.
 ## Using `esy`
 
 ```bash
-apt install libsdl2-dev
+apt install libsdl2-dev pkgconf npm
 # Installing esy
 npm install esy
 # Installing the dependencies and compiling
