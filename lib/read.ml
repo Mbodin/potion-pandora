@@ -37,6 +37,50 @@ let ( ~$ ) (type t) (reader : t monad) : t monad =
   return r
 
 
+let char_to_bits c =
+  let i = Char.code c in
+  let rec aux acc i = function
+    | 0 -> assert (i = 0) ; acc
+    | k -> aux ((i mod 2 = 1) :: acc) (i / 2) (k - 1) in
+  aux [] i 8
+
+(* A monad to read individual bits.
+ The input list is strictly bounded by 8: it is the leftover of a previous read. *)
+type 'a monadbit = bool list -> ('a * bool list) monad
+
+let returnbit (type t) (x : t) : t monadbit = fun bl -> return (x, bl)
+
+let bindbit (type a b) (m : a monadbit) (f : a -> b monadbit) : b monadbit =
+  fun bl ->
+    assert (List.length bl < 8) ;
+    let* (a, bl) = m bl in
+    f a bl
+
+let readbit : bool monadbit = function
+  | b :: bl -> return (b, bl)
+  | [] ->
+    let* c = read in
+    match char_to_bits c with
+    | [] -> assert false
+    | b :: bl -> return (b, bl)
+
+let readnbits : int -> bool list monadbit =
+  let rec aux acc = function
+  | 0 -> returnbit (List.rev acc)
+  | n ->
+    bindbit (readbit) (fun b ->
+      aux (b :: acc) (n - 1)) in
+  aux []
+
+(* Check that no bits are left. *)
+let eofbits : unit monadbit = fun bl ->
+  (* There might have been additionnal bits, for padding, but they should all be false. *)
+  assert (List.for_all (not) bl) ;
+  let* () = eof in
+  return ((), [])
+
+
+(* Decompresses a string. *)
 let deflate_string ?(level=4) str =
   let i = De.bigstring_create De.io_buffer_size in
   let o = De.bigstring_create De.io_buffer_size in
@@ -77,11 +121,12 @@ let decode_int : int monad =
     )
   ) else (
     (* Negative value *)
-    if i < 64 then return (-i)
+    let i = i - 128 in
+    if i < 64 then return (-i - 1)
     else (
       let r = i - 64 in
       let* d = aux () in
-      return (-(r + 64 * d))
+      return (-(r + 64 * d) - 1)
     )
   )
 
@@ -121,7 +166,13 @@ let rec decode_monad : type t. t Save.t -> t monad =
     let str = Base64.decode_exn str in
     let (r, _index) = ~$ (decode_monad s) str 0 in
     return r
-t  | _ -> failwith "NYI" (* TODO *)
+  | Save.Compress s ->
+    let* size = decode_int in
+    let* str = readn size in
+    let str = deflate_string str in
+    let (r, _index) = ~$ (decode_monad s) str 0 in
+    return r
+  | _ -> failwith "NYI" (* TODO *)
 
 let decode (type t) (s : t Save.t) str =
   let (r, _index) = ~$ (decode_monad s) str 0 in
