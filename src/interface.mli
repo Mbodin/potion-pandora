@@ -38,7 +38,8 @@ module type T = sig
   val write : t -> (int * int * int) -> (int * int) -> unit m
 
   (* Flushes the interface to actually display all the pixels to the user.
-    Note that depending on the implementations, pixels may be displayed as soon as write. *)
+    Note that depending on the implementations, pixels may be displayed as soon as they are
+    being written. *)
   val flush : t -> unit m
 
   (* Attach a function to be called when the user clicks on the interface.

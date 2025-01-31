@@ -2,12 +2,10 @@
 (library
  	(public_name potion-pandora)
 	(name potion_pandora)
-	(libraries lwt tyxml imagelib potion-pandora.libsave)
+	(libraries lwt imagelib potion-pandora.libsave)
 	(preprocess
     (pps
       ppx_inline_test
-      lwt_ppx
-      tyxml-ppx
       ppx_deriving.enum
       ppx_deriving.show))
 	(modules_without_implementation
