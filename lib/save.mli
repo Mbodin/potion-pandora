@@ -9,6 +9,7 @@ type 'a t =
   | Int : int t
   | String : string t
   | Seq : 'a t * 'b t -> ('a * 'b) t
+  | Option : 'a t -> 'a option t
   | List : 'a t -> 'a list t
   | Array : 'a t -> 'a array t
   | Image : (palette * Image.image) t

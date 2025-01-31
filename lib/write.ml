@@ -42,9 +42,12 @@ let bindbit (type a b) (m : a monadbit) (f : a -> b monadbit) : b monadbit =
     | bl -> return (b, bl) in
   aux (bl1 @ bl2)
 
-let writebit (b : bool) : unit monadbit = return ((), [b])
+let ( %%% ) (type t) : unit monadbit -> t monadbit -> t monadbit =
+  fun m1 m2 -> bindbit m1 (fun () -> m2)
 
 let writebits (lb : bool list) : unit monadbit = return ((), lb)
+
+let writebit (b : bool) : unit monadbit = writebits [b]
 
 let escapebits (type t) (m : t monadbit) : t * string =
   let m =
@@ -56,7 +59,8 @@ let escapebits (type t) (m : t monadbit) : t * string =
     | [b1; b2; b3; b4; b5; b6; b7; b8] ->
       (r, str ^ String.make 1 (bits_to_char b1 b2 b3 b4 b5 b6 b7 b8))
     | _b1 :: _b2 :: _b3 :: _b4 :: _b5 :: _b6 :: _b7 :: _b8 :: _ -> assert false
-    | bl -> aux (bl @ [false]) in
+    | bl -> (* We fill-in the remaining bits with false. *)
+      aux (bl @ [false]) in
   aux bl
 
 
@@ -119,8 +123,64 @@ let rec encode_monad : type t. t Save.t -> t -> unit monad =
   | Save.Seq (s1, s2) -> fun (a, b) ->
     encode_monad s1 a %%
     encode_monad s2 b
+  | Save.Option s -> (function
+    | None -> write "n"
+    | Some x ->
+      write "s" %%
+      encode_monad s x)
   | Save.List s -> encode_list s
   | Save.Array s -> fun a -> encode_list s (Array.to_list a)
+  | Save.Image -> fun (palette, img) ->
+    (* First, we create a mapping add a completely transparent pixel into the palette. *)
+    let module M =
+      Map.Make (struct
+        type t = int * int * int * int
+        let compare = compare
+      end) in
+    let (num_bits, get) =
+      let (transparent, m) =
+        Array.fold_left (fun (n, m) c -> (n + 1, M.add c n m)) (0, M.empty) palette in
+      let get r g b a =
+        if a = 0 then transparent
+        else
+          match M.find_opt (r, g, b, a) m with
+          | Some id -> id
+          | None -> assert false in
+      let num = Read.log2 (transparent + 1) in
+      (num, get) in
+    (* Second, we encode the palette.
+      We add a completely transparent pixel into it. *)
+    encode_int (1 + Array.length palette) %%
+    let rec encode_palette i =
+      let write_pixel (r, g, b, a) =
+        write (Printf.sprintf "%c%c%c%c" (Char.chr r) (Char.chr g) (Char.chr b) (Char.chr a)) in
+      if i = Array.length palette then return ()
+      else (
+        write_pixel palette.(i) %%
+        encode_palette (i + 1)
+      ) in
+    encode_palette 0 %%
+    (* Then, we encode the data. *)
+    encode_int img.Image.width %%
+    encode_int img.Image.height %%
+    let rec encode_data x y : unit monadbit =
+      if x = img.Image.width then encode_data 0 (y + 1)
+      else if y = img.Image.height then returnbit ()
+      else (
+        let color_id = Image.read_rgba img x y get in
+        let rec aux k m =
+          if k = 0 then (
+            assert (m = 0) ;
+            returnbit ()
+          ) else (
+            writebit (m mod 2 = 1) %%%
+            aux (k - 1) (m / 2)
+          ) in
+        aux num_bits color_id %%%
+        aux (x + 1) y
+      ) in
+    let ((), str) = escapebits (encode_data 0 0) in
+    write str
   | Save.Base64 s -> fun x ->
     let ((), str) = escape (encode_monad s x) in
     let str = Base64.encode_exn str in
@@ -131,7 +191,6 @@ let rec encode_monad : type t. t Save.t -> t -> unit monad =
     let str = deflate_string str in
     encode_int (String.length str) %%
     write str
-  | _ -> failwith "NYI" (* TODO *)
 
 let encode (type t) (s : t Save.t) (v : t) : string =
   let ((), str) = escape (encode_monad s v) in
@@ -191,6 +250,10 @@ let%test "string single" = check String "1"
 let%test "string newline" = check String "\n"
 let%test "string abc" = check String "abc"
 
+let%test "None" = check (Option String) None
+let%test "Some None" = check (Option (Option Int)) (Some None)
+let%test "Some Some abc" = check (Option (Option String)) (Some (Some ("abc")))
+
 let%test "list []" = check (List Int) []
 let%test "list [1]" = check (List Int) [1]
 let%test "list [1; 2; 3]" = check (List Int) [1; 2; 3]
@@ -203,4 +266,10 @@ let%test "compress" = check (Compress (List Int)) [-1; 2; -3]
 
 let%test "compress base64 list base64 compress int" =
   check (Compress (Base64 (List (Base64 (Compress Int))))) [1; -2; 3]
+
+let%test "image" =
+  let img = Image.create_rgb ~alpha:true 1 1 in
+  Image.fill_rgb ~alpha:255 img 1 2 3 ;
+  let (_, img') = Read.decode Image (encode Image ([|(1, 2, 3, 255)|], img)) in
+  img = img'
 

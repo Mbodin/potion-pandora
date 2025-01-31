@@ -1,4 +1,23 @@
 
+let log2 n =
+  let rec aux p k = (* p = 2^k *)
+    if n <= p then k
+    else aux (2 * p) (1 + k) in
+  aux 1 0
+
+let%test "log2 1" = log2 1 = 0
+let%test "log2 2" = log2 2 = 1
+let%test "log2 3" = log2 3 = 2
+let%test "log2 4" = log2 4 = 2
+let%test "log2 5" = log2 5 = 3
+let%test "log2 32" = log2 32 = 5
+let%test "log2 63" = log2 63 = 6
+let%test "log2 64" = log2 64 = 6
+let%test "log2 80" = log2 80 = 7
+let%test "log2 123" = log2 123 = 7
+let%test "log2 128" = log2 128 = 7
+
+
 (* We use a reader monad within this file.
  It takes as argument the string being read, the current index, and returns the current index. *)
 type 'a monad = string -> int -> 'a * int
@@ -11,6 +30,9 @@ let bind (type a b) (m : a monad) (f : a -> b monad) : b monad =
     f a str index
 
 let ( let* ) = bind
+
+let ( %% ) (type t) : unit monad -> t monad -> t monad =
+  fun m1 m2 -> bind m1 (fun () -> m2)
 
 (* Read the current character. *)
 let read : char monad =
@@ -33,7 +55,7 @@ let eof : unit monad =
 (* Forces the reader to fully read its input string. *)
 let ( ~$ ) (type t) (reader : t monad) : t monad =
   let* r = reader in
-  let* () = eof in
+  eof %%
   return r
 
 
@@ -56,6 +78,8 @@ let bindbit (type a b) (m : a monadbit) (f : a -> b monadbit) : b monadbit =
     let* (a, bl) = m bl in
     f a bl
 
+let ( let** ) = bindbit
+
 let readbit : bool monadbit = function
   | b :: bl -> return (b, bl)
   | [] ->
@@ -68,20 +92,25 @@ let readnbits : int -> bool list monadbit =
   let rec aux acc = function
   | 0 -> returnbit (List.rev acc)
   | n ->
-    bindbit (readbit) (fun b ->
-      aux (b :: acc) (n - 1)) in
+    let** b = readbit in
+    aux (b :: acc) (n - 1) in
   aux []
 
-(* Check that no bits are left. *)
-let eofbits : unit monadbit = fun bl ->
+(* Check that no bits are left when closing the monad. *)
+let read_and_close_bits (type t) (k : t monadbit) : t monad =
+  let* (r, bl) = k [] in
   (* There might have been additionnal bits, for padding, but they should all be false. *)
   assert (List.for_all (not) bl) ;
-  let* () = eof in
+  return r
+
+let _eofbits : unit monadbit = fun bl ->
+  assert (List.for_all (not) bl) ;
+  eof %%
   return ((), [])
 
 
 (* Decompresses a string. *)
-let deflate_string ?(level=4) str =
+let deflate_string (*?(level=4)*) str =
   let i = De.bigstring_create De.io_buffer_size in
   let o = De.bigstring_create De.io_buffer_size in
   let allocate bits = De.make_window ~bits in
@@ -156,10 +185,54 @@ let rec decode_monad : type t. t Save.t -> t monad =
     let* a = decode_monad s1 in
     let* b = decode_monad s2 in
     return (a, b)
+  | Save.Option s ->
+    let* c = read in
+    (match c with
+     | 'n' -> return None
+     | 's' ->
+        let* r = decode_monad s in
+        return (Some r)
+     | _ -> assert false)
   | Save.List s -> decode_list s
   | Save.Array s ->
     let* l = decode_list s in
     return (Array.of_list l)
+  | Save.Image ->
+    (* First, reading the palette and building an array of pixels accordingly. *)
+    let* size = decode_int in
+    let palette = Array.make size (0, 0, 0, 0) in
+    let rec build_palette i =
+      if i = size - 1 then
+        (* The last color in the palette is always (0, 0, 0, 0) and is not stored. *)
+        return ()
+      else (
+        let* r = read in
+        let* g = read in
+        let* b = read in
+        let* a = read in
+        palette.(i) <- (Char.code r, Char.code g, Char.code b, Char.code a) ;
+        build_palette (1 + i)
+      ) in
+    build_palette 0 %%
+    (* Second, read the data. *)
+    let* width = decode_int in
+    let* height = decode_int in
+    let num_bits = log2 size in
+    let img = Image.create_rgb ~alpha:true width height in
+    let rec decode_data x y : unit monadbit =
+      if x = width then decode_data 0 (y + 1)
+      else if y = height then returnbit ()
+      else (
+        let** bl = readnbits num_bits in
+        let rec to_int w acc = function
+          | [] -> 0
+          | b :: bl -> to_int (2 * w) (acc + if b then w else 0) bl in
+        let (r, g, b, a) = palette.(to_int 1 0 bl) in
+        Image.write_rgba img x y r g b a ;
+        decode_data (x + 1) y
+      ) in
+    read_and_close_bits (decode_data 0 0) %%
+    return (palette, img)
   | Save.Base64 s ->
     let* size = decode_int in
     let* str = readn size in
@@ -172,7 +245,6 @@ let rec decode_monad : type t. t Save.t -> t monad =
     let str = deflate_string str in
     let (r, _index) = ~$ (decode_monad s) str 0 in
     return r
-  | _ -> failwith "NYI" (* TODO *)
 
 let decode (type t) (s : t Save.t) str =
   let (r, _index) = ~$ (decode_monad s) str 0 in
