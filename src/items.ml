@@ -8,6 +8,11 @@ let range a b =
 let static = Animation.static
 let loop = Animation.loop
 
+(* Plays a sequence once, then stays transparent. *)
+let once s =
+  let final = static Filter.transparent in
+  Animation.force_same_size (Animation.prefix s final)
+
 (* Converts the coordinates of Images_coords into an image. *)
 let from_coords ~bundle ((width, height), (x, y)) =
   Subimage.make ~bundle width height (x, y)
@@ -910,20 +915,20 @@ let briques_ligne = static_unique Images_coords.briques_ligne
 
 let mur_abime = static_unique Images_coords.mur_abime
 
-let texture_fond1 = static_unique Images_coords.texture_fond1
-let texture_fond2 = static_unique Images_coords.texture_fond2
-let texture_mur1a = static_unique Images_coords.texture_mur1
-let texture_mur1b = static (Filter.flip_vertically (from Images_coords.texture_mur1 0))
-let texture_mur1_toit_gauche = triangle_left (from Images_coords.texture_mur1 0)
-let texture_mur1_toit_droit = triangle_right (from Images_coords.texture_mur1 0)
-let texture_mur2a = static_unique Images_coords.texture_mur2
-let texture_mur2b = static (Filter.flip_vertically (from Images_coords.texture_mur2 0))
-let texture_mur2_toit_gauche = triangle_left (from Images_coords.texture_mur2 0)
-let texture_mur2_toit_droit = triangle_right (from Images_coords.texture_mur2 0)
-let texture_mur3a = static_unique Images_coords.texture_mur3
-let texture_mur3b = static (Filter.flip_horizontally (from Images_coords.texture_mur3 0))
-let texture_mur3_toit_gauche = triangle_left (from Images_coords.texture_mur3 0)
-let texture_mur3_toit_droit = triangle_right (from Images_coords.texture_mur3 0)
+let texture_fond1 = static (from Images_coords.texture_fond 0)
+let texture_fond2 = static (from Images_coords.texture_fond 1)
+let texture_mur1a = static (from Images_coords.texture_mur 0)
+let texture_mur1b = static (Filter.flip_vertically (from Images_coords.texture_mur 0))
+let texture_mur1_toit_gauche = triangle_left (from Images_coords.texture_mur 0)
+let texture_mur1_toit_droit = triangle_right (from Images_coords.texture_mur 0)
+let texture_mur2a = static (from Images_coords.texture_mur 1)
+let texture_mur2b = static (Filter.flip_vertically (from Images_coords.texture_mur 1))
+let texture_mur2_toit_gauche = triangle_left (from Images_coords.texture_mur 1)
+let texture_mur2_toit_droit = triangle_right (from Images_coords.texture_mur 1)
+let texture_mur3a = static (from Images_coords.texture_mur 2)
+let texture_mur3b = static (Filter.flip_horizontally (from Images_coords.texture_mur 2))
+let texture_mur3_toit_gauche = triangle_left (from Images_coords.texture_mur 2)
+let texture_mur3_toit_droit = triangle_right (from Images_coords.texture_mur 2)
 
 (* * Ciel et effets d'air *)
 
@@ -940,8 +945,11 @@ let soleil =
 
 let explosion_potion =
   let mk = from Images_coords.explosion_potion in
-  let final = static Filter.transparent in
-  Animation.force_same_size (Animation.prefix (mk_sequence_range 0.05 mk 0 6) final)
+  once (mk_sequence_range 0.05 mk 0 6)
+
+let trainee_loin =
+  let mk = from Images_coords.trainee_loin in
+  once (mk_sequence_range 0.1 mk 0 12)
 
 
 (* * Interface *)
