@@ -1,8 +1,8 @@
 
 (executable
   (name main_js)
-	(libraries potion_pandora tyxml js_of_ocaml-lwt js_of_ocaml-tyxml)
-  (preprocess (pps lwt_ppx js_of_ocaml-ppx tyxml-ppx))
+	(libraries potion_pandora js_of_ocaml-lwt)
+  (preprocess (pps lwt_ppx js_of_ocaml-ppx))
 	(modes js)
   (flags (:standard -warn-error -A)))
 

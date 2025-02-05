@@ -1,11 +1,14 @@
 open Js_of_ocaml
+open Js_of_ocaml_lwt
+
+module Html = Dom_html
 
 type t = {
   width : int ;
   height : int ;
-  canvas : unit (* TODO *) ;
-  context : unit ;
-  pixel : unit
+  canvas : Html.canvasElement Js.t ;
+  context : Html.canvasRenderingContext2D Js.t ;
+  pixel : Html.imageData Js.t
 }
 
 type 'a m = 'a Lwt.t
@@ -13,10 +16,10 @@ let return v = Lwt.return v
 let ( let* ) = Lwt.bind
 
 let init width height =
-  let canvas = Html.createCanvas Html.window##document in
+  let canvas = Html.createCanvas Html.document in
   canvas##.width := width ;
   canvas##.height := height ;
-  Dom.appendChild Html.window##document##body ;
+  Dom.appendChild Html.document##.body canvas ;
   let context = canvas##getContext Html._2d_ in
   return {
     width ;
@@ -29,15 +32,40 @@ let init width height =
 let write { width ; height ; context ; pixel ; _ } (r, g, b) (x, y) =
   assert (x >= 0 && y >= 0) ;
   assert (x < width && y < height) ;
-  pixel##.data.(0) <- r ;
-  pixel##.data.(1) <- g ;
-  pixel##.data.(2) <- b ;
-  pixel##.data.(3) <- 255 ;
-  context##putImageData pixel x y ;
-  return () (* TODO *)
+  Html.pixel_set pixel##.data 0 r ;
+  Html.pixel_set pixel##.data 1 g ;
+  Html.pixel_set pixel##.data 2 b ;
+  Html.pixel_set pixel##.data 3 255 ;
+  context##putImageData pixel (Float.of_int x) (Float.of_int y) ;
+  return ()
 
 let flush _ =
   Lwt.pause ()
+
+(* Given a canvas coordinate, computes in which pixel of the canvas it happened. *)
+let get_pixel_from_event { width ; height ; canvas ; _ } (x, y) =
+  let mx = canvas##.offsetWidth in
+  let my = canvas##.offsetHeight in
+  let c w x mx = Float.to_int (Float.of_int w *. Float.of_int x /. Float.of_int mx) in
+  (c width x mx, c height y my)
+
+let on_click =
+  let thread = ref (Lwt.return ()) in fun t f ->
+    Lwt.cancel !thread ;
+    thread :=
+      Lwt_js_events.clicks canvas (fun ev _ ->
+        let (x, y) = get_pixel_from_event t (ev##.offsetX, ev##.offsetY) in
+        f x y) ;
+    !thread
+
+let on_move =
+  let thread = ref (Lwt.return ()) in fun t f ->
+    Lwt.cancel !thread ;
+    thread :=
+      Lwt_js_events.mouusemoves canvas (fun ev _ ->
+        let (x, y) = get_pixel_from_event t (ev##.offsetX, ev##.offsetY) in
+        f x y)
+    !thread
 
 let set_event default =
   let e = ref default in
