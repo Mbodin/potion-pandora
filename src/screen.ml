@@ -5,6 +5,7 @@ module SplitVertical (I : Interface.T) = struct
   type event_functions = {
     event_click : ((int * int) -> unit I.m) option ;
     event_move : ((int * int) -> (int * int) -> unit I.m) option ;
+    event_drag : ((int * int) -> (int * int) -> unit I.m) option ;
     event_key_pressed : (Interface.direction option -> unit I.m) option ;
     event_quit : (unit -> unit I.m) option
   }
@@ -12,6 +13,7 @@ module SplitVertical (I : Interface.T) = struct
   let none_event_functions = {
     event_click = None ;
     event_move = None ;
+    event_drag = None ;
     event_key_pressed = None ;
     event_quit = None
   }
@@ -42,6 +44,8 @@ module SplitVertical (I : Interface.T) = struct
 
   let return = I.return
   let ( let* ) = I.( let* )
+
+  let run = I.run
 
   let get_states () =
     match !global_state with
@@ -104,26 +108,27 @@ module SplitVertical (I : Interface.T) = struct
           run_if_event st_down.event_functions.event_click
             (fun f -> f (convert_down xy))
         else return ()) in
-    let* () =
-      on_move t (fun xy_start xy_end ->
-        let (_t, st_up, st_down) = get_states () in
-        if is_up xy_end then
-          let xy_start =
-            if is_up xy_start then xy_start
-            else xy_end in
-          run_if_event st_up.event_functions.event_move
+    let on_move_drag f xy_start xy_end =
+      let (_t, st_up, st_down) = get_states () in
+      if is_up xy_end then
+        let xy_start =
+          if is_up xy_start then xy_start
+          else xy_end in
+        run_if_event (f st_up)
+          (fun f ->
+            f (convert_up xy_start)
+              (convert_up xy_end))
+      else if is_down xy_end then
+        let xy_start =
+          if is_down xy_start then xy_start
+          else xy_end in
+        run_if_event (f st_down)
             (fun f ->
-              f (convert_up xy_start)
-                (convert_up xy_end))
-        else if is_down xy_end then
-          let xy_start =
-            if is_down xy_start then xy_start
-            else xy_end in
-          run_if_event st_down.event_functions.event_move
-              (fun f ->
-                f (convert_down xy_start)
-                  (convert_down xy_end))
-        else return ()) in
+              f (convert_down xy_start)
+                (convert_down xy_end))
+      else return () in
+    let* () = on_move t (on_move_drag (fun st -> st.event_functions.event_move)) in
+    let* () = on_drag t (on_move_drag (fun st -> st.event_functions.event_drag)) in
     let* () =
       on_key_pressed t (fun d ->
         let (_t, st_up, st_down) = get_states () in
@@ -187,6 +192,7 @@ module SplitVertical (I : Interface.T) = struct
     let return = return
     let ( let* ) = ( let* )
     let wait () = wait
+    let run = run
 
     let init = proj (set_state_up, set_state_down)
 
@@ -243,6 +249,7 @@ module SplitVertical (I : Interface.T) = struct
 
     let on_click = on_event (fun st handler -> { st with event_click = handler })
     let on_move = on_event (fun st handler -> { st with event_move = handler })
+    let on_drag = on_event (fun st handler -> { st with event_drag = handler })
     let on_key_pressed = on_event (fun st handler -> { st with event_key_pressed = handler })
     let on_quit = on_event (fun st handler -> { st with event_quit = handler })
 

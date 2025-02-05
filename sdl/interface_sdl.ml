@@ -60,11 +60,17 @@ let on_click, call_click =
 let on_move, call_move =
   set_event (fun _ _ -> ())
 
+let on_drag, call_drag =
+  set_event (fun _ _ -> ())
+
 let on_key_pressed, call_key_pressed =
   set_event (fun _ -> ())
 
 let on_quit, call_quit =
   set_event (fun () -> ())
+
+(* Place when the mouse was last pressed down. *)
+let mouse_down = ref None
 
 let rec process_events () =
   let convert_coords (x, y) =
@@ -96,11 +102,22 @@ let rec process_events () =
       -> call_quit ()
     | KeyDown _ -> call_key_pressed None
     | Mouse_Button_Down e ->
-      call_click (convert_coords (e.mb_x, e.mb_y))
+      if e.mb_button = 0 then
+        mouse_down := Some (convert_coords (e.mb_x, e.mb_y))
     | Mouse_Motion e ->
-      call_move
-        (convert_coords (e.mm_x - e.mm_xrel, e.mm_y - e.mm_yrel))
-        (convert_coords (e.mm_x, e.mm_y))
+      (match !mouse_down with
+       | None -> ()
+       | Some (init_x, init_y) ->
+         call_move (init_x, init_y) (convert_coords (e.mm_x, e.mm_y)))
+    | Mouse_Button_Up e ->
+      if e.mb_button = 0 then (
+        match !mouse_down with
+        | None -> () (* The mouse probably pressed outside the window, then moved into it. *)
+        | Some (init_x, init_y) ->
+          let (x, y) = convert_coords (e.mb_x, e.mb_y) in
+          if (init_x, init_y) = (x, y) then call_click (x, y)
+          else call_drag (init_x, init_y) (x, y)
+      )
     | Window_Event { kind = WindowEvent_Close ; _ } -> call_quit ()
     | _ -> () in
   match poll_event () with
@@ -125,4 +142,6 @@ let wait _ time f =
   if time > diff && not !has_quit then
     Sdltimer.delay ~ms:(time - diff) ;
   r
+
+let run m = m
 

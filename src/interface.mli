@@ -24,6 +24,9 @@ module type T = sig
   val return : 'a -> 'a m
   val ( let* ) : 'a m -> ('a -> 'b m) -> 'b m
 
+  (* To be called once: it ensures that the monadic computation is executed. *)
+  val run : unit m -> unit
+
   (* Initialise the interface of a given width and height.
     To be called only once, and at the very beginning. *)
   val init : int -> int -> t m
@@ -47,9 +50,14 @@ module type T = sig
     Note that calls to on_click resets the previous attached functions. *)
   val on_click : t -> ((int * int) -> unit m) -> unit m
 
-  (* Same than on_click, but for a move event (the user held the click while moving the cursor).
+  (* Same than on_click, but for a move event (the user held the click while moving the cursor,
+    and we probably want to add some feedback before the user releases the cursor).
     The callback function takes the initial position and the final position of the move. *)
   val on_move : t -> ((int * int) -> (int * int) -> unit m) -> unit m
+
+  (* Same than on_move, but for a drag event (the user held the click while moving the cursor,
+    then released it). *)
+  val on_drag : t -> ((int * int) -> (int * int) -> unit m) -> unit m
 
   (* Called on a key pressed.
     If it was an arrow key, it provides the callback function with the corresponding direction.

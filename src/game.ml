@@ -89,30 +89,46 @@ module Launch (I : Interface.T) = struct
     let quit = ref false in
     let* () = I.on_quit interface (fun () -> quit := true; I.quit interface) in
     let target_coords = ref None in
+    (* Interface coordinate are reversed compared to game coordinates. *)
+    let convert_coords (x, y) = (x, Display.height - 1 - y) in
+    let react_to_direction d =
+      let current_coords = Store.get_coords store player in
+      target_coords := Some (follow_direction ~step:3 current_coords d) ;
+      (* For now, we launch an explosion in the event of an up-key event. *)
+      if d = Interface.North then (
+        (* We launch the explosion in the middle of the feet. *)
+        let (dimx, _dimy) =
+          Subimage.dimensions (Animation.image (Store.get_display store player)) in
+        let coords = (fst current_coords + dimx / 2, snd current_coords) in
+        Store.explode store coords 10
+      ) ;
+      I.return () in
     let* () =
-      I.on_click interface (fun (x, y) ->
-        (* Interface coordinate are reversed compared to game coordinates. *)
-        let click_coords = (x, Display.height - 1 - y) in
+      I.on_click interface (fun click_coords ->
+        let click_coords = convert_coords click_coords in
         let coords =
           (fst !screen_coords - Display.width / 2 + fst click_coords,
            snd !screen_coords - Display.height / 2 + snd click_coords) in
         target_coords := Some coords ;
         I.return ()) in
     let* () =
+      I.on_move interface (fun coords coords' ->
+        let coords = convert_coords coords in
+        let coords' = convert_coords coords' in
+        if coords' = coords then I.return ()
+        else
+          let d =
+            if abs (fst coords - fst coords') > abs (snd coords - snd coords') then
+              (* Horizontal movement. *)
+              if fst coords' > fst coords then Interface.East else Interface.West
+            else
+              (* Vertical movement. *)
+              if snd coords' > snd coords then Interface.North else Interface.South in
+          react_to_direction d) in
+    let* () =
       I.on_key_pressed interface (function
         | None -> I.return ()
-        | Some d ->
-          let current_coords = Store.get_coords store player in
-          target_coords := Some (follow_direction ~step:3 current_coords d) ;
-          (* For now, we launch an explosion in the event of an up-key event. *)
-          if d = Interface.North then (
-            (* We launch the explosion in the middle of the feet. *)
-            let (dimx, _dimy) =
-              Subimage.dimensions (Animation.image (Store.get_display store player)) in
-            let coords = (fst current_coords + dimx / 2, snd current_coords) in
-            Store.explode store coords 10
-          ) ;
-          I.return ()) in
+        | Some d -> react_to_direction d) in
     let rec play () =
       let* () =
         wait interface (1000 / Animation.frames_per_second) (fun () ->
@@ -165,10 +181,12 @@ module Launch (I : Interface.T) = struct
       else play () in
     play ()
 
-  let _ : unit I.m =
-    let* interface = E.interface in
-    let* () = play_level level_store in
-    return ()
+  let _ : unit =
+    run (
+      let* interface = E.interface in
+      let* () = play_level level_store in
+      return ()
+    )
 
 end
 

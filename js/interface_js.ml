@@ -3,7 +3,9 @@ open Js_of_ocaml_lwt
 
 module Html = Dom_html
 
-type t = {
+type t = unit
+
+type obj = {
   width : int ;
   height : int ;
   canvas : Html.canvasElement Js.t ;
@@ -15,21 +17,114 @@ type 'a m = 'a Lwt.t
 let return v = Lwt.return v
 let ( let* ) = Lwt.bind
 
+let ( %% ) m k =
+  let* () = m in k
+
+let global_object = ref None
+
+let get_object () =
+  match !global_object with
+  | None -> failwith "Uninitialised interface."
+  | Some obj -> obj
+
+(* Given a canvas coordinate, computes in which pixel of the canvas it happened. *)
+let convert_coords (x, y) =
+  let { width ; height ; canvas ; _ } = get_object () in
+  let mx = canvas##.offsetWidth in
+  let my = canvas##.offsetHeight in
+  let c w x mx = Float.to_int (Float.of_int w *. Float.of_int x /. Float.of_int mx) in
+  (c width x mx, c height y my)
+
+let set_event default =
+  let e = ref default in
+  let call_e a = !e a in
+  let on_e t f = e := f ; return () in
+  (on_e, call_e)
+
+let on_click, call_click =
+  set_event (fun _ -> return ())
+
+let on_move, call_move =
+  set_event (fun _ _ -> return ())
+
+let on_drag, call_drag =
+  set_event (fun _ _ -> return ())
+
+let on_key_pressed, call_key_pressed =
+  set_event (fun _ -> return ())
+
+let on_quit, call_quit =
+  set_event (fun () -> return ())
+
+(* Place when the mouse was last pressed down. *)
+let mouse_down = ref None
+
 let init width height =
+  assert (!global_object = None) ;
   let canvas = Html.createCanvas Html.document in
   canvas##.width := width ;
   canvas##.height := height ;
   Dom.appendChild Html.document##.body canvas ;
   let context = canvas##getContext Html._2d_ in
-  return {
-    width ;
-    height ;
-    canvas ;
-    context ;
-    pixel = context##createImageData 1 1
-  }
+  global_object :=
+    Some {
+      width ;
+      height ;
+      canvas ;
+      context ;
+      pixel = context##createImageData 1 1
+    } ;
+  Lwt_js_events.mousedowns canvas
+    (fun event _thread ->
+      if event##.button = 0 then
+        mouse_down := Some (convert_coords (event##.offsetX, event##.offsetY)) ;
+      return ()
+    ) %%
+  Lwt_js_events.mousemoves canvas
+    (fun event _thread ->
+      match !mouse_down with
+      | None -> return ()
+      | Some (init_x, init_y) ->
+        call_move (init_x, init_y) (convert_coords (event##.offsetX, event##.offsetY))
+    ) %%
+  Lwt_js_events.mouseups canvas
+    (fun event _thread ->
+      if event##.button = 0 then (
+        match !mouse_down with
+        | None -> return ()
+        | Some (init_x, init_y) ->
+          let (x, y) = convert_coords (event##.offsetX, event##.offsetY) in
+          if (init_x, init_y) = (x, y) then call_click (x, y)
+          else call_drag (init_x, init_y) (x, y)
+      ) else return ()
+    ) %%
+  Lwt_js_events.keydowns Html.document
+    (fun event _thread ->
+      let get key = Option.map Js.to_string (Js.Optdef.to_option key) in
+      match get event##.code, get event##.key with
+      | Some ("KeyA" | "KeyH" | "ArrowLeft"), _
+      | _, Some "ArrowLeft"
+        -> call_key_pressed (Some Potion_pandora.Interface.West)
+      | Some ("KeyD" | "KeyL" | "ArrowRight"), _
+      | _, Some "ArrowRight"
+        -> call_key_pressed (Some Potion_pandora.Interface.East)
+      | Some ("KeyW" | "KeyK" | "ArrowUp"), _
+      | _, Some "ArrowUp"
+        -> call_key_pressed (Some Potion_pandora.Interface.North)
+      | Some ("KeyS" | "KeyJ" | "ArrowDown"), _
+      | _, Some "ArrowDown"
+        -> call_key_pressed (Some Potion_pandora.Interface.South)
+      | _, _ -> call_key_pressed None
+    ) %%
+  (* One could add an event on_quit linked to the beforeunload Javascript event,
+    but it seems that the corresponding binding is lacking Lwt_js_events. *)
+  return ()
 
-let write { width ; height ; context ; pixel ; _ } (r, g, b) (x, y) =
+let flush () =
+  Lwt_js.yield ()
+
+let write () (r, g, b) (x, y) =
+  let { width ; height ; context ; pixel ; _ } = get_object () in
   assert (x >= 0 && y >= 0) ;
   assert (x < width && y < height) ;
   Html.pixel_set pixel##.data 0 r ;
@@ -39,109 +134,21 @@ let write { width ; height ; context ; pixel ; _ } (r, g, b) (x, y) =
   context##putImageData pixel (Float.of_int x) (Float.of_int y) ;
   return ()
 
-let flush _ =
-  Lwt.pause ()
+let quit () =
+  let { canvas ; _ } = get_object () in
+  ignore (Html.document##.body##removeChild (canvas :> Dom.node Js.t)) ;
+  return ()
 
-(* Given a canvas coordinate, computes in which pixel of the canvas it happened. *)
-let get_pixel_from_event { width ; height ; canvas ; _ } (x, y) =
-  let mx = canvas##.offsetWidth in
-  let my = canvas##.offsetHeight in
-  let c w x mx = Float.to_int (Float.of_int w *. Float.of_int x /. Float.of_int mx) in
-  (c width x mx, c height y my)
+let wait () time f =
+  let res = ref None in
+  let run () =
+    let* r = f () in
+    res := Some r ;
+    return () in
+  Lwt.join [ Lwt_js.sleep (Float.of_int time /. 1000.) ; run () ] %%
+  match !res with
+  | None -> assert false
+  | Some r -> return r
 
-let on_click =
-  let thread = ref (Lwt.return ()) in fun t f ->
-    Lwt.cancel !thread ;
-    thread :=
-      Lwt_js_events.clicks canvas (fun ev _ ->
-        let (x, y) = get_pixel_from_event t (ev##.offsetX, ev##.offsetY) in
-        f x y) ;
-    !thread
-
-let on_move =
-  let thread = ref (Lwt.return ()) in fun t f ->
-    Lwt.cancel !thread ;
-    thread :=
-      Lwt_js_events.mouusemoves canvas (fun ev _ ->
-        let (x, y) = get_pixel_from_event t (ev##.offsetX, ev##.offsetY) in
-        f x y)
-    !thread
-
-let set_event default =
-  let e = ref default in
-  let call_e a = !e a in
-  let on_e _ f = e := f in
-  (on_e, call_e)
-
-let on_click, call_click =
-  set_event (fun _ -> ())
-
-let on_move, call_move =
-  set_event (fun _ _ -> ())
-
-let on_key_pressed, call_key_pressed =
-  set_event (fun _ -> ())
-
-let on_quit, call_quit =
-  set_event (fun () -> ())
-
-let rec process_events () =
-  let convert_coords (x, y) =
-    (x / scale_factor, y / scale_factor) in
-  let open Sdlevent in
-  let aux = function
-    | KeyDown { scancode = Sdlscancode.A ; _ }
-    | KeyDown { scancode = Sdlscancode.H ; _ }
-    | KeyDown { scancode = Sdlscancode.LEFT ; _ }
-    | KeyDown { keycode = Sdlkeycode.Left ; _ }
-      -> call_key_pressed (Some Potion_pandora.Interface.West)
-    | KeyDown { scancode = Sdlscancode.D ; _ }
-    | KeyDown { scancode = Sdlscancode.L ; _ }
-    | KeyDown { scancode = Sdlscancode.RIGHT ; _ }
-    | KeyDown { keycode = Sdlkeycode.Right ; _ }
-      -> call_key_pressed (Some Potion_pandora.Interface.East)
-    | KeyDown { scancode = Sdlscancode.W ; _ }
-    | KeyDown { scancode = Sdlscancode.K ; _ }
-    | KeyDown { scancode = Sdlscancode.UP ; _ }
-    | KeyDown { keycode = Sdlkeycode.Up ; _ }
-      -> call_key_pressed (Some Potion_pandora.Interface.North)
-    | KeyDown { scancode = Sdlscancode.S ; _ }
-    | KeyDown { scancode = Sdlscancode.J ; _ }
-    | KeyDown { scancode = Sdlscancode.DOWN ; _ }
-    | KeyDown { keycode = Sdlkeycode.Down ; _ }
-      -> call_key_pressed (Some Potion_pandora.Interface.South)
-    | KeyDown { scancode = Sdlscancode.ESCAPE ; _ }
-    | KeyDown { keycode = Sdlkeycode.Escape ; _ }
-      -> call_quit ()
-    | KeyDown _ -> call_key_pressed None
-    | Mouse_Button_Down e ->
-      call_click (convert_coords (e.mb_x, e.mb_y))
-    | Mouse_Motion e ->
-      call_move
-        (convert_coords (e.mm_x - e.mm_xrel, e.mm_y - e.mm_yrel))
-        (convert_coords (e.mm_x, e.mm_y))
-    | Window_Event { kind = WindowEvent_Close ; _ } -> call_quit ()
-    | _ -> () in
-  match poll_event () with
-  | None -> ()
-  | Some e ->
-    aux e ;
-    process_events ()
-
-(* A global variable to detect when quitting has been requested,
-  hence preventing the program to launch anything that might take time. *)
-let has_quit = ref false
-
-let quit _ =
-  has_quit := true ;
-  Sdl.quit ()
-
-let wait _ time f =
-  let before = Sdltimer.get_ticks () in
-  let r = f () in
-  process_events () ;
-  let diff = Sdltimer.get_ticks () - before in
-  if time > diff && not !has_quit then
-    Sdltimer.delay ~ms:(time - diff) ;
-  r
+let run = ignore
 
