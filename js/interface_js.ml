@@ -150,5 +150,5 @@ let wait () time f =
   | None -> assert false
   | Some r -> return r
 
-let run = ignore
+let run = Lwt.async
 

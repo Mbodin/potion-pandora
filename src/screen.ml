@@ -260,3 +260,71 @@ module SplitVertical (I : Interface.T) = struct
 
 end
 
+
+
+type button_actions = {
+  on_press : bool -> unit ;
+  on_release : bool -> unit ;
+  set_toggle : (bool -> unit) -> unit
+}
+
+module type ButtonInputs = sig
+  val width : int
+  val height : int
+  val buttons : (Subimage.t * button_actions) list
+end
+
+module Buttons (B : ButtonInputs) (I : Interface.T) = struct
+
+  (* TODO *)
+
+end
+
+
+
+module SelectButtons (B : ButtonInputs) (I : Interface.T) = struct
+
+  module B' = struct
+
+    let width = B.width
+    let height = B.height
+
+    let buttons =
+      (* The currently pressed button, as its place within B.buttons. *)
+      let current = ref 0 in
+      let () =
+        match B.buttons with
+        | [] -> () (* No buttons are provided.  I guess that's fine. *)
+        | (_img, actions) :: _ -> actions.on_press false in
+      let toggles =
+        List.map (fun (_img, actions) ->
+          let toggle = ref (fun b -> assert false) in
+          (* FIXME TODO: actions.set_toggle (fun f -> toggle := f) ; *)
+          (fun b -> !toggle b)) B.buttons in
+      (* Reset all buttons except one. *)
+      let set_index i =
+        let rec aux i = function
+          | [] -> assert (i < 0)
+          | toggle :: l ->
+            toggle (i = 0) ;
+            aux (i - 1) l in
+        aux i toggles in
+      List.mapi (fun index ((img, actions), toggle) ->
+        (img, {
+          on_press = (fun _ ->
+            if !current <> index then (
+              current := index ;
+              set_index index
+            )) ;
+          on_release = (fun _ ->
+            (* On can't release a button in this setting, so we just cancel the action. *)
+            toggle true) ;
+          set_toggle = actions.set_toggle (* TODO: This is wrong: the function set_toggle will be called twice. *)
+         })) (List.combine B.buttons toggles)
+
+  end
+
+  module Run = Buttons (B') (I)
+
+end
+

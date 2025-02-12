@@ -2,7 +2,7 @@
 (library
  	(public_name potion-pandora)
 	(name potion_pandora)
-	(libraries lwt imagelib potion-pandora.libsave)
+	(libraries imagelib potion-pandora.libsave)
 	(preprocess
     (pps
       ppx_inline_test

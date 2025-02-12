@@ -39,3 +39,7 @@ val flip_diagonally : Subimage.t -> Subimage.t
 (* An entirely transparent image (with only pixel), useful to serve as an empty pattern. *)
 val transparent : Subimage.t
 
+(* Create a kind of inversion effect, in which each pixel will be mapped into the furthest
+  colors in the palette (or the image itself if no palette is provided). *)
+val invert : ?palette:Subimage.t -> Subimage.t -> Subimage.t
+

@@ -143,3 +143,54 @@ let flip_diagonally img =
   let (width, height) = Subimage.dimensions img in
   change_coordinates height width (fun x y -> (y, x)) img
 
+module ColorMap =
+  Map.Make (struct
+    type t = int * int * int
+    let compare = compare
+  end)
+
+let invert ?palette img =
+  let palette =
+    match palette with
+    | Some palette -> palette
+    | None -> img in
+  let color_map = ref ColorMap.empty in
+  let get rgb =
+    match ColorMap.find_opt rgb !color_map with
+    | Some c -> c
+    | None ->
+      let c =
+        (* Finding the furthest color from the provided one. *)
+        let distance (r', g', b') =
+          let (r, g, b) = rgb in
+          abs (r' - r) + abs (g' - g) + abs (b' - b) in
+        let best = ref None in
+        let (width, height) = Subimage.dimensions palette in
+        for x = 0 to width - 1 do
+          for y = 0 to height - 1 do
+            let (r, g, b, a) = Subimage.read palette (x, y) in
+            if a <> 0 then
+              match !best with
+              | None -> best := Some (r, g, b)
+              | Some rgb0 ->
+                if distance rgb0 < distance (r, g, b) then
+                  best := Some (r, g, b)
+          done
+        done ;
+        match !best with
+        | None -> assert false (* All the pixels of the palette were transparent. *)
+        | Some r -> r in
+      color_map := ColorMap.add rgb c !color_map ;
+      c in
+  let (width, height) = Subimage.dimensions img in
+  let img' = Image.create_rgb ~alpha:true width height in
+  Image.fill_rgb ~alpha:0 img' 0 0 0 ;
+  for x = 0 to width - 1 do
+    for y = 0 to height - 1 do
+      let (r, g, b, a) = Subimage.read img (x, y) in
+      let (r', g', b') = get (r, g, b) in
+      Image.write_rgba img' x y r' g' b' a
+    done
+  done ;
+  Subimage.from_image img'
+

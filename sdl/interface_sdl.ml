@@ -143,5 +143,5 @@ let wait _ time f =
     Sdltimer.delay ~ms:(time - diff) ;
   r
 
-let run m = m
+let run g = g ()
 

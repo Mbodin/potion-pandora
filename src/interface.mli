@@ -24,8 +24,9 @@ module type T = sig
   val return : 'a -> 'a m
   val ( let* ) : 'a m -> ('a -> 'b m) -> 'b m
 
-  (* To be called once: it ensures that the monadic computation is executed. *)
-  val run : unit m -> unit
+  (* To be called once: it ensures that the monadic computation is executed.
+   It is meant to be instantiable by Lwt_main. *)
+  val run : (unit -> unit m) -> unit
 
   (* Initialise the interface of a given width and height.
     To be called only once, and at the very beginning. *)

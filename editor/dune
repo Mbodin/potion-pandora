@@ -1,0 +1,9 @@
+
+(library
+ 	(public_name potion-pandora.editor)
+	(name editor)
+	(libraries potion-pandora potion-pandora.libsave)
+	(preprocess (pps ppx_inline_test))
+  (inline_tests)
+  (flags (:standard -warn-error -A -g)))
+
