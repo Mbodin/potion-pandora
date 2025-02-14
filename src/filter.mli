@@ -43,3 +43,11 @@ val transparent : Subimage.t
   colors in the palette (or the image itself if no palette is provided). *)
 val invert : ?palette:Subimage.t -> Subimage.t -> Subimage.t
 
+(* Return the RGB color of the brightest/darkest non-transparent pixel of the image. *)
+val brightest : Subimage.t -> (int * int * int)
+val darkest : Subimage.t -> (int * int * int)
+
+(* Provided a background pattern and an image, update all its transparent pixels to fit
+  the background pattern. *)
+val add_background : Subimage.t -> Subimage.t -> Subimage.t
+

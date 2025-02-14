@@ -276,7 +276,101 @@ end
 
 module Buttons (B : ButtonInputs) (I : Interface.T) = struct
 
-  (* TODO *)
+  (* (Maximal) dimension of buttons. *)
+  let (dimx, dimy) =
+    List.fold_left (fun (dimx, dimy) (img, _actions) ->
+      let (dimx', dimy') = Subimage.dimensions img in
+      (max dimx dimx', max dimy dimy')) (0, 0) B.buttons
+
+  (* We then resize each image to have all of then the same dimensions. *)
+  let buttons =
+    List.map (fun (img, actions) ->
+      (Subimage.enlarge img (dimx, dimy), actions)) B.buttons
+
+  (* We now compute the disposition of buttons, and in particular how many
+    buttons should be placed per line. *)
+  let (button_per_lines, nb_lines) =
+    let aspect_ratio (width, height) = Float.of_int width /. Float.of_int height in
+    let target_aspect_ratio = aspect_ratio (B.width, B.height) in
+    let nb_buttons = List.length B.buttons in
+    assert (nb_buttons >= 1) ;
+    let nb_line button_per_lines =
+      (nb_buttons / button_per_lines)
+      + if nb_buttons mod button_per_lines = 0 then 0 else 1 in
+    (* Given a configuration, the minimal dimension of the interface. *)
+    let minimal_dimensions button_per_lines =
+      (* We draw lines between each buttons, hence the +1s. *)
+      let width = button_per_lines * (1 + dimx) + 1 in
+      let height = nb_line button_per_lines * (1 + dimy) + 1 in
+      (width, height) in
+    (* Whether a configuration can indeed be drawn within the constraints. *)
+    let valid button_per_lines =
+      let (w, h) = minimal_dimensions button_per_lines in
+      w <= B.width && h <= B.height in
+    let better_than nb1 nb2 =
+      match valid nb1, valid nb2 with
+      | false, false -> assert false
+      | true, false -> true
+      | false, true -> false
+      | true, true ->
+        let a1 = aspect_ratio (minimal_dimensions nb1) in
+        let a2 = aspect_ratio (minimal_dimensions nb2) in
+        Float.abs (a1 -. target_aspect_ratio) <= Float.abs (a2 -. target_aspect_ratio) in
+    let rec aux nb_min nb_max =
+      if nb_min + 1 <= nb_max then (
+        if better_than nb_min nb_max then nb_min else nb_max
+      ) else (
+        let middle = (nb_max + nb_max) / 2 in
+        if better_than middle (middle + 1) then
+          aux nb_min middle
+        else aux (middle + 1) nb_max
+      ) in
+    let nb = aux 1 nb_buttons in
+    (nb, nb_line nb)
+
+  (* The interface will use a bright and a dark color for its display. *)
+  let bright_color =
+    List.fold_left (fun (r, g, b) (img, _actions) ->
+      let (r', g', b') = Filter.brightest img in
+      if r + g + b < r' + g' + b' then (r', g', b') else (r, g, b)) (0, 0, 0) B.buttons
+  let dark_color =
+    List.fold_left (fun (r, g, b) (img, _actions) ->
+      let (r', g', b') = Filter.darkest img in
+      if r + g + b > r' + g' + b' then (r', g', b') else (r, g, b)) (255, 255, 255) B.buttons
+
+  let interface =
+    let open I in
+    let* interface = init B.width B.height in
+    let rec fill_dark x y =
+      if x = B.width then fill_dark 0 (y + 1)
+      else if y = B.height then return ()
+      else (
+        let* () = write interface dark_color (x, y) in
+        fill_dark (x + 1) y
+      ) in
+    let* () = fill_dark 0 0 in
+    (* TODO: Draw lines and buttons. *)
+    let* () = flush interface in
+    return interface
+
+  (* The button statuses: true for pressed. *)
+  let state =
+    Array.of_list (List.map (fun (_img, actions) ->
+      (ref false, actions.on_press, actions.on_release)) B.buttons)
+
+  let toggle i b =
+    let (status, on_press, on_release) = state.(i) in
+    if !status <> b then (
+      status := b ;
+      (* TODO: Redraw the corresponding button *)
+      (if b then on_press else on_release) false
+    )
+
+  let () =
+    List.iteri (fun i (_img, actions) ->
+      actions.set_toggle (toggle i)) B.buttons
+
+  (* TODO: React to a click. *)
 
 end
 
@@ -296,30 +390,30 @@ module SelectButtons (B : ButtonInputs) (I : Interface.T) = struct
         match B.buttons with
         | [] -> () (* No buttons are provided.  I guess that's fine. *)
         | (_img, actions) :: _ -> actions.on_press false in
-      let toggles =
-        List.map (fun (_img, actions) ->
-          let toggle = ref (fun b -> assert false) in
-          (* FIXME TODO: actions.set_toggle (fun f -> toggle := f) ; *)
-          (fun b -> !toggle b)) B.buttons in
+      let toggles = List.map (fun _ -> ref (fun b -> assert false)) B.buttons in
       (* Reset all buttons except one. *)
       let set_index i =
         let rec aux i = function
           | [] -> assert (i < 0)
           | toggle :: l ->
-            toggle (i = 0) ;
+            !toggle (i = 0) ;
             aux (i - 1) l in
         aux i toggles in
       List.mapi (fun index ((img, actions), toggle) ->
+        let on_press _ =
+          if !current <> index then (
+            current := index ;
+            set_index index
+          ) in
+        let on_release _ =
+          (* On can't release a button in this setting, so we just cancel the action. *)
+          !toggle true in
+        (* When we receive a message to toggle a button, we apply it. *)
+        actions.set_toggle (fun b -> if b then on_press false) ;
         (img, {
-          on_press = (fun _ ->
-            if !current <> index then (
-              current := index ;
-              set_index index
-            )) ;
-          on_release = (fun _ ->
-            (* On can't release a button in this setting, so we just cancel the action. *)
-            toggle true) ;
-          set_toggle = actions.set_toggle (* TODO: This is wrong: the function set_toggle will be called twice. *)
+          on_press ;
+          on_release ;
+          set_toggle = (fun f -> toggle := f)
          })) (List.combine B.buttons toggles)
 
   end

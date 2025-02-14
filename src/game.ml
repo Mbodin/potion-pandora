@@ -181,7 +181,7 @@ module Launch (I : Interface.T) = struct
       else play () in
     play ()
 
-  let _ : unit =
+  let () =
     run (fun () ->
       let* interface = E.interface in
       let* () = play_level level_store in

@@ -15,6 +15,10 @@ val from_image : Image.image -> t
   bundle for Bundled_image. *)
 val make : ?bundle:Image.image -> int -> int -> (int * int) -> t
 
+(* Extract a subimage from a subimage, provided the sub-subimage width, height, and
+ coordinates (in the provided subimage). *)
+val sub : t -> int -> int -> (int * int) -> t
+
 (* Given an image, reads its (r, g, b, a) values at the provided coordinate. *)
 val read : t -> (int * int) -> (int * int * int * int)
 
@@ -23,6 +27,10 @@ val dimensions : t -> (int * int)
 
 (* Combine a list of images with an offset into a single image. *)
 val combine : (t * (int * int)) list -> t
+
+(* Take a list of images and place then aligned horizontally (vertically centered) with a space
+  between then of as many pixels as the provided integer. *)
+val horizontal_sequence : int -> t list -> t
 
 (* Create an image from the provided image of the provided dimensions.
   These dimensions must be larger than the image.

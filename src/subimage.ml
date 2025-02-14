@@ -17,6 +17,12 @@ let make ?(bundle = Bundled_image.image) width height position =
   assert (snd position + height <= bundle.Image.height) ;
   { width ; height ; position ; picture = bundle }
 
+let sub t width height (x, y) =
+  assert (x >= 0 && y >= 0) ;
+  assert (x + width < t.width) ;
+  assert (y + height < t.height) ;
+  { width ; height ; picture = t.picture ; position = (x + fst t.position, y + snd t.position) }
+
 let from_image img =
   make ~bundle:img img.Image.width img.Image.height (0, 0)
 
@@ -68,4 +74,17 @@ let combine imgl =
   (* We apply the difference to the offsets, to make sure that they are all positive. *)
   let imgl = List.map (fun (img, (dx, dy)) -> (img, (dx + fst d, dy + snd d))) imgl in
   combine_raw dim imgl
+
+let horizontal_sequence offset imgl =
+  (* First, we compute the total required width and height. *)
+  let (width, height) =
+    List.fold_left (fun (w, h) img ->
+      (w + offset + img.width, max h img.height)) (-offset, 0) imgl in
+  let width = max 0 width in
+  (* Then we compute the individual offsets. *)
+  let (_width, imgl) =
+    List.fold_left (fun (x, imgl) img ->
+      let y = (height - img.height) / 2 in
+      (x + offset + img.width, (img, (x + offset, y)) :: imgl)) (-offset, []) imgl in
+  combine_raw (width, height) imgl
 

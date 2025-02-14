@@ -36,6 +36,20 @@ let decolor ~pattern original =
   done ;
   Subimage.from_image destination
 
+let add_background pattern original =
+  let (width, height) = Subimage.dimensions original in
+  let destination = Image.create_rgb ~alpha:true width height in
+  let (pattern_width, pattern_height) = Subimage.dimensions pattern in
+  for x = 0 to width - 1 do
+    for y = 0 to height - 1 do
+      let (r, g, b, a) = Subimage.read original (x, y) in
+      let (pr, pg, pb, pa) = Subimage.read pattern (x mod pattern_width, y mod pattern_height) in
+      let interp c pc = (c * a + pc * (255 - a)) / 255 in
+      Image.write_rgba destination x y (interp r pr) (interp g pg) (interp b pb) (max a pa)
+    done
+  done ;
+  Subimage.from_image destination
+
 let curve ifl (width, height) =
   let img = Image.create_rgb ~alpha:true width height in
   Image.fill_rgb ~alpha:0 img 0 0 0 ;
@@ -149,6 +163,28 @@ module ColorMap =
     let compare = compare
   end)
 
+(* Provided a function and an image, return the non-transparent pixel maximizing the function. *)
+let find_best_color f img =
+  let best = ref None in
+  let (width, height) = Subimage.dimensions img in
+  for x = 0 to width - 1 do
+    for y = 0 to height - 1 do
+      let (r, g, b, a) = Subimage.read img (x, y) in
+      if a <> 0 then
+        match !best with
+        | None -> best := Some (r, g, b)
+        | Some rgb0 ->
+          if f rgb0 < f (r, g, b) then
+            best := Some (r, g, b)
+    done
+  done ;
+  match !best with
+  | None -> assert false (* All the pixels of the image were transparent. *)
+  | Some r -> r
+
+let brightest = find_best_color (fun (r, g, b) -> r + g + b)
+let darkest = find_best_color (fun (r, g, b) -> - (r + g + b))
+
 let invert ?palette img =
   let palette =
     match palette with
@@ -164,22 +200,7 @@ let invert ?palette img =
         let distance (r', g', b') =
           let (r, g, b) = rgb in
           abs (r' - r) + abs (g' - g) + abs (b' - b) in
-        let best = ref None in
-        let (width, height) = Subimage.dimensions palette in
-        for x = 0 to width - 1 do
-          for y = 0 to height - 1 do
-            let (r, g, b, a) = Subimage.read palette (x, y) in
-            if a <> 0 then
-              match !best with
-              | None -> best := Some (r, g, b)
-              | Some rgb0 ->
-                if distance rgb0 < distance (r, g, b) then
-                  best := Some (r, g, b)
-          done
-        done ;
-        match !best with
-        | None -> assert false (* All the pixels of the palette were transparent. *)
-        | Some r -> r in
+        find_best_color distance palette in
       color_map := ColorMap.add rgb c !color_map ;
       c in
   let (width, height) = Subimage.dimensions img in
