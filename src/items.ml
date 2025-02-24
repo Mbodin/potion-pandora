@@ -938,6 +938,8 @@ let etoile =
 
 let nuage1 = static (from Images_coords.nuage 0)
 let nuage2 = static (from Images_coords.nuage 1)
+let nuage3 = static (from Images_coords.nuage 2)
+let nuage4 = static (from Images_coords.nuage 3)
 
 let soleil =
   let mk = from Images_coords.soleil in
