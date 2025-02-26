@@ -18,16 +18,21 @@ let%test "log2 123" = log2 123 = 7
 let%test "log2 128" = log2 128 = 7
 
 
-(* We use a reader monad within this file.
- It takes as argument the string being read, the current index, and returns the current index. *)
-type 'a monad = string -> int -> 'a * int
+type colors = Save.color array
 
-let return (type t) (x : t) : t monad = fun _str index -> (x, index)
+let initial_colors : colors = Array.make 1 (0, 0, 0, 0)
+
+(* We use a reader monad within this file.
+ It takes as argument the string being read, the current index, as well as a mapping of colors,
+ and returns the current index. *)
+type 'a monad = string -> int -> colors -> 'a * int
+
+let return (type t) (x : t) : t monad = fun _str index _colors -> (x, index)
 
 let bind (type a b) (m : a monad) (f : a -> b monad) : b monad =
-  fun str index ->
-    let (a, index) = m str index in
-    f a str index
+  fun str index colors ->
+    let (a, index) = m str index colors in
+    f a str index colors
 
 let ( let* ) = bind
 
@@ -36,19 +41,19 @@ let ( %% ) (type t) : unit monad -> t monad -> t monad =
 
 (* Read the current character. *)
 let read : char monad =
-  fun str index ->
+  fun str index _colors ->
     assert (index < String.length str) ;
     (str.[index], index + 1)
 
 (* Read a string of size n. *)
 let readn n : string monad =
-  fun str index ->
+  fun str index _colors ->
     assert (index + n <= String.length str) ;
     (String.sub str index n, index + n)
 
 (* Check that no characters are left. *)
 let eof : unit monad =
-  fun str index ->
+  fun str index _colors ->
     assert (index = String.length str) ;
     ((), index)
 
@@ -58,6 +63,22 @@ let ( ~$ ) (type t) (reader : t monad) : t monad =
   eof %%
   return r
 
+(* Get the [i]th saved color. *)
+let get_color i : Save.color monad =
+  fun _str index colors ->
+    assert (i < Array.length colors) ;
+    (colors.(i), index)
+
+(* Add a color to the current palette. *)
+let add_color r g b a (m : 'a monad) : 'a monad =
+  fun str index colors ->
+    let colors = Array.append colors (Array.make 1 (r, g, b, a)) in
+    m str index colors
+
+(* Get the current number of registered colors. *)
+let num_colors : int monad =
+  fun _str index colors ->
+    (Array.length colors, index)
 
 let char_to_bits c =
   let i = Char.code c in
@@ -108,6 +129,11 @@ let _eofbits : unit monadbit = fun bl ->
   eof %%
   return ((), [])
 
+let get_color_bits i : Save.color monadbit =
+  fun bl ->
+    let* color = get_color i in
+    return (color, bl)
+
 
 (* Decompresses a string. *)
 let deflate_string (*?(level=4)*) str =
@@ -128,16 +154,21 @@ let deflate_string (*?(level=4)*) str =
   | Error (`Msg err) -> failwith ("deflate_string: " ^ err)
 
 
-let decode_int : int monad =
-  let rec aux () =
+(* Decode a positive integer. *)
+let rec decode_positive : int monad =
+  fun str -> ( (* This is just a trick to make the compiler accept this [let rec] here. *)
     let* c = read in
     let i = Char.code c in
     if i < 128 then return i
     else (
       let r = i - 128 in
-      let* d = aux () in
+      let* d = decode_positive in
       return (r + 128 * d)
-    ) in
+    )
+  ) str
+
+(* Decode an integer. *)
+let decode_int : int monad =
   let* c = read in
   let i = Char.code c in
   if i < 128 then (
@@ -145,7 +176,7 @@ let decode_int : int monad =
     if i < 64 then return i
     else (
       let r = i - 64 in
-      let* d = aux () in
+      let* d = decode_positive in
       return (r + 64 * d)
     )
   ) else (
@@ -154,14 +185,14 @@ let decode_int : int monad =
     if i < 64 then return (-i - 1)
     else (
       let r = i - 64 in
-      let* d = aux () in
+      let* d = decode_positive in
       return (-(r + 64 * d) - 1)
     )
   )
 
 let rec decode_monad : type t. t Save.t -> t monad =
   let decode_list (type t) (s : t Save.t) : t list monad =
-    let* size = decode_int in
+    let* size = decode_positive in
     let rec aux (acc : t list) : int -> t list monad = function
       | 0 ->
         (* Lists are already stored reversed, so there is no need to reverse it there. *)
@@ -179,7 +210,7 @@ let rec decode_monad : type t. t Save.t -> t monad =
      | _ -> assert false)
   | Save.Int -> decode_int
   | Save.String ->
-    let* l = decode_int in
+    let* l = decode_positive in
     readn l
   | Save.Seq (s1, s2) ->
     let* a = decode_monad s1 in
@@ -197,27 +228,22 @@ let rec decode_monad : type t. t Save.t -> t monad =
   | Save.Array s ->
     let* l = decode_list s in
     return (Array.of_list l)
+  | Save.AddColor s ->
+    let* r = read in
+    let r = Char.code r in
+    let* g = read in
+    let g = Char.code g in
+    let* b = read in
+    let b = Char.code b in
+    let* a = read in
+    let a = Char.code a in
+    let* data = add_color r g b a (decode_monad s) in
+    return ((r, g, b, a), data)
   | Save.Image ->
-    (* First, reading the palette and building an array of pixels accordingly. *)
-    let* size = decode_int in
-    let palette = Array.make size (0, 0, 0, 0) in
-    let rec build_palette i =
-      if i = size - 1 then
-        (* The last color in the palette is always (0, 0, 0, 0) and is not stored. *)
-        return ()
-      else (
-        let* r = read in
-        let* g = read in
-        let* b = read in
-        let* a = read in
-        palette.(i) <- (Char.code r, Char.code g, Char.code b, Char.code a) ;
-        build_palette (1 + i)
-      ) in
-    build_palette 0 %%
-    (* Second, read the data. *)
-    let* width = decode_int in
-    let* height = decode_int in
-    let num_bits = log2 size in
+    let* width = decode_positive in
+    let* height = decode_positive in
+    let* num_colors = num_colors in
+    let num_bits = log2 num_colors in
     let img = Image.create_rgb ~alpha:true width height in
     let rec decode_data x y : unit monadbit =
       if x = width then decode_data 0 (y + 1)
@@ -225,28 +251,28 @@ let rec decode_monad : type t. t Save.t -> t monad =
       else (
         let** bl = readnbits num_bits in
         let rec to_int w acc = function
-          | [] -> 0
+          | [] -> acc
           | b :: bl -> to_int (2 * w) (acc + if b then w else 0) bl in
-        let (r, g, b, a) = palette.(to_int 1 0 bl) in
+        let** (r, g, b, a) = get_color_bits (to_int 1 0 bl) in
         Image.write_rgba img x y r g b a ;
         decode_data (x + 1) y
       ) in
     read_and_close_bits (decode_data 0 0) %%
-    return (palette, img)
+    return img
   | Save.Base64 s ->
-    let* size = decode_int in
+    let* size = decode_positive in
     let* str = readn size in
     let str = Base64.decode_exn str in
-    let (r, _index) = ~$ (decode_monad s) str 0 in
+    let (r, _index) = ~$ (decode_monad s) str 0 initial_colors in
     return r
   | Save.Compress s ->
-    let* size = decode_int in
+    let* size = decode_positive in
     let* str = readn size in
     let str = deflate_string str in
-    let (r, _index) = ~$ (decode_monad s) str 0 in
+    let (r, _index) = ~$ (decode_monad s) str 0 initial_colors in
     return r
 
 let decode (type t) (s : t Save.t) str =
-  let (r, _index) = ~$ (decode_monad s) str 0 in
+  let (r, _index) = ~$ (decode_monad s) str 0 initial_colors in
   r
 

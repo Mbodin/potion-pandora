@@ -1,23 +1,62 @@
 
+module ColorMap =
+  Map.Make (struct
+    type t = Save.color
+    let compare = compare
+  end)
+
 (* We use a writer monad within this file.
-  It stores a list of substrings to be written, in reverse order. *)
-type 'a monad = 'a * string list
+ It stores a list of substrings to be written, in reverse order.
+ It also gets the current color mapping. *)
+type 'a monad = int ColorMap.t -> 'a * string list
 
-let return (type t) (x : t) : t monad = (x, [])
+let return (type t) (x : t) : t monad = fun _colors -> (x, [])
 
-let bind (type a b) ((a, l1) : a monad) (f : a -> b monad) : b monad =
-  let (r, l2) = f a in
-  (r, l2 @ l1)
+let bind (type a b) (o : a monad) (f : a -> b monad) : b monad =
+  fun colors ->
+    let (a, l1) = o colors in
+    let (r, l2) = f a colors in
+    (r, l2 @ l1)
 
 let ( let* ) = bind
 
 let ( %% ) (type t) : unit monad -> t monad -> t monad =
   fun m1 m2 -> bind m1 (fun () -> m2)
 
-let write str : unit monad = ((), [str])
+let write str : unit monad = fun _colors -> ((), [str])
 
+(* The first identifier is always [0]. *)
+let transparent = 0
+
+(* Escape the monad. *)
 let escape (type t) : t monad -> t * string =
-  fun (t, l) -> (t, String.concat "" (List.rev l))
+  fun m ->
+    let colors = ColorMap.add (0, 0, 0, 0) transparent ColorMap.empty in
+    let (t, l) = m colors in
+    (t, String.concat "" (List.rev l))
+
+(* Get the identifier of a color. *)
+let get_color_id r g b a : int monad =
+  fun colors ->
+    if a = 0 then (transparent, [])
+    else
+      match ColorMap.find_opt (r, g, b, a) colors with
+      | Some id -> (id, [])
+      | None -> assert false
+
+(* Add a color to the current palette. *)
+let add_color r g b a (m : 'a monad) : 'a monad =
+  fun colors ->
+    let id = ColorMap.cardinal colors in
+    let colors = ColorMap.add (r, g, b, a) id colors in
+    m colors
+
+(* Get the current number of registered colors. *)
+let num_colors : int monad =
+  fun colors -> (ColorMap.cardinal colors, [])
+
+(* Write a single character. *)
+let write_char i = write (String.make 1 i)
 
 (* Converts 8 bits to a character. *)
 let bits_to_char b1 b2 b3 b4 b5 b6 b7 b8 =
@@ -49,15 +88,16 @@ let writebits (lb : bool list) : unit monadbit = return ((), lb)
 
 let writebit (b : bool) : unit monadbit = writebits [b]
 
-let escapebits (type t) (m : t monadbit) : t * string =
+let escapebits (type t) (m : t monadbit) : t monad =
   let m =
     (* This flushes the waiting bits if possible. *)
     bindbit m returnbit in
-  let ((r, bl), str) = escape m in
+  let* (r, bl) = m in
   let rec aux = function
-    | [] -> (r, str)
+    | [] -> return r
     | [b1; b2; b3; b4; b5; b6; b7; b8] ->
-      (r, str ^ String.make 1 (bits_to_char b1 b2 b3 b4 b5 b6 b7 b8))
+      write_char (bits_to_char b1 b2 b3 b4 b5 b6 b7 b8) %%
+      return r
     | _b1 :: _b2 :: _b3 :: _b4 :: _b5 :: _b6 :: _b7 :: _b8 :: _ -> assert false
     | bl -> (* We fill-in the remaining bits with false. *)
       aux (bl @ [false]) in
@@ -82,33 +122,33 @@ let deflate_string ?(level=4) str =
   Zl.Higher.compress ~level ~dynamic:true ~w ~q ~refill ~flush i o ;
   Buffer.contents r
 
+(* Encode a positive integer. *)
+let rec encode_positive i =
+  assert (i >= 0) ;
+  if i < 128 then
+    write_char (Char.chr i)
+  else (
+    write_char (Char.chr (128 + (i mod 128))) %%
+    encode_positive (i / 128)
+  )
 
 (* The first bit encodes the sign, then each group of one character starts with a bit
  stating whether there will be another group, and the rest is coding. *)
 let encode_int i : unit monad =
-  let one_char i = write (String.make 1 (Char.chr i)) in
-  let rec aux i =
-    assert (i >= 0) ;
-    if i < 128 then
-      one_char i
-    else (
-      one_char (128 + (i mod 128)) %%
-      aux (i / 128)
-    ) in
   if i < 0 then (
     let i = i + 1 in
-    one_char (128 + (if -i < 64 then 0 else 64) + ((-i) mod 64)) %%
+    write_char (Char.chr (128 + (if -i < 64 then 0 else 64) + ((-i) mod 64))) %%
     if -i < 64 then return ()
-    else aux ((-i) / 64)
+    else encode_positive ((-i) / 64)
   ) else (
-    one_char ((if i < 64 then 0 else 64) + (i mod 64)) %%
+    write_char (Char.chr ((if i < 64 then 0 else 64) + (i mod 64))) %%
     if i < 64 then return ()
-    else aux (i / 64)
+    else encode_positive (i / 64)
   )
 
 let rec encode_monad : type t. t Save.t -> t -> unit monad =
   let encode_list (type t) (s : t Save.t) (l : t list) : unit monad =
-    encode_int (List.length l) %%
+    encode_positive (List.length l) %%
     let rec iter = function
       | [] -> return ()
       | x :: l -> encode_monad s x %% iter l in
@@ -118,7 +158,7 @@ let rec encode_monad : type t. t Save.t -> t -> unit monad =
   | Save.Bool -> fun b -> if b then write "t" else write "f"
   | Save.Int -> encode_int
   | Save.String -> fun str ->
-    encode_int (String.length str) %%
+    encode_positive (String.length str) %%
     write str
   | Save.Seq (s1, s2) -> fun (a, b) ->
     encode_monad s1 a %%
@@ -130,66 +170,41 @@ let rec encode_monad : type t. t Save.t -> t -> unit monad =
       encode_monad s x)
   | Save.List s -> encode_list s
   | Save.Array s -> fun a -> encode_list s (Array.to_list a)
-  | Save.Image -> fun (palette, img) ->
-    (* First, we create a mapping add a completely transparent pixel into the palette. *)
-    let module M =
-      Map.Make (struct
-        type t = int * int * int * int
-        let compare = compare
-      end) in
-    let (num_bits, get) =
-      let (transparent, m) =
-        Array.fold_left (fun (n, m) c -> (n + 1, M.add c n m)) (0, M.empty) palette in
-      let get r g b a =
-        if a = 0 then transparent
-        else
-          match M.find_opt (r, g, b, a) m with
-          | Some id -> id
-          | None -> assert false in
-      let num = Read.log2 (transparent + 1) in
-      (num, get) in
-    (* Second, we encode the palette.
-      We add a completely transparent pixel into it. *)
-    encode_int (1 + Array.length palette) %%
-    let rec encode_palette i =
-      let write_pixel (r, g, b, a) =
-        write (Printf.sprintf "%c%c%c%c" (Char.chr r) (Char.chr g) (Char.chr b) (Char.chr a)) in
-      if i = Array.length palette then return ()
-      else (
-        write_pixel palette.(i) %%
-        encode_palette (i + 1)
-      ) in
-    encode_palette 0 %%
-    (* Then, we encode the data. *)
-    encode_int img.Image.width %%
-    encode_int img.Image.height %%
+  | Save.AddColor s -> fun ((r, g, b, a), data) ->
+    write (Printf.sprintf "%c%c%c%c" (Char.chr r) (Char.chr g) (Char.chr b) (Char.chr a)) %%
+    add_color r g b a (encode_monad s data)
+  | Save.Image -> fun img ->
+    encode_positive img.Image.width %%
+    encode_positive img.Image.height %%
+    let* num_colors = num_colors in
+    let num_bits = Read.log2 num_colors in
     let rec encode_data x y : unit monadbit =
       if x = img.Image.width then encode_data 0 (y + 1)
       else if y = img.Image.height then returnbit ()
       else (
-        let color_id = Image.read_rgba img x y get in
-        let rec aux k m =
+        let (r, g, b, a) = Image.read_rgba img x y (fun r g b a -> (r, g, b, a)) in
+        let* color_id = get_color_id r g b a in
+        let rec encode_id k m =
           if k = 0 then (
             assert (m = 0) ;
             returnbit ()
           ) else (
             writebit (m mod 2 = 1) %%%
-            aux (k - 1) (m / 2)
+            encode_id (k - 1) (m / 2)
           ) in
-        aux num_bits color_id %%%
-        aux (x + 1) y
+        encode_id num_bits color_id %%%
+        encode_data (x + 1) y
       ) in
-    let ((), str) = escapebits (encode_data 0 0) in
-    write str
+    escapebits (encode_data 0 0)
   | Save.Base64 s -> fun x ->
     let ((), str) = escape (encode_monad s x) in
     let str = Base64.encode_exn str in
-    encode_int (String.length str) %%
+    encode_positive (String.length str) %%
     write str
   | Save.Compress s -> fun x ->
     let ((), str) = escape (encode_monad s x) in
     let str = deflate_string str in
-    encode_int (String.length str) %%
+    encode_positive (String.length str) %%
     write str
 
 let encode (type t) (s : t Save.t) (v : t) : string =
@@ -268,8 +283,18 @@ let%test "compress base64 list base64 compress int" =
   check (Compress (Base64 (List (Base64 (Compress Int))))) [1; -2; 3]
 
 let%test "image" =
-  let img = Image.create_rgb ~alpha:true 1 1 in
+  let img = Image.create_rgb ~alpha:true 1 2 in
   Image.fill_rgb ~alpha:255 img 1 2 3 ;
-  let (_, img') = Read.decode Image (encode Image ([|(1, 2, 3, 255)|], img)) in
-  img = img'
+  let t = Save.(AddColor Image) in
+  let color = (1, 2, 3, 255) in
+  let (color', img') = Read.decode t (encode t (color, img)) in
+  let check_pixel x y =
+    Image.read_rgba img x y (fun r g b a ->
+      Image.read_rgba img' x y (fun r' g' b' a' ->
+        r = r' && g = g' && b = b' && a = a')) in
+  color = color'
+  && img.Image.width = img'.Image.width
+  && img.Image.height = img'.Image.height
+  && check_pixel 0 0
+  && check_pixel 0 1
 
