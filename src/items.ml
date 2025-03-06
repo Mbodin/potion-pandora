@@ -911,3 +911,9 @@ let bouton_copier = from Images_coords.boutons 13
 let bouton_menu_points = from Images_coords.boutons 11
 let bouton_menu_lignes = from Images_coords.boutons 12
 
+
+(* * Characters *)
+
+let ascii = fromlist Images_coords.ascii
+let extended_characters = fromlist Images_coords.characteres
+
