@@ -70,7 +70,12 @@ module Launch (I : Interface.T) = struct
     ignore (Store.add store Items.enfant_cerf_volant (350, -50)) ;
     let player = Store.add store Items.perso (0, 0) in
     ignore (Store.add store Items.arbre1_tres_sombre (130, -25)) ;
-    ignore (Store.add store (Items_aux.static (Text.render "Test" 100)) (0, 200)) ;
+    ignore (Store.add store (Items_aux.static (Text.render "Test" 100)) (15, 50)) ;
+    for i = 0 to 25 do
+      let c = Char.chr (Char.code 'a' + i) in
+      ignore (Store.add store
+        (Items_aux.static (Text.render (Printf.sprintf "%cT%c" c c) 100)) (15, 60 + 9 * i))
+    done ;
     Store.add_birds store [Items.canard; Items.papillon] ;
     Store.add_bird_location store (130, 10) ;
     Store.add_bird_location store (110, 30) ;

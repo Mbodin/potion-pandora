@@ -19,8 +19,8 @@ let make ?(bundle = Bundled_image.image) width height position =
 
 let sub t width height (x, y) =
   assert (x >= 0 && y >= 0) ;
-  assert (x + width < t.width) ;
-  assert (y + height < t.height) ;
+  assert (x + width <= t.width) ;
+  assert (y + height <= t.height) ;
   { width ; height ; picture = t.picture ; position = (x + fst t.position, y + snd t.position) }
 
 let from_image img =
@@ -85,7 +85,7 @@ let combine_horizontally imgl =
   let (_width, imgl) =
     List.fold_left (fun (x, imgl) (offset, img) ->
       let y = (height - img.height) / 2 in
-      (x + offset + img.width, (img, (x, y)) :: imgl)) (0, []) imgl in
+      (x + offset + img.width, (img, (x + offset, y)) :: imgl)) (0, []) imgl in
   combine_raw (width, height) imgl
 
 let horizontal_sequence offset imgl =
@@ -103,7 +103,7 @@ let combine_vertically imgl =
   let (_height, imgl) =
     List.fold_left (fun (y, imgl) (offset, img) ->
       let x = (width - img.width) / 2 in
-      (y + offset + img.height, (img, (x, y)) :: imgl)) (0, []) imgl in
+      (y + offset + img.height, (img, (x, y + offset)) :: imgl)) (0, []) imgl in
   combine_raw (width, height) imgl
 
 let vertical_sequence offset imgl =

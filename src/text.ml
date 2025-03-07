@@ -32,11 +32,15 @@ type substring_search =
   | NoSubstring of bool (* No data is associated with the current substring. *)
   | SubstringData of substring_search array * bool (* For each next character, we provide the data. *)
 
+(* Raised when a string has been added twice, which is probably a mistake (the same string would then
+  have several renderings). *)
+exception StringAddedTwice
+
 (* Set the current accepted-boolean to true. *)
 let add_accepted = function
   | NoSubstring false -> NoSubstring true
   | SubstringData (data, false) -> SubstringData (data, true)
-  | NoSubstring true | SubstringData (_, true) -> assert false (* We shouldn't add twice the same string. *)
+  | NoSubstring true | SubstringData (_, true) -> raise StringAddedTwice
 
 (* Read the current accepted-boolean. *)
 let is_accepted = function
@@ -44,17 +48,20 @@ let is_accepted = function
   | SubstringData (_data, accepted) -> accepted
 
 (* Add as a data a string. *)
-let rec add_substring data str =
-  if String.length str = 0 then add_accepted data
-  else (
-    let (data, accepted) =
-      match data with
-      | NoSubstring accepted -> (Array.make 255 (NoSubstring false), accepted)
-      | SubstringData (data, accepted) -> (data, accepted) in
-    let c = Char.code str.[0] in
-    data.(c) <- add_substring data.(c) (tail str) ;
-    SubstringData (data, accepted)
-  )
+let add_substring data str =
+  let rec aux data str =
+    if String.length str = 0 then add_accepted data
+    else (
+      let (data, accepted) =
+        match data with
+        | NoSubstring accepted -> (Array.make 255 (NoSubstring false), accepted)
+        | SubstringData (data, accepted) -> (data, accepted) in
+      let c = Char.code str.[0] in
+      data.(c) <- aux data.(c) (tail str) ;
+      SubstringData (data, accepted)
+    ) in
+  try aux data str with
+  | StringAddedTwice -> failwith (Printf.sprintf "String added twice: \"%s\"." str)
 
 (* Given a string, returns the length of the maximum substring for which a data is associated,
   if any. *)
@@ -125,7 +132,7 @@ let character_data = [
     (["ĵ"; "ĵ"; "j́"], Consonant) ;
     (["ñ"; "ñ"; "ǹ"; "ǹ"; "ń"; "ń"], Consonant) ;
     (["õ"; "õ"; "ô"; "ô"; "ō"; "ō"; "ò"; "ò"; "ó"; "ó"; "ŏ"; "ŏ"; "ǒ"; "ǒ"], Vowel) ;
-    (["ŝ"; "ŝ"; "Ś"; "ś"; "š"; "š"], Consonant) ;
+    (["ŝ"; "ŝ"; "ś"; "ś"; "š"; "š"], Consonant) ;
     (["ũ"; "ũ"; "û"; "û"; "ū"; "ū"; "ù"; "ù"; "ú"; "ú"; "ŭ"; "ŭ"], Vowel) ;
     (["ỹ"; "ỹ"; "ŷ"; "ŷ"; "ỳ"; "ỳ"; "ý"; "ý"], Vowel) ;
     (["ẑ"; "ẑ"; "ź"; "ź"; "z̆"; "ž"; "ž"], Consonant) ;
@@ -147,8 +154,8 @@ let character_data = [
     (["fi"], OtherLetter) ;
     (["fl"], OtherLetter) ;
     (["°"], OtherKind) ;
-    (["–"; "֊"; "־"; "᠆"; "-"; "‑"; "‒"; "–"; "−"; "﹣"], Punctuation) ;
-    (["—"; "—"; "﹘"], Punctuation) ;
+    (["–"; "֊"; "־"; "᠆"; "-"; "‑"; "‒"; "−"; "﹣"], Punctuation) ;
+    (["—"; "﹘"], Punctuation) ;
     (["🄯"; "(ɔ)"], OtherKind) ;
     (["->"; "→"; "🡒"; "⟶"; "➙"; "➛"; "➜"; "➔"; "➝"; "➞"; "➺"; "➻"; "⭢"; "🠂"; "🠆"; "🠊"; "🠢"; "🠦"; "🠪"; "🠒"; "🠖"; "🡢"; "🡪"; "🡲"; "➤"; "⮞"; "➢"; "➣"; "⮚"; "🠺"], OtherKind) ;
     (["<-"; "←"; "🡐"; "⟵"; "⭠"; "🠀"; "🠄"; "🠈"; "🠠"; "🠤"; "🠨"; "🠐"; "🠔"; "🡠"; "🡨"; "🡰"; "⮜"; "⮘"; "🠸"], OtherKind) ;
@@ -179,7 +186,7 @@ let character_data = [
     (["“"; "‟"], Punctuation) ;
     (["”"], Punctuation) ;
     (["„"], Punctuation) ;
-    (["·"; "·"; "·"; "⸱"; "ꞏ"; "・"; "᛫"; "⋅"], Punctuation) ;
+    (["·"; "·"; "⸱"; "ꞏ"; "・"; "᛫"; "⋅"], Punctuation) ;
     (["⚠︎"; "⚠️"; "⚠"], OtherKind) ;
     (["✴"; "✷"; "✵"], OtherKind) ;
     (["Æ"], Vowel) ;
@@ -269,13 +276,51 @@ let kernings =
     List.fold_left (fun m first ->
       List.fold_left (fun m second ->
         StringPairMap.add (first, second) k m) m firsts) m seconds) StringPairMap.empty [
-      ("f", "f", 0) ;
-      ("l", "l", 0) ;
-      ("f", "l", 0) ;
-      ("t", "t", 0) ;
       ("/", "/", -1) ;
-      ("L", "'", -1) ;
-      ("l", "'", 0) ;
+      ("C", "s", 0) ;
+      ("F", "a", 0) ; ("F", "c", 0) ; ("F", "d", 0) ; ("F", "e", 0) ; ("F", "g", 0) ;
+      ("F", "j", 0) ; ("F", "m", 0) ; ("F", "o", 0) ; ("F", "p", 0) ; ("F", "q", 0) ;
+      ("F", "r", 0) ; ("F", "s", 0) ; ("F", "u", 0) ; ("F", "v", 0) ; ("F", "w", 0) ;
+      ("F", "x", 0) ; ("F", "y", 0) ; ("F", "z", 0) ;
+      ("I", "q", 0) ; ("I", "s", 0) ;
+      ("J", "a", 0) ; ("J", "c", 0) ; ("J", "d", 0) ; ("J", "g", 0) ; ("J", "j", 0) ;
+      ("J", "m", 0) ; ("J", "n", 0) ; ("J", "o", 0) ; ("J", "p", 0) ; ("J", "q", 0) ;
+      ("J", "r", 0) ; ("J", "s", 0) ; ("J", "u", 0) ; ("J", "v", 0) ; ("J", "w", 0) ;
+      ("J", "x", 0) ; ("J", "y", 0) ;
+      ("L", "'", -1) ; ("L", "g", 0) ; ("L", "q", 0) ; ("L", "s", 0) ; ("L", "v", 0) ;
+      ("L", "w", 0) ; ("L", "y", 0) ;
+      ("P", "a", 0) ; ("P", "c", 0) ; ("P", "d", 0) ; ("P", "g", 0) ; ("P", "j", 0) ;
+      ("P", "m", 0) ; ("P", "n", 0) ; ("P", "o", 0) ; ("P", "p", 0) ; ("P", "q", 0) ;
+      ("P", "r", 0) ;
+      ("T", "a", 0) ; ("T", "c", 0) ; ("T", "d", 0) ; ("T", "e", 0) ; ("T", "g", 0) ;
+      ("T", "j", 0) ; ("T", "m", 0) ; ("T", "n", 0) ; ("T", "o", 0) ; ("T", "p", 0) ;
+      ("T", "q", 0) ; ("T", "r", 0) ; ("T", "s", 0) ; ("T", "u", 0) ; ("T", "v", 0) ;
+      ("T", "w", 0) ; ("T", "x", 0) ; ("T", "y", 0) ; ("T", "z", 0) ;
+      ("V", "a", 0) ; ("V", "c", 0) ; ("V", "d", 0) ; ("V", "g", 0) ; ("V", "j", 0) ;
+      ("V", "m", 0) ; ("V", "n", 0) ; ("V", "o", 0) ; ("V", "r", 0) ;
+      ("W", "a", 0) ; ("W", "c", 0) ; ("W", "d", 0) ; ("W", "g", 0) ; ("W", "j", 0) ;
+      ("W", "m", 0) ; ("W", "n", 0) ; ("W", "o", 0) ; ("W", "r", 0) ;
+      ("a", "T", 0) ;
+      ("b", "T", -1) ; ("b", "V", 0) ; ("b", "W", 0) ;
+      ("c", "T", 0) ;
+      ("e", "T", 0) ;
+      ("f", "f", 0) ; ("f", "l", 0) ;
+      ("g", "T", 0) ; ("h", "T", 0) ; ("h", "V", 0) ; ("h", "W", 0) ;
+      ("k", "T", 0) ; ("l", "'", 0) ; ("l", "T", 0) ; ("l", "l", 0) ;
+      ("m", "T", 0) ; ("m", "V", 0) ; ("m", "W", 0) ;
+      ("n", "T", 0) ; ("n", "V", 0) ; ("n", "W", 0) ;
+      ("o", "T", 0) ; ("o", "V", 0) ; ("o", "W", 0) ;
+      ("p", "T", 0) ;
+      ("q", "T", 0) ;
+      ("r", "J", 0) ; ("r", "T", 0) ;
+      ("s", "T", 0) ; ("s", "V", 0) ; ("s", "W", 0) ;
+      ("t", "J", 0) ; ("t", "t", 0) ;
+      ("u", "T", 0) ;
+      ("v", "T", 0) ;
+      ("w", "T", 0) ;
+      ("x", "T", 0) ;
+      ("y", "T", 0) ;
+      ("z", "T", 0) ;
     ]
 
 (* Possible break-line behaviours. *)
@@ -287,7 +332,7 @@ type breakline =
 
 (* Divide a text into a list of images, kerning with the next character, and how we can break lines
   here. *)
-let rec parse str : (Subimage.t * int * breakline) list =
+let parse str : (Subimage.t * int * breakline) list =
   let get_image = function
     | Either.Left c -> ascii_table.(Char.code c)
     | Either.Right str ->
@@ -314,11 +359,11 @@ let rec parse str : (Subimage.t * int * breakline) list =
     | (Either.Left ' ' as d) :: l -> aux ((get_image d, 0, BreakRemove) :: acc) l
     | (Either.Left '-' as d) :: l -> aux ((get_image d, 1, BreakSimple) :: acc) l
     | d1 :: d2 :: l when get_kind d1 = Consonant && d1 = d2 ->
-      aux ((get_image d1, get_kerning d1 d2, BreakHyphen) :: acc) l
+      aux ((get_image d1, get_kerning d1 d2, BreakHyphen) :: acc) (d2 :: l)
     | d1 :: d2 :: l when get_kind d1 = Vowel && get_kind d2 = Consonant ->
       (* This rule is not correct, but should be good enough in this context. *)
-      aux ((get_image d1, get_kerning d1 d2, BreakHyphen) :: acc) l
-    | d1 :: d2 :: l -> aux ((get_image d1, get_kerning d1 d2, NoBreak) :: acc) l
+      aux ((get_image d1, get_kerning d1 d2, BreakHyphen) :: acc) (d2 :: l)
+    | d1 :: d2 :: l -> aux ((get_image d1, get_kerning d1 d2, NoBreak) :: acc) (d2 :: l)
     | [d] -> aux ((get_image d, 0, NoBreak) :: acc) [] in
   aux [] (split_characters str)
 
@@ -367,7 +412,7 @@ let get_current_position_if_new_line : int m =
         | (img, _offset, break) :: l ->
             match break with
             | NoBreak | BreakSimple -> st.position
-            | BreakHyphen -> st.position + 3
+            | BreakHyphen -> st.position + hyphen_width
             | BreakRemove ->
               let p = st.position - (fst (Subimage.dimensions img)) in
               match l with

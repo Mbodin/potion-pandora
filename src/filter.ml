@@ -19,8 +19,8 @@ let fill_pattern opaque pattern image width height (x, y) =
   done
 
 let rectangle pattern (width, height) =
-  let img = Image.create_rgb ~alpha:true width height in
-  fill_pattern true pattern img width height (0, 0) ;
+  let img = Image.create_rgb ~alpha:true (max 1 width) (max 1 height) in
+  fill_pattern true pattern img (max 1 width) (max 1 height) (0, 0) ;
   Subimage.from_image img
 
 let decolor ~pattern original =
