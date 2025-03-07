@@ -70,6 +70,7 @@ module Launch (I : Interface.T) = struct
     ignore (Store.add store Items.enfant_cerf_volant (350, -50)) ;
     let player = Store.add store Items.perso (0, 0) in
     ignore (Store.add store Items.arbre1_tres_sombre (130, -25)) ;
+    ignore (Store.add store (Items_aux.static (Text.render "Test" 100)) (0, 200)) ;
     Store.add_birds store [Items.canard; Items.papillon] ;
     Store.add_bird_location store (130, 10) ;
     Store.add_bird_location store (110, 30) ;

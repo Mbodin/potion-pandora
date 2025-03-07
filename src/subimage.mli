@@ -32,9 +32,15 @@ val combine : (t * (int * int)) list -> t
   between then of as many pixels as the provided integer. *)
 val horizontal_sequence : int -> t list -> t
 
+(* Same than [horizontal_sequence], but vertically. *)
+val vertical_sequence : int -> t list -> t
+
 (* Similar than [horizontal_sequence], but the offset is provided independently for each image.
   The first offset should probably be [0], otherwise a leading space will be added. *)
 val combine_horizontally : (int * t) list -> t
+
+(* Same than [horizontal_sequence], but vertically. *)
+val combine_vertically : (int * t) list -> t
 
 (* Create an image from the provided image of the provided dimensions.
   These dimensions must be larger than the image.

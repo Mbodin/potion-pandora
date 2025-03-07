@@ -80,16 +80,34 @@ let combine_horizontally imgl =
   let (width, height) =
     List.fold_left (fun (w, h) (offset, img) ->
       (w + offset + img.width, max h img.height)) (0, 0) imgl in
-  let width = max 0 width in
+  let width = max 0 width in (* There could be negative offsets. *)
   (* Then we compute the individual offsets. *)
   let (_width, imgl) =
     List.fold_left (fun (x, imgl) (offset, img) ->
       let y = (height - img.height) / 2 in
-      (x + offset + img.width, (img, (x + offset, y)) :: imgl)) (0, []) imgl in
+      (x + offset + img.width, (img, (x, y)) :: imgl)) (0, []) imgl in
   combine_raw (width, height) imgl
 
 let horizontal_sequence offset imgl =
   combine_horizontally (List.mapi (fun i img ->
+    let offset = if i = 0 then 0 else offset in
+    (offset, img)) imgl)
+
+let combine_vertically imgl =
+  (* First, we compute the total required width and height. *)
+  let (width, height) =
+    List.fold_left (fun (w, h) (offset, img) ->
+      (max w img.width, h + offset + img.height)) (0, 0) imgl in
+  let height = max 0 height in (* There could be negative offsets. *)
+  (* Then we compute the individual offsets. *)
+  let (_height, imgl) =
+    List.fold_left (fun (y, imgl) (offset, img) ->
+      let x = (width - img.width) / 2 in
+      (y + offset + img.height, (img, (x, y)) :: imgl)) (0, []) imgl in
+  combine_raw (width, height) imgl
+
+let vertical_sequence offset imgl =
+  combine_vertically (List.mapi (fun i img ->
     let offset = if i = 0 then 0 else offset in
     (offset, img)) imgl)
 

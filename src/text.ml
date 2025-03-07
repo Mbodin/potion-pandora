@@ -3,6 +3,12 @@
 let ascii_imgs = Items.ascii
 let extended_characters_imgs = Items.extended_characters
 
+(* The height of characters, in pixels. *)
+let font_height = 8
+
+(* The width of an hyphen, in pixels. *)
+let hyphen_width = 3
+
 (* The unknown character replacement “�”. *)
 let unknown = List.hd extended_characters_imgs
 
@@ -28,8 +34,9 @@ type substring_search =
 
 (* Set the current accepted-boolean to true. *)
 let add_accepted = function
-  | NoSubstring _ -> NoSubstring true
-  | SubstringData (data, _) -> SubstringData (data, true)
+  | NoSubstring false -> NoSubstring true
+  | SubstringData (data, false) -> SubstringData (data, true)
+  | NoSubstring true | SubstringData (_, true) -> assert false (* We shouldn't add twice the same string. *)
 
 (* Read the current accepted-boolean. *)
 let is_accepted = function
@@ -69,6 +76,7 @@ module StringMap = Map.Make (String)
 type kind =
   | Vowel
   | Consonant
+  | OtherLetter
   | Punctuation
   | Number
   | OtherKind
@@ -92,19 +100,134 @@ let kind_table =
   ] ;
   a
 
+(* LATER: Encode and compress this list. *)
+let character_data = [
+    ([" "] (* Non-breaking space *), Punctuation) ;
+    (["Ã"; "Ã"; "Â"; "Â"; "Ā"; "Ā"; "À"; "À"; "Á"; "Á"; "Ă"; "Ă"; "Ǎ"; "Ǎ"], Vowel) ;
+    (["Ĉ"; "Ĉ"; "Ć"; "Ć"; "Č"; "Č"], Consonant) ;
+    (["Ẽ"; "Ẽ"; "Ê"; "Ê"; "Ē"; "Ē"; "È"; "È"; "É"; "É"; "Ě"; "Ě"], Vowel) ;
+    (["Ĝ"; "Ĝ"; "Ǵ"; "Ǵ"; "Ğ"; "Ğ"; "Ǧ"; "Ǧ"], Consonant) ;
+    (["Ĥ"; "Ĥ"], Consonant) ;
+    (["Ĩ"; "Ĩ"; "Î"; "Î"; "Ī"; "Ī"; "Ì"; "Ì"; "Í"; "Í"; "Ĭ"; "Ĭ"], Vowel) ;
+    (["Ĵ"; "Ĵ"; "J́"], Consonant) ;
+    (["Ñ"; "Ñ"; "Ǹ"; "Ǹ"; "Ń"; "Ń"], Consonant) ;
+    (["Õ"; "Õ"; "Ô"; "Ô"; "Ō"; "Ō"; "Ò"; "Ò"; "Ó"; "Ó"; "Ŏ"; "Ŏ"; "Ǒ"; "Ǒ"], Vowel) ;
+    (["Ŝ"; "Ŝ"; "Ś"; "Ś"; "Š"; "Š"], Consonant) ;
+    (["Ũ"; "Ũ"; "Û"; "Û"; "Ū"; "Ū"; "Ù"; "Ù"; "Ú"; "Ú"; "Ŭ"; "Ŭ"], Vowel) ;
+    (["Ỹ"; "Ỹ"; "Ŷ"; "Ŷ"; "Ỳ"; "Ỳ"; "Ý"; "Ý"], Vowel) ;
+    (["Ẑ"; "Ẑ"; "Ź"; "Ź"; "Z̆"; "Ž"; "Ž"], Consonant) ;
+    (["ã"; "ã"; "â"; "â"; "ā"; "ā"; "à"; "à"; "á"; "á"; "ă"; "ă"; "ǎ"; "ǎ"], Vowel) ;
+    (["ĉ"; "ĉ"; "ć"; "ć"; "č"; "č"], Consonant) ;
+    (["ẽ"; "ẽ"; "ê"; "ê"; "ē"; "ē"; "è"; "è"; "é"; "é"; "ě"; "ě"], Vowel) ;
+    (["ĝ"; "ĝ"; "ǵ"; "ǵ"; "ğ"; "ğ"; "ǧ"; "ǧ"], Consonant) ;
+    (["ĥ"; "ĥ"], Consonant) ;
+    (["ĩ"; "ĩ"; "i̇̃"; "î"; "î"; "ī"; "ī"; "ì"; "ì"; "i̇̀"; "í"; "í"; "i̇́"; "ĭ"; "ĭ"], Vowel) ;
+    (["ĵ"; "ĵ"; "j́"], Consonant) ;
+    (["ñ"; "ñ"; "ǹ"; "ǹ"; "ń"; "ń"], Consonant) ;
+    (["õ"; "õ"; "ô"; "ô"; "ō"; "ō"; "ò"; "ò"; "ó"; "ó"; "ŏ"; "ŏ"; "ǒ"; "ǒ"], Vowel) ;
+    (["ŝ"; "ŝ"; "Ś"; "ś"; "š"; "š"], Consonant) ;
+    (["ũ"; "ũ"; "û"; "û"; "ū"; "ū"; "ù"; "ù"; "ú"; "ú"; "ŭ"; "ŭ"], Vowel) ;
+    (["ỹ"; "ỹ"; "ŷ"; "ŷ"; "ỳ"; "ỳ"; "ý"; "ý"], Vowel) ;
+    (["ẑ"; "ẑ"; "ź"; "ź"; "z̆"; "ž"; "ž"], Consonant) ;
+    (["ẞ"; "ß"], Consonant) ;
+    (["⁰"], Number) ;
+    (["¹"], Number) ;
+    (["²"], Number) ;
+    (["³"], Number) ;
+    (["⁴"], Number) ;
+    (["⁵"], Number) ;
+    (["⁶"], Number) ;
+    (["⁷"], Number) ;
+    (["⁸"], Number) ;
+    (["⁹"], Number) ;
+    (["¿"], Punctuation) ;
+    (["¡"], Punctuation) ;
+    (["ª"], Vowel) ;
+    (["º"], Vowel) ;
+    (["fi"], OtherLetter) ;
+    (["fl"], OtherLetter) ;
+    (["°"], OtherKind) ;
+    (["–"; "֊"; "־"; "᠆"; "-"; "‑"; "‒"; "–"; "−"; "﹣"], Punctuation) ;
+    (["—"; "—"; "﹘"], Punctuation) ;
+    (["🄯"; "(ɔ)"], OtherKind) ;
+    (["->"; "→"; "🡒"; "⟶"; "➙"; "➛"; "➜"; "➔"; "➝"; "➞"; "➺"; "➻"; "⭢"; "🠂"; "🠆"; "🠊"; "🠢"; "🠦"; "🠪"; "🠒"; "🠖"; "🡢"; "🡪"; "🡲"; "➤"; "⮞"; "➢"; "➣"; "⮚"; "🠺"], OtherKind) ;
+    (["<-"; "←"; "🡐"; "⟵"; "⭠"; "🠀"; "🠄"; "🠈"; "🠠"; "🠤"; "🠨"; "🠐"; "🠔"; "🡠"; "🡨"; "🡰"; "⮜"; "⮘"; "🠸"], OtherKind) ;
+    (["↑"; "🡑"; "⭡"; "🠁"; "🠅"; "🠉"; "🠡"; "🠥"; "🠩"; "🠑"; "🠕"; "🡡"; "🡩"; "🡱"; "⮝"; "⮙"; "🠹"], OtherKind) ;
+    (["↓"; "🡓"; "⭣"; "🠃"; "🠇"; "🠋"; "🠣"; "🠧"; "🠫"; "🠓"; "🠗"; "🡣"; "🡫"; "🡳"; "⮟"; "⮛"; "🠻"], OtherKind) ;
+    (["Ą"; "Ą"], Vowel) ;
+    (["ą"; "ą"], Vowel) ;
+    (["Ç"; "Ç"], Consonant) ;
+    (["ç"; "ç"], Consonant) ;
+    (["Ę"; "Ę"], Vowel) ;
+    (["ę"; "ę"], Vowel) ;
+    (["Į"; "Į"], Vowel) ;
+    (["į"; "į"], Vowel) ;
+    (["Ș"; "Ș"; "Ş"; "Ş"], Consonant) ;
+    (["ș"; "ș"; "ş"; "ş"], Consonant) ;
+    (["Ț"; "Ț"; "Ţ"; "Ţ"], Consonant) ;
+    (["ț"; "ț"; "ţ"; "ţ"], Consonant) ;
+    (["Ų"; "Ų"], Vowel) ;
+    (["ų"; "ų"], Vowel) ;
+    (["Z̦"; "Z̧"], Consonant) ;
+    (["z̦"; "z̧"], Consonant) ;
+    (["¬"], OtherKind) ;
+    (["‘"; "‛"], Punctuation) ;
+    (["’"], Punctuation) ;
+    (["‚"], Punctuation) ;
+    (["«"], Punctuation) ;
+    (["»"], Punctuation) ;
+    (["“"; "‟"], Punctuation) ;
+    (["”"], Punctuation) ;
+    (["„"], Punctuation) ;
+    (["·"; "·"; "·"; "⸱"; "ꞏ"; "・"; "᛫"; "⋅"], Punctuation) ;
+    (["⚠︎"; "⚠️"; "⚠"], OtherKind) ;
+    (["✴"; "✷"; "✵"], OtherKind) ;
+    (["Æ"], Vowel) ;
+    (["æ"], Vowel) ;
+    (["Œ"], Vowel) ;
+    (["œ"], Vowel) ;
+    (["Ø"], Vowel) ;
+    (["ø"], Vowel) ;
+    (["…"], Vowel) ;
+    (["Ł"], Consonant) ;
+    (["ł"], Consonant) ;
+    (["Ė"; "Ė"], Vowel) ;
+    (["ė"; "ė"], Vowel) ;
+    (["Ċ"; "Ċ"], Consonant) ;
+    (["ċ"; "ċ"], Consonant) ;
+    (["Ż"; "Ż"], Consonant) ;
+    (["ż"; "ż"], Consonant) ;
+    (["Ɣ"], Consonant) ;
+    (["ɣ"], Consonant) ;
+    (["Ɛ"], Vowel) ;
+    (["ɛ"], Vowel) ;
+    (["Đ"], Consonant) ;
+    (["đ"], Consonant) ;
+    (["Ḍ"; "Ḍ"], Consonant) ;
+    (["ḍ"; "ḍ"], Consonant) ;
+    (["Ḥ"; "Ḥ"], Consonant) ;
+    (["ḥ"; "ḥ"], Consonant) ;
+    (["Ṛ"; "Ṛ"], Consonant) ;
+    (["ṛ"; "ṛ"], Consonant) ;
+    (["Ṣ"; "Ṣ"], Consonant) ;
+    (["ṣ"; "ṣ"], Consonant) ;
+    (["Ṭ"; "Ṭ"], Consonant) ;
+    (["ṭ"; "ṭ"], Consonant) ;
+    (["Ẓ"; "Ẓ"], Consonant) ;
+    (["ẓ"; "ẓ"], Consonant) ;
+    (["♡"; "♥"; "❤"; "💓"; "💖"; "💗"; "💝"], OtherKind)
+  ]
+
 (* The data of all images, including ligatures, and so on. *)
 let characters =
-  let get i =
-    assert (i < List.length extended_characters_imgs) ;
-    List.nth extended_characters_imgs i in
   let get_ascii c = ascii_table.(Char.code c) in
-  List.fold_left (fun (substrings, m) (str, img, kind) ->
-      (add_substring substrings str, StringMap.add str (img, kind) m))
-    (NoSubstring false, StringMap.empty) [
-    (" " (* Non-breaking space *), get_ascii ' ', Punctuation) ;
-    ("¡", get 1, Punctuation) ;
-    (* TODO *)
-  ]
+  let l =
+    List.map2 (fun img (strl, kind) -> (strl, img, kind))
+      (get_ascii ' ' :: List.tl extended_characters_imgs) character_data in
+  List.fold_left (fun (substrings, m) (strl, img, kind) ->
+      List.fold_left (fun (substrings, m) str ->
+        (add_substring substrings str, StringMap.add str (img, kind) m)) (substrings, m) strl)
+    (NoSubstring false, StringMap.empty) l
 
 (* Split a string into a list of lexemes, each being either a raw character or a valid substring. *)
 let split_characters : string -> (char, string) Either.t list =
@@ -118,13 +241,42 @@ let split_characters : string -> (char, string) Either.t list =
         aux (Either.Right (String.sub str 0 n) :: acc) (String.sub str n (String.length str - n)) in
   aux []
 
+(* Check whether the first argument is a prefix of the second. *)
+let is_prefix pre str =
+  if String.length pre > String.length str then false
+  else pre = String.sub str 0 (String.length pre)
+
+(* Check whether the first argument is a suffix of the second. *)
+let is_suffix suf str =
+  let len = String.length suf in
+  if len > String.length str then false
+  else suf = String.sub str (String.length str - len) len
+
 module StringPairMap =
   Map.Make (struct
     type t = string * string
     let compare = compare
   end)
 
-let kernings = StringPairMap.empty (* TODO *)
+let kernings =
+  List.fold_left (fun m (str1, str2, k) ->
+    let firsts =
+      List.fold_left (fun l (strl, _kind) ->
+        List.filter (is_prefix str2) strl @ l) [str2] character_data in
+    let seconds =
+      List.fold_left (fun l (strl, _kind) ->
+        List.filter (is_suffix str1) strl @ l) [str1] character_data in
+    List.fold_left (fun m first ->
+      List.fold_left (fun m second ->
+        StringPairMap.add (first, second) k m) m firsts) m seconds) StringPairMap.empty [
+      ("f", "f", 0) ;
+      ("l", "l", 0) ;
+      ("f", "l", 0) ;
+      ("t", "t", 0) ;
+      ("/", "/", -1) ;
+      ("L", "'", -1) ;
+      ("l", "'", 0) ;
+    ]
 
 (* Possible break-line behaviours. *)
 type breakline =
@@ -170,11 +322,154 @@ let rec parse str : (Subimage.t * int * breakline) list =
     | [d] -> aux ((get_image d, 0, NoBreak) :: acc) [] in
   aux [] (split_characters str)
 
+(* We define a small monad for the rendering.
+  It stores the list of strings that have already been validated (as one line each),
+  and the list of characters that are pending.
+  It also carries the current position within the line (in pixels), as well as the last-committed
+  position.
+  Finally, it enables to backtrack to the previous non-committed state. *)
+type state = {
+  previous_lines : Subimage.t list (* This list is stored in reverse. *) ;
+  current_committed_line : Subimage.t ;
+  offset_with_pending : int ;
+  pending : (Subimage.t * int * breakline) list (* This list is stored in reverse. *) ;
+  position : int ;
+  next_characters : (Subimage.t * int * breakline) list ;
+  backtrack : state option (* Invariant: the pointed state will always have a [backtrack] field set to [None]. *)
+}
+
+type 'a m = state -> (state * 'a)
+
+let return (type a) (a : a) : a m = fun st -> (st, a)
+let bind (type u v) (o : u m) (k : u -> v m) : v m =
+  fun st ->
+    let (st, r) = o st in
+    k r st
+
+let ( let* ) = bind
+
+let ( %% ) (type t) : unit m -> t m -> t m =
+  fun m1 m2 -> bind m1 (fun () -> m2)
+
+(* Reading the next character, removing it from the next characters. *)
+let read : (Subimage.t * int * breakline) option m =
+  fun st ->
+    match st.next_characters with
+    | [] -> (st, None)
+    | data :: l -> ({ st with next_characters = l }, Some data)
+
+(* Get the current position if we were to stop the line here. *)
+let get_current_position_if_new_line : int m =
+  fun st ->
+    let pos =
+        match st.pending with
+        | [] -> st.position
+        | (img, _offset, break) :: l ->
+            match break with
+            | NoBreak | BreakSimple -> st.position
+            | BreakHyphen -> st.position + 3
+            | BreakRemove ->
+              let p = st.position - (fst (Subimage.dimensions img)) in
+              match l with
+              | [] -> p
+              | (_img, offset, _break) :: _ -> p - offset in
+    (st, pos)
+
+(* Whether one can break a line right now. *)
+let can_break_line : bool m =
+  fun st ->
+    let can =
+      match st.pending with
+      | [] -> false
+      | (_img, _offset, NoBreak) :: _ -> false
+      | (_img, _offset, _) :: _ -> true in
+    (st, can)
+
+(* Commit the currently pending characters. *)
+let commit : unit m =
+  fun st ->
+    let (committed_line, offset) =
+      let (l, offset) =
+        let rec aux pr acc = function
+          | [] -> (List.rev acc, pr)
+          | (img, offset, _break) :: l ->
+            aux offset ((pr, img) :: acc) l in
+        aux st.offset_with_pending [] (List.rev st.pending) in
+      (Subimage.combine_horizontally
+        ((0, st.current_committed_line) :: l), offset) in
+    let st =
+      { st with
+            current_committed_line = committed_line ;
+            offset_with_pending = offset ;
+            pending = [] ;
+            backtrack = None
+      } in
+    ({ st with backtrack = Some st }, ())
+
+(* Add an element to the pending position. *)
+let write (img, offset, break) : unit m =
+  fun st ->
+    ({ st with
+            offset_with_pending = offset ;
+            pending = (img, offset, break) :: st.pending ;
+            position = st.position + st.offset_with_pending + fst (Subimage.dimensions img)
+    }, ())
+
+(* Insert (and commit) a new line. *)
+let new_line : unit m =
+  commit %%
+  fun st ->
+    let zero_width_image img =
+      Subimage.sub img 0 (snd (Subimage.dimensions img)) (0, 0) in
+    ({ st with
+            previous_lines = st.current_committed_line :: st.previous_lines ;
+            current_committed_line = zero_width_image st.current_committed_line ;
+            offset_with_pending = 0 ;
+            position = 0
+    }, ())
+
+(* Backtrack to a previous position.
+  It returns a boolean stating whether it succeeded. *)
+let backtrack : bool m =
+  fun st ->
+    match st.backtrack with
+    | Some st -> (st, true)
+    | None -> (st, false)
+
+(* Save the current state. *)
+let save : unit m =
+  fun st -> ({ st with backtrack = Some { st with backtrack = None } }, ())
+
 let render str max_width =
-  let l = parse str in
-  (* TODO: Deal with line-breaks. *)
-  let rec aux pr acc = function
-    | [] -> List.rev acc
-    | (img, kerning, _line_break) :: l -> aux kerning ((pr, img) :: acc) l in
-  Subimage.combine_horizontally (aux 0 [] l)
+  let rec aux prevent_backtrack : unit m =
+    let* r = read in
+    match r with
+    | None -> new_line
+    | Some c ->
+      write c %%
+      let* p = get_current_position_if_new_line in
+      if p > max_width && not prevent_backtrack then (
+        let* _b = backtrack in
+        let* can = can_break_line in
+        (if can then new_line else return ()) %%
+        aux true
+      ) else (
+        let* can = can_break_line in
+        if can then (
+          save %%
+          aux false
+        ) else aux prevent_backtrack
+      ) in
+  let (st, ()) =
+    let st = {
+      previous_lines = [] ;
+      current_committed_line = Filter.rectangle Filter.transparent (0, font_height) ;
+      offset_with_pending = 0 ;
+      pending = [] ;
+      position = 0 ;
+      next_characters = parse str ;
+      backtrack = None
+    } in
+    aux false { st with backtrack = Some st } in
+  Subimage.vertical_sequence 1 (List.rev st.previous_lines)
 
