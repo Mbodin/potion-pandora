@@ -3,14 +3,16 @@
 let ascii_imgs = Items.ascii
 let extended_characters_imgs = Items.extended_characters
 
-(* The height of characters, in pixels. *)
-let font_height = 8
-
 (* The width of an hyphen, in pixels. *)
 let hyphen_width = 3
 
 (* The unknown character replacement “�”. *)
 let unknown = List.hd extended_characters_imgs
+
+(* An empty image, the size of a character. *)
+let empty_img =
+  let (_x, y) = Subimage.dimensions unknown in
+  Filter.rectangle Filter.transparent (0, y)
 
 (* A raw table of ASCII characters as images. *)
 let ascii_table =
@@ -27,34 +29,34 @@ let ascii_table =
 let tail str = String.sub str 1 (String.length str - 1)
 
 (* A type to help find substrings that will be stored in an external map.
-  In each case, we store as a boolean whether the current substring can be accepted. *)
-type substring_search =
-  | NoSubstring of bool (* No data is associated with the current substring. *)
-  | SubstringData of substring_search array * bool (* For each next character, we provide the data. *)
+  In each case, we store the image of the associated substring if it is associated with one. *)
+type 'a substring_search =
+  | NoSubstring of 'a option (* This string is an end-of-data: no larger substrings will be accepted. *)
+  | SubstringData of 'a substring_search array * 'a option (* For each next character, we provide the data. *)
 
 (* Raised when a string has been added twice, which is probably a mistake (the same string would then
-  have several renderings). *)
+  be associated to several renderings). *)
 exception StringAddedTwice
 
-(* Set the current accepted-boolean to true. *)
-let add_accepted = function
-  | NoSubstring false -> NoSubstring true
-  | SubstringData (data, false) -> SubstringData (data, true)
-  | NoSubstring true | SubstringData (_, true) -> raise StringAddedTwice
+(* Associate an image with the current substring. *)
+let add_accepted img = function
+  | NoSubstring None -> NoSubstring (Some img)
+  | SubstringData (data, None) -> SubstringData (data, Some img)
+  | NoSubstring (Some _) | SubstringData (_, Some _) -> raise StringAddedTwice
 
-(* Read the current accepted-boolean. *)
-let is_accepted = function
+(* Read the current accepted-image. *)
+let get_accepted = function
   | NoSubstring accepted -> accepted
   | SubstringData (_data, accepted) -> accepted
 
-(* Add as a data a string. *)
-let add_substring data str =
+(* Add a string/image correspondance to the data. *)
+let add_substring data str img =
   let rec aux data str =
-    if String.length str = 0 then add_accepted data
+    if String.length str = 0 then add_accepted img data
     else (
       let (data, accepted) =
         match data with
-        | NoSubstring accepted -> (Array.make 255 (NoSubstring false), accepted)
+        | NoSubstring accepted -> (Array.make 255 (NoSubstring None), accepted)
         | SubstringData (data, accepted) -> (data, accepted) in
       let c = Char.code str.[0] in
       data.(c) <- aux data.(c) (tail str) ;
@@ -63,19 +65,19 @@ let add_substring data str =
   try aux data str with
   | StringAddedTwice -> failwith (Printf.sprintf "String added twice: \"%s\"." str)
 
-(* Given a string, returns the length of the maximum substring for which a data is associated,
-  if any. *)
+(* Given a string, returns the length of the maximum substring for which a data is associated
+  as well as the associated image, if any. *)
 let rec search_string data str =
   if String.length str = 0 then
-    if is_accepted data then Some 0 else None
+    Option.map (fun img -> (0, img)) (get_accepted data)
   else
     match data with
-    | NoSubstring accepted -> if accepted then Some 0 else None
+    | NoSubstring accepted -> Option.map (fun img -> (0, img)) accepted
     | SubstringData (data, accepted) ->
       match search_string data.(Char.code str.[0]) (tail str) with
       | None -> (* No further string is accepted. *)
-        if accepted then Some 0 else None
-      | Some i -> Some (1 + i)
+        Option.map (fun img -> (0, img)) accepted
+      | Some (i, img) -> Some (1 + i, img)
 
 module StringMap = Map.Make (String)
 
@@ -87,6 +89,7 @@ type kind =
   | Punctuation
   | Number
   | OtherKind
+  | Newline
 
 (* Table of kinds for ASCII characters. *)
 let kind_table =
@@ -105,11 +108,13 @@ let kind_table =
   List.iter (fun c -> a.(Char.code c) <- Punctuation) [
     '!'; '"'; '\''; '('; ')'; ','; '.'; ':'; ';'; '?'; '`'
   ] ;
+  List.iter (fun c -> a.(Char.code c) <- Newline) [
+    '\r'; '\n'
+  ] ;
   a
 
 (* LATER: Encode and compress this list. *)
 let character_data = [
-    ([" "] (* Non-breaking space *), Punctuation) ;
     (["Ã"; "Ã"; "Â"; "Â"; "Ā"; "Ā"; "À"; "À"; "Á"; "Á"; "Ă"; "Ă"; "Ǎ"; "Ǎ"], Vowel) ;
     (["Ĉ"; "Ĉ"; "Ć"; "Ć"; "Č"; "Č"], Consonant) ;
     (["Ẽ"; "Ẽ"; "Ê"; "Ê"; "Ē"; "Ē"; "È"; "È"; "É"; "É"; "Ě"; "Ě"], Vowel) ;
@@ -154,7 +159,7 @@ let character_data = [
     (["fi"], OtherLetter) ;
     (["fl"], OtherLetter) ;
     (["°"], OtherKind) ;
-    (["–"; "֊"; "־"; "᠆"; "-"; "‑"; "‒"; "−"; "﹣"], Punctuation) ;
+    (["–"; "֊"; "־"; "᠆"; "‑"; "‒"; "−"; "﹣"], Punctuation) ;
     (["—"; "﹘"], Punctuation) ;
     (["🄯"; "(ɔ)"], OtherKind) ;
     (["->"; "→"; "🡒"; "⟶"; "➙"; "➛"; "➜"; "➔"; "➝"; "➞"; "➺"; "➻"; "⭢"; "🠂"; "🠆"; "🠊"; "🠢"; "🠦"; "🠪"; "🠒"; "🠖"; "🡢"; "🡪"; "🡲"; "➤"; "⮞"; "➢"; "➣"; "⮚"; "🠺"], OtherKind) ;
@@ -228,24 +233,32 @@ let character_data = [
 (* The data of all images, including ligatures, and so on. *)
 let characters =
   let get_ascii c = ascii_table.(Char.code c) in
+  let ascii_substrings =
+    SubstringData (Array.mapi (fun i kind ->
+      let img = ascii_table.(i) in
+      NoSubstring (Some (img, kind))) kind_table, None) in
   let l =
     List.map2 (fun img (strl, kind) -> (strl, img, kind))
-      (get_ascii ' ' :: List.tl extended_characters_imgs) character_data in
-  List.fold_left (fun (substrings, m) (strl, img, kind) ->
-      List.fold_left (fun (substrings, m) str ->
-        (add_substring substrings str, StringMap.add str (img, kind) m)) (substrings, m) strl)
-    (NoSubstring false, StringMap.empty) l
+      (List.tl extended_characters_imgs) character_data in
+  List.fold_left (fun substrings (strl, img, kind) ->
+      List.fold_left (fun substrings str ->
+        (add_substring substrings str (img, kind))) substrings strl)
+    ascii_substrings (
+      (["\r\n"; "\n\r"], get_ascii '\n', Newline)
+      :: ([" "] (* Non-breaking space *), get_ascii ' ', OtherKind)
+      :: (["​"] (* Zero-width space *), empty_img, OtherKind)
+      :: l)
 
 (* Split a string into a list of lexemes, each being either a raw character or a valid substring. *)
-let split_characters : string -> (char, string) Either.t list =
+let split_characters : string -> (string * Subimage.t * kind) list =
   let rec aux acc str =
     if String.length str = 0 then List.rev acc
     else
-      match search_string (fst characters) str with
-      | None -> (* We then default to reading ascii characters. *)
-        aux (Either.Left str.[0] :: acc) (tail str)
-      | Some n ->
-        aux (Either.Right (String.sub str 0 n) :: acc) (String.sub str n (String.length str - n)) in
+      match search_string characters str with
+      | None ->
+        assert false (* All ASCII characters are associated to an image, so we should at least get one. *)
+      | Some (n, (img, kind)) ->
+        aux ((String.sub str 0 n, img, kind) :: acc) (String.sub str n (String.length str - n)) in
   aux []
 
 (* Check whether the first argument is a prefix of the second. *)
@@ -258,6 +271,24 @@ let is_suffix suf str =
   let len = String.length suf in
   if len > String.length str then false
   else suf = String.sub str (String.length str - len) len
+
+(* Compute some kind of “optimal” kerning between two images.
+  Exceptions are listed in the [kernings] definition below. *)
+let compute_kerning img1 img2 =
+  let heigth = snd (Subimage.dimensions img1) in
+  assert (heigth = snd (Subimage.dimensions img2)) ;
+  (* TODO
+  (* First, checking whether the last column of img1 is empty: if so, the kerning is [0]. *)
+  TODO
+  (* Second, checking whether the first column of img2 is empty: if so, we only accept one pixel from img1 to fuse in. *)
+  TODO
+  (* Then, we compute a possible candidate by only looking at the difference horizontally. *)
+  let min =
+    List.fold_left ((* how many spaces can we find in both at this y-coordinate? *)) 0 (range 0 (heigth - 1))
+  (* Finally, we check diagonals: we only accept one diagonal-touch between the characters. *)
+  TODO
+  *)
+  1
 
 module StringPairMap =
   Map.Make (struct
@@ -331,40 +362,29 @@ type breakline =
   | BreakSimple (* A line-break can be added after this character without any addition. *)
 
 (* Divide a text into a list of images, kerning with the next character, and how we can break lines
-  here. *)
-let parse str : (Subimage.t * int * breakline) list =
-  let get_image = function
-    | Either.Left c -> ascii_table.(Char.code c)
-    | Either.Right str ->
-      match StringMap.find_opt str (snd characters) with
-      | None -> assert false
-      | Some (img, _kind) -> img in
-  let get_kind = function
-    | Either.Left c -> kind_table.(Char.code c)
-    | Either.Right str ->
-      match StringMap.find_opt str (snd characters) with
-      | None -> assert false
-      | Some (_img, kind) -> kind in
+  here.  When returning [None], this means that there is a forced line-break here. *)
+let parse str : (Subimage.t * int * breakline) option list =
   let get_kerning d1 d2 =
-    let to_str = function
-      | Either.Left c -> String.make 1 c
-      | Either.Right str -> str in
-    if d1 = Either.Left ' ' || d2 = Either.Left ' ' then 0
+    if d1 = " " || d2 = " " then 0
     else
-      match StringPairMap.find_opt (to_str d1, to_str d2) kernings with
+      match StringPairMap.find_opt (d1, d2) kernings with
       | None -> 1 (* Default kerning *)
       | Some n -> n in
   let rec aux acc = function
     | [] -> List.rev acc
-    | (Either.Left ' ' as d) :: l -> aux ((get_image d, 0, BreakRemove) :: acc) l
-    | (Either.Left '-' as d) :: l -> aux ((get_image d, 1, BreakSimple) :: acc) l
-    | d1 :: d2 :: l when get_kind d1 = Consonant && d1 = d2 ->
-      aux ((get_image d1, get_kerning d1 d2, BreakHyphen) :: acc) (d2 :: l)
-    | d1 :: d2 :: l when get_kind d1 = Vowel && get_kind d2 = Consonant ->
-      (* This rule is not correct, but should be good enough in this context. *)
-      aux ((get_image d1, get_kerning d1 d2, BreakHyphen) :: acc) (d2 :: l)
-    | d1 :: d2 :: l -> aux ((get_image d1, get_kerning d1 d2, NoBreak) :: acc) (d2 :: l)
-    | [d] -> aux ((get_image d, 0, NoBreak) :: acc) [] in
+    | (_, _, Newline) :: l -> aux (None :: acc) l
+    | (" ", img, _) :: l -> aux (Some (img, 0, BreakRemove) :: acc) l
+    | [("-", img, _)] -> aux (Some (img, 1, BreakSimple) :: acc) []
+    | ("-", img, _) :: ((d2, _, _) :: _ as l) ->
+      aux (Some (img, get_kerning "-" d2, BreakSimple) :: acc) l
+    | (d1, img, Consonant) :: ((d2, _, Consonant) :: _ as l) ->
+      aux (Some (img, get_kerning d1 d2, BreakHyphen) :: acc) l
+    | (d1, img, Vowel) :: ((d2, _, Consonant) :: _ as l) ->
+      (* This rule is not always correct, but should be good enough in this context. *)
+      aux (Some (img, get_kerning d1 d2, BreakHyphen) :: acc) l
+    | (d1, img, _) :: ((d2, _, _) :: _ as l) ->
+      aux (Some (img, get_kerning d1 d2, NoBreak) :: acc) l
+    | [(_, img, _)] -> aux (Some (img, 0, NoBreak) :: acc) [] in
   aux [] (split_characters str)
 
 (* We define a small monad for the rendering.
@@ -379,7 +399,7 @@ type state = {
   offset_with_pending : int ;
   pending : (Subimage.t * int * breakline) list (* This list is stored in reverse. *) ;
   position : int ;
-  next_characters : (Subimage.t * int * breakline) list ;
+  next_characters : (Subimage.t * int * breakline) option list ;
   backtrack : state option (* Invariant: the pointed state will always have a [backtrack] field set to [None]. *)
 }
 
@@ -396,12 +416,16 @@ let ( let* ) = bind
 let ( %% ) (type t) : unit m -> t m -> t m =
   fun m1 m2 -> bind m1 (fun () -> m2)
 
-(* Reading the next character, removing it from the next characters. *)
-let read : (Subimage.t * int * breakline) option m =
+(* Reading the next character, removing it from the next characters.
+  If it returns [Right], it also returns a boolean: if it is true,
+  then we have just read a new line, otherwise, this is the end of
+  the string to be displayed. *)
+let read : (Subimage.t * int * breakline, bool) Either.t m =
   fun st ->
     match st.next_characters with
-    | [] -> (st, None)
-    | data :: l -> ({ st with next_characters = l }, Some data)
+    | [] -> (st, Either.Right false)
+    | None :: l -> ({ st with next_characters = l }, Either.Right true)
+    | Some data :: l -> ({ st with next_characters = l }, Either.Left data)
 
 (* Get the current position if we were to stop the line here. *)
 let get_current_position_if_new_line : int m =
@@ -489,8 +513,10 @@ let render str max_width =
   let rec aux prevent_backtrack : unit m =
     let* r = read in
     match r with
-    | None -> new_line
-    | Some c ->
+    | Either.Right b ->
+      new_line %%
+      if b then aux true else return ()
+    | Either.Left c ->
       write c %%
       let* p = get_current_position_if_new_line in
       if p > max_width && not prevent_backtrack then (
@@ -508,7 +534,7 @@ let render str max_width =
   let (st, ()) =
     let st = {
       previous_lines = [] ;
-      current_committed_line = Filter.rectangle Filter.transparent (0, font_height) ;
+      current_committed_line = empty_img ;
       offset_with_pending = 0 ;
       pending = [] ;
       position = 0 ;
