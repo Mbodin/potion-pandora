@@ -3,16 +3,15 @@
 let ascii_imgs = Items.ascii
 let extended_characters_imgs = Items.extended_characters
 
-(* The width of an hyphen, in pixels. *)
-let hyphen_width = 3
-
 (* The unknown character replacement “�”. *)
 let unknown = List.hd extended_characters_imgs
 
+(* We assume that all character have the same height (possibly with transparent pixels). *)
+let height = snd (Subimage.dimensions unknown)
+
 (* An empty image, the size of a character. *)
 let empty_img =
-  let (_x, y) = Subimage.dimensions unknown in
-  Filter.rectangle Filter.transparent (0, y)
+  Filter.rectangle Filter.transparent (0, height)
 
 (* A raw table of ASCII characters as images. *)
 let ascii_table =
@@ -24,6 +23,13 @@ let ascii_table =
     a.(i) <- List.nth ascii_imgs (i - start)
   done ;
   a
+
+(* The image of an hyphen. *)
+let hyphen_img = ascii_table.(Char.code '-')
+
+(* The width of an hyphen, in pixels. *)
+let hyphen_width =
+  fst (Subimage.dimensions hyphen_img)
 
 (* Remove the first character of a string. *)
 let tail str = String.sub str 1 (String.length str - 1)
@@ -115,31 +121,31 @@ let kind_table =
 
 (* LATER: Encode and compress this list. *)
 let character_data = [
-    (["Ã"; "Ã"; "Â"; "Â"; "Ā"; "Ā"; "À"; "À"; "Á"; "Á"; "Ă"; "Ă"; "Ǎ"; "Ǎ"], Vowel) ;
+    (["Ã"; "Ã"; "Â"; "Â"; "Ā"; "Ā"; "À"; "À"; "Á"; "Á"; "Ă"; "Ă"; "Ǎ"; "Ǎ"; "Ä"; "Ä"], Vowel) ;
     (["Ĉ"; "Ĉ"; "Ć"; "Ć"; "Č"; "Č"], Consonant) ;
-    (["Ẽ"; "Ẽ"; "Ê"; "Ê"; "Ē"; "Ē"; "È"; "È"; "É"; "É"; "Ě"; "Ě"], Vowel) ;
+    (["Ẽ"; "Ẽ"; "Ê"; "Ê"; "Ē"; "Ē"; "È"; "È"; "É"; "É"; "Ě"; "Ě"; "Ë"; "Ë"], Vowel) ;
     (["Ĝ"; "Ĝ"; "Ǵ"; "Ǵ"; "Ğ"; "Ğ"; "Ǧ"; "Ǧ"], Consonant) ;
     (["Ĥ"; "Ĥ"], Consonant) ;
-    (["Ĩ"; "Ĩ"; "Î"; "Î"; "Ī"; "Ī"; "Ì"; "Ì"; "Í"; "Í"; "Ĭ"; "Ĭ"], Vowel) ;
+    (["Ĩ"; "Ĩ"; "Î"; "Î"; "Ī"; "Ī"; "Ì"; "Ì"; "Í"; "Í"; "Ĭ"; "Ĭ"; "Ï"; "Ï"], Vowel) ;
     (["Ĵ"; "Ĵ"; "J́"], Consonant) ;
     (["Ñ"; "Ñ"; "Ǹ"; "Ǹ"; "Ń"; "Ń"], Consonant) ;
-    (["Õ"; "Õ"; "Ô"; "Ô"; "Ō"; "Ō"; "Ò"; "Ò"; "Ó"; "Ó"; "Ŏ"; "Ŏ"; "Ǒ"; "Ǒ"], Vowel) ;
+    (["Õ"; "Õ"; "Ô"; "Ô"; "Ō"; "Ō"; "Ò"; "Ò"; "Ó"; "Ó"; "Ŏ"; "Ŏ"; "Ǒ"; "Ǒ"; "Ö"; "Ö"], Vowel) ;
     (["Ŝ"; "Ŝ"; "Ś"; "Ś"; "Š"; "Š"], Consonant) ;
-    (["Ũ"; "Ũ"; "Û"; "Û"; "Ū"; "Ū"; "Ù"; "Ù"; "Ú"; "Ú"; "Ŭ"; "Ŭ"], Vowel) ;
-    (["Ỹ"; "Ỹ"; "Ŷ"; "Ŷ"; "Ỳ"; "Ỳ"; "Ý"; "Ý"], Vowel) ;
+    (["Ũ"; "Ũ"; "Û"; "Û"; "Ū"; "Ū"; "Ù"; "Ù"; "Ú"; "Ú"; "Ŭ"; "Ŭ"; "Ü"; "Ü"], Vowel) ;
+    (["Ỹ"; "Ỹ"; "Ŷ"; "Ŷ"; "Ỳ"; "Ỳ"; "Ý"; "Ý"; "Ÿ"; "Ÿ"], Vowel) ;
     (["Ẑ"; "Ẑ"; "Ź"; "Ź"; "Z̆"; "Ž"; "Ž"], Consonant) ;
-    (["ã"; "ã"; "â"; "â"; "ā"; "ā"; "à"; "à"; "á"; "á"; "ă"; "ă"; "ǎ"; "ǎ"], Vowel) ;
+    (["ã"; "ã"; "â"; "â"; "ā"; "ā"; "à"; "à"; "á"; "á"; "ă"; "ă"; "ǎ"; "ǎ"; "ä"; "ä"], Vowel) ;
     (["ĉ"; "ĉ"; "ć"; "ć"; "č"; "č"], Consonant) ;
-    (["ẽ"; "ẽ"; "ê"; "ê"; "ē"; "ē"; "è"; "è"; "é"; "é"; "ě"; "ě"], Vowel) ;
+    (["ẽ"; "ẽ"; "ê"; "ê"; "ē"; "ē"; "è"; "è"; "é"; "é"; "ě"; "ě"; "ë"; "ë"], Vowel) ;
     (["ĝ"; "ĝ"; "ǵ"; "ǵ"; "ğ"; "ğ"; "ǧ"; "ǧ"], Consonant) ;
     (["ĥ"; "ĥ"], Consonant) ;
-    (["ĩ"; "ĩ"; "i̇̃"; "î"; "î"; "ī"; "ī"; "ì"; "ì"; "i̇̀"; "í"; "í"; "i̇́"; "ĭ"; "ĭ"], Vowel) ;
+    (["ĩ"; "ĩ"; "i̇̃"; "î"; "î"; "ī"; "ī"; "ì"; "ì"; "i̇̀"; "í"; "í"; "i̇́"; "ĭ"; "ĭ"; "ï"; "ï"], Vowel) ;
     (["ĵ"; "ĵ"; "j́"], Consonant) ;
     (["ñ"; "ñ"; "ǹ"; "ǹ"; "ń"; "ń"], Consonant) ;
-    (["õ"; "õ"; "ô"; "ô"; "ō"; "ō"; "ò"; "ò"; "ó"; "ó"; "ŏ"; "ŏ"; "ǒ"; "ǒ"], Vowel) ;
+    (["õ"; "õ"; "ô"; "ô"; "ō"; "ō"; "ò"; "ò"; "ó"; "ó"; "ŏ"; "ŏ"; "ǒ"; "ǒ"; "ö"; "ö"], Vowel) ;
     (["ŝ"; "ŝ"; "ś"; "ś"; "š"; "š"], Consonant) ;
-    (["ũ"; "ũ"; "û"; "û"; "ū"; "ū"; "ù"; "ù"; "ú"; "ú"; "ŭ"; "ŭ"], Vowel) ;
-    (["ỹ"; "ỹ"; "ŷ"; "ŷ"; "ỳ"; "ỳ"; "ý"; "ý"], Vowel) ;
+    (["ũ"; "ũ"; "û"; "û"; "ū"; "ū"; "ù"; "ù"; "ú"; "ú"; "ŭ"; "ŭ"; "ü"; "ü"], Vowel) ;
+    (["ỹ"; "ỹ"; "ŷ"; "ŷ"; "ỳ"; "ỳ"; "ý"; "ý"; "ÿ"; "ÿ"], Vowel) ;
     (["ẑ"; "ẑ"; "ź"; "ź"; "z̆"; "ž"; "ž"], Consonant) ;
     (["ẞ"; "ß"], Consonant) ;
     (["⁰"], Number) ;
@@ -249,7 +255,8 @@ let characters =
       :: (["​"] (* Zero-width space *), empty_img, OtherKind)
       :: l)
 
-(* Split a string into a list of lexemes, each being either a raw character or a valid substring. *)
+(* Split a string into a list of lexemes, with their string (with one Unicode character),
+  image, and kind. *)
 let split_characters : string -> (string * Subimage.t * kind) list =
   let rec aux acc str =
     if String.length str = 0 then List.rev acc
@@ -262,97 +269,163 @@ let split_characters : string -> (string * Subimage.t * kind) list =
   aux []
 
 (* Check whether the first argument is a prefix of the second. *)
-let is_prefix pre str =
+let _is_prefix pre str =
   if String.length pre > String.length str then false
   else pre = String.sub str 0 (String.length pre)
 
 (* Check whether the first argument is a suffix of the second. *)
-let is_suffix suf str =
+let _is_suffix suf str =
   let len = String.length suf in
   if len > String.length str then false
   else suf = String.sub str (String.length str - len) len
 
 (* Compute some kind of “optimal” kerning between two images.
-  Exceptions are listed in the [kernings] definition below. *)
+  Exceptions can be declared with the [set_kerning] function below. *)
 let compute_kerning img1 img2 =
-  let heigth = snd (Subimage.dimensions img1) in
-  assert (heigth = snd (Subimage.dimensions img2)) ;
-  (* TODO
+  assert (height = snd (Subimage.dimensions img1)) ;
+  assert (height = snd (Subimage.dimensions img2)) ;
+  let width1 = fst (Subimage.dimensions img1) in
+  let width2 = fst (Subimage.dimensions img2) in
+  let is_transparent img (x, y) =
+    assert (x >= 0 && x < fst (Subimage.dimensions img)) ;
+    assert (y >= 0 && y < height) ;
+    let (_r, _g, _b, a) = Subimage.read img (x, y) in
+    a = 0 in
+  let nb_in_column img x =
+    assert (x >= 0 && x < fst (Subimage.dimensions img)) ;
+    let rec aux acc y =
+      if y = height then acc
+      else
+        let acc = if is_transparent img (x, y) then acc else (acc + 1) in
+        aux acc (y + 1) in
+    aux 0 0 in
+  let depth_right img y =
+    assert (y >= 0 && y < height) ;
+    let rec aux acc x =
+      if x < 0 then acc
+      else
+        if is_transparent img (x, y) then aux (acc + 1) (x - 1)
+        else acc in
+    aux 0 (fst (Subimage.dimensions img) - 1) in
+  let depth_left img y =
+    assert (y >= 0 && y < height) ;
+    let rec aux x =
+      if x = fst (Subimage.dimensions img) then x
+      else
+        if is_transparent img (x, y) then aux (x + 1)
+        else x in
+    aux 0 in
+  let empty_column img x = nb_in_column img x = 0 in
   (* First, checking whether the last column of img1 is empty: if so, the kerning is [0]. *)
-  TODO
-  (* Second, checking whether the first column of img2 is empty: if so, we only accept one pixel from img1 to fuse in. *)
-  TODO
-  (* Then, we compute a possible candidate by only looking at the difference horizontally. *)
-  let min =
-    List.fold_left ((* how many spaces can we find in both at this y-coordinate? *)) 0 (range 0 (heigth - 1))
-  (* Finally, we check diagonals: we only accept one diagonal-touch between the characters. *)
-  TODO
-  *)
-  1
+  if width1 = 0 then 0
+  else if width2 = 0 then 1
+  else if empty_column img1 (width1 - 1) then 0
+  else
+    (* Second, checking whether the first column of img2 is empty: if so, we only accept one pixel from img1 to fuse in. *)
+    if empty_column img2 0 then (
+      if nb_in_column img1 (width1 - 1) <= 1 then (-1) else 0
+    ) else (
+      (* Otherwise, we compute a possible candidate by only looking at the difference horizontally. *)
+      let min_distance =
+        List.fold_left (fun acc y ->
+          (* The number of pixels we fit in both direction at this y-coordinate. *)
+          let dist = depth_right img1 y + depth_left img2 y in
+          min acc dist) (width1 + width2) (Items_aux.range 0 (height - 1)) in
+      let candidate = 1 - min (min width1 width2) min_distance in
+      (* Finally, we check diagonals: we only accept one diagonal-touch between the characters. *)
+      let rec aux distance =
+        assert (distance <= 1) ;
+        if distance = 1 then 1
+        else (
+          (* We are going to look slightly outside of the bounds of the image, so we extend the
+            scope of [is_transparent] accordingly. *)
+          let is_transparent img (x, y) =
+            if x = -1 || y = -1 || y = height || x = fst (Subimage.dimensions img) then true
+            else is_transparent img (x, y) in
+          (* Check for all relevant pixels of img2. *)
+          let for_all_relevant f acc =
+            assert (1 - candidate >= 0) ;
+            let rec check acc x y =
+              assert (y <= height) ;
+              let x1 = width1 + distance + x in
+              if y = height then acc
+              else if x = 1 - candidate || x1 >= width1 then check acc 0 (y + 1)
+              else (
+                assert (y >= 0 && y < height) ;
+                assert (x1 >= 0 && x1 < width1) ;
+                assert (x >= 0 && x < width2) ;
+                let (continue, acc) = f acc x1 x y in
+                if continue then check acc (x + 1) y
+                else acc
+              ) in
+            check acc 0 0 in
+          (* Checking that there are no direct vertically touching pixels. *)
+          let check_up_down dy =
+            for_all_relevant (fun b x1 x2 y ->
+              assert b ;
+                if not (is_transparent img1 (x1, y))
+                && not (is_transparent img2 (x2, y + dy)) then
+                  (false, false)
+                else (true, true)
+              ) true in
+          (* Check that there are at most one touching diagonal. *)
+          let diagonals = [(1, 1); (1, -1); (-1, 1); (-1, -1)] in
+          let rec check_diag already_seen_one = function
+            | [] -> true
+            | (dx, dy) :: l ->
+              (* Meaning of the accumulator:
+                - None: two touching diagonals or more.
+                - Some false: no touching diagonals.
+                - Some true: exactly one touching diagonal.  *)
+              (* TODO FIXME: For "c" and "o", it seems that it actually accepts two diagonals? *)
+              match for_all_relevant (function
+                | None -> assert false
+                | Some already_seen_one -> fun x1 x2 y ->
+                  if not (is_transparent img1 (x1, y))
+                  && not (is_transparent img2 (x2 + dx, y + dy)) then (
+                    if already_seen_one then (false, None)
+                    else (true, Some true)
+                  ) else (true, Some already_seen_one)) (Some already_seen_one) with
+              | None -> false
+              | Some already_seen_one -> check_diag already_seen_one l in
+          if check_up_down (-1)
+          && check_up_down 1
+          && check_diag false diagonals then distance
+          else aux (distance + 1)
+        ) in
+      aux candidate
+    )
+    (* TODO FIXME: Consider alternative character graphs. *)
 
 module StringPairMap =
   Map.Make (struct
-    type t = string * string
+    type t = Subimage.t * Subimage.t
     let compare = compare
   end)
 
-let kernings =
-  List.fold_left (fun m (str1, str2, k) ->
-    let firsts =
-      List.fold_left (fun l (strl, _kind) ->
-        List.filter (is_prefix str2) strl @ l) [str2] character_data in
-    let seconds =
-      List.fold_left (fun l (strl, _kind) ->
-        List.filter (is_suffix str1) strl @ l) [str1] character_data in
-    List.fold_left (fun m first ->
-      List.fold_left (fun m second ->
-        StringPairMap.add (first, second) k m) m firsts) m seconds) StringPairMap.empty [
-      ("/", "/", -1) ;
-      ("C", "s", 0) ;
-      ("F", "a", 0) ; ("F", "c", 0) ; ("F", "d", 0) ; ("F", "e", 0) ; ("F", "g", 0) ;
-      ("F", "j", 0) ; ("F", "m", 0) ; ("F", "o", 0) ; ("F", "p", 0) ; ("F", "q", 0) ;
-      ("F", "r", 0) ; ("F", "s", 0) ; ("F", "u", 0) ; ("F", "v", 0) ; ("F", "w", 0) ;
-      ("F", "x", 0) ; ("F", "y", 0) ; ("F", "z", 0) ;
-      ("I", "q", 0) ; ("I", "s", 0) ;
-      ("J", "a", 0) ; ("J", "c", 0) ; ("J", "d", 0) ; ("J", "g", 0) ; ("J", "j", 0) ;
-      ("J", "m", 0) ; ("J", "n", 0) ; ("J", "o", 0) ; ("J", "p", 0) ; ("J", "q", 0) ;
-      ("J", "r", 0) ; ("J", "s", 0) ; ("J", "u", 0) ; ("J", "v", 0) ; ("J", "w", 0) ;
-      ("J", "x", 0) ; ("J", "y", 0) ;
-      ("L", "'", -1) ; ("L", "g", 0) ; ("L", "q", 0) ; ("L", "s", 0) ; ("L", "v", 0) ;
-      ("L", "w", 0) ; ("L", "y", 0) ;
-      ("P", "a", 0) ; ("P", "c", 0) ; ("P", "d", 0) ; ("P", "g", 0) ; ("P", "j", 0) ;
-      ("P", "m", 0) ; ("P", "n", 0) ; ("P", "o", 0) ; ("P", "p", 0) ; ("P", "q", 0) ;
-      ("P", "r", 0) ;
-      ("T", "a", 0) ; ("T", "c", 0) ; ("T", "d", 0) ; ("T", "e", 0) ; ("T", "g", 0) ;
-      ("T", "j", 0) ; ("T", "m", 0) ; ("T", "n", 0) ; ("T", "o", 0) ; ("T", "p", 0) ;
-      ("T", "q", 0) ; ("T", "r", 0) ; ("T", "s", 0) ; ("T", "u", 0) ; ("T", "v", 0) ;
-      ("T", "w", 0) ; ("T", "x", 0) ; ("T", "y", 0) ; ("T", "z", 0) ;
-      ("V", "a", 0) ; ("V", "c", 0) ; ("V", "d", 0) ; ("V", "g", 0) ; ("V", "j", 0) ;
-      ("V", "m", 0) ; ("V", "n", 0) ; ("V", "o", 0) ; ("V", "r", 0) ;
-      ("W", "a", 0) ; ("W", "c", 0) ; ("W", "d", 0) ; ("W", "g", 0) ; ("W", "j", 0) ;
-      ("W", "m", 0) ; ("W", "n", 0) ; ("W", "o", 0) ; ("W", "r", 0) ;
-      ("a", "T", 0) ;
-      ("b", "T", -1) ; ("b", "V", 0) ; ("b", "W", 0) ;
-      ("c", "T", 0) ;
-      ("e", "T", 0) ;
-      ("f", "f", 0) ; ("f", "l", 0) ;
-      ("g", "T", 0) ; ("h", "T", 0) ; ("h", "V", 0) ; ("h", "W", 0) ;
-      ("k", "T", 0) ; ("l", "'", 0) ; ("l", "T", 0) ; ("l", "l", 0) ;
-      ("m", "T", 0) ; ("m", "V", 0) ; ("m", "W", 0) ;
-      ("n", "T", 0) ; ("n", "V", 0) ; ("n", "W", 0) ;
-      ("o", "T", 0) ; ("o", "V", 0) ; ("o", "W", 0) ;
-      ("p", "T", 0) ;
-      ("q", "T", 0) ;
-      ("r", "J", 0) ; ("r", "T", 0) ;
-      ("s", "T", 0) ; ("s", "V", 0) ; ("s", "W", 0) ;
-      ("t", "J", 0) ; ("t", "t", 0) ;
-      ("u", "T", 0) ;
-      ("v", "T", 0) ;
-      ("w", "T", 0) ;
-      ("x", "T", 0) ;
-      ("y", "T", 0) ;
-      ("z", "T", 0) ;
-    ]
+
+let kernings = ref StringPairMap.empty
+
+let set_kerning img1 img2 v =
+  kernings := StringPairMap.add (img1, img2) v !kernings
+
+let get_kerning img1 img2 =
+  match StringPairMap.find_opt (img1, img2) !kernings with
+  | Some v -> v
+  | None ->
+    let v = compute_kerning img1 img2 in
+    set_kerning img1 img2 v ;
+    v
+
+let set_kerning_str str1 str2 v =
+  let get_img str =
+    match search_string characters str with
+    | None -> assert false
+    | Some (_, (img, _)) -> img in
+  set_kerning (get_img str1) (get_img str2) v
+
+let () = (* TODO: Define this as a ligature. *)
+  set_kerning_str "t" "t" 0
 
 (* Possible break-line behaviours. *)
 type breakline =
@@ -364,26 +437,20 @@ type breakline =
 (* Divide a text into a list of images, kerning with the next character, and how we can break lines
   here.  When returning [None], this means that there is a forced line-break here. *)
 let parse str : (Subimage.t * int * breakline) option list =
-  let get_kerning d1 d2 =
-    if d1 = " " || d2 = " " then 0
-    else
-      match StringPairMap.find_opt (d1, d2) kernings with
-      | None -> 1 (* Default kerning *)
-      | Some n -> n in
   let rec aux acc = function
     | [] -> List.rev acc
     | (_, _, Newline) :: l -> aux (None :: acc) l
     | (" ", img, _) :: l -> aux (Some (img, 0, BreakRemove) :: acc) l
     | [("-", img, _)] -> aux (Some (img, 1, BreakSimple) :: acc) []
-    | ("-", img, _) :: ((d2, _, _) :: _ as l) ->
-      aux (Some (img, get_kerning "-" d2, BreakSimple) :: acc) l
-    | (d1, img, Consonant) :: ((d2, _, Consonant) :: _ as l) ->
-      aux (Some (img, get_kerning d1 d2, BreakHyphen) :: acc) l
-    | (d1, img, Vowel) :: ((d2, _, Consonant) :: _ as l) ->
+    | ("-", img1, _) :: ((_, img2, _) :: _ as l) ->
+      aux (Some (img1, get_kerning img1 img2, BreakSimple) :: acc) l
+    | (_, img1, Consonant) :: ((_, img2, Consonant) :: _ as l) ->
+      aux (Some (img1, get_kerning img1 img2, BreakHyphen) :: acc) l
+    | (_, img1, Vowel) :: ((_, img2, Consonant) :: _ as l) ->
       (* This rule is not always correct, but should be good enough in this context. *)
-      aux (Some (img, get_kerning d1 d2, BreakHyphen) :: acc) l
-    | (d1, img, _) :: ((d2, _, _) :: _ as l) ->
-      aux (Some (img, get_kerning d1 d2, NoBreak) :: acc) l
+      aux (Some (img1, get_kerning img1 img2, BreakHyphen) :: acc) l
+    | (_, img1, _) :: ((_, img2, _) :: _ as l) ->
+      aux (Some (img1, get_kerning img1 img2, NoBreak) :: acc) l
     | [(_, img, _)] -> aux (Some (img, 0, NoBreak) :: acc) [] in
   aux [] (split_characters str)
 
@@ -521,6 +588,9 @@ let render str max_width =
       let* p = get_current_position_if_new_line in
       if p > max_width && not prevent_backtrack then (
         let* _b = backtrack in
+        (* TODO: There are several kinds of newlines, and we need to check for this.
+          In particular, we need to think when exactly it is relevant to save (for a [BreakRemove],
+          it will be typically just before the character). *)
         let* can = can_break_line in
         (if can then new_line else return ()) %%
         aux true
