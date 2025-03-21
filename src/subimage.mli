@@ -3,7 +3,7 @@
 
 (* A static image, ready to be displayed.
   Note that the (0, 0) coordinate of an image is on its top-left corner: y-coordinates are
-  not reversed like the rest of the program. *)
+  not reversed like in the rest of the program. *)
 type t
 
 (* Conversion of types of images. *)

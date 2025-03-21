@@ -38,7 +38,7 @@ let enlarge img (width, height) =
     let center = (width / 2, height / 2) in
     let center_img = (img.width / 2, img.height / 2) in
     (fst center - fst center_img, snd center - snd center_img) in
-  let result = Image.create_rgb ~alpha:true width height in
+  let result = Image.create_rgb ~alpha:true (max 1 width) (max 1 height) in
   Image.fill_rgb ~alpha:0 result 0 0 0 ;
   for x = 0 to img.width - 1 do
     for y = 0 to img.height - 1 do
@@ -51,12 +51,14 @@ let enlarge img (width, height) =
 (* Given a canvas size, a list of images and offsets (which must be positive), combine the images
   into a single image. *)
 let combine_raw (width, height) imgl =
-  let result = Image.create_rgb ~alpha:true width height in
+  let result = Image.create_rgb ~alpha:true (max 1 width) (max 1 height) in
   Image.fill_rgb ~alpha:0 result 0 0 0 ;
   List.iter (fun (img, (dx, dy)) ->
     for x = 0 to img.width - 1 do
       for y = 0 to img.height - 1 do
         let (r, g, b, a) = read img (x, y) in
+        assert (x + dx >= 0 && x + dx < width) ;
+        assert (y + dy >= 0 && y + dy < height) ;
         if a <> 0 then
           Image.write_rgba result (x + dx) (y + dy) r g b a
       done
@@ -77,15 +79,17 @@ let combine imgl =
 
 let combine_horizontally imgl =
   (* First, we compute the total required width and height. *)
-  let (width, height) =
-    List.fold_left (fun (w, h) (offset, img) ->
-      (w + offset + img.width, max h img.height)) (0, 0) imgl in
+  let (min_width, width, height) =
+    List.fold_left (fun (mw, w, h) (offset, img) ->
+      (min mw (w + offset), w + offset + img.width, max h img.height)) (0, 0, 0) imgl in
+  assert (min_width <= 0) ;
+  let width = width - min_width in
   let width = max 0 width in (* There could be negative offsets. *)
   (* Then we compute the individual offsets. *)
   let (_width, imgl) =
     List.fold_left (fun (x, imgl) (offset, img) ->
       let y = (height - img.height) / 2 in
-      (x + offset + img.width, (img, (x + offset, y)) :: imgl)) (0, []) imgl in
+      (x + offset + img.width, (img, (x + offset, y)) :: imgl)) (-min_width, []) imgl in
   combine_raw (width, height) imgl
 
 let horizontal_sequence offset imgl =
@@ -95,15 +99,17 @@ let horizontal_sequence offset imgl =
 
 let combine_vertically imgl =
   (* First, we compute the total required width and height. *)
-  let (width, height) =
-    List.fold_left (fun (w, h) (offset, img) ->
-      (max w img.width, h + offset + img.height)) (0, 0) imgl in
+  let (width, min_height, height) =
+    List.fold_left (fun (w, mh, h) (offset, img) ->
+      (max w img.width, min mh (h + offset), h + offset + img.height)) (0, 0, 0) imgl in
+  assert (min_height <= 0) ;
+  let height = height - min_height in
   let height = max 0 height in (* There could be negative offsets. *)
   (* Then we compute the individual offsets. *)
   let (_height, imgl) =
     List.fold_left (fun (y, imgl) (offset, img) ->
       let x = (width - img.width) / 2 in
-      (y + offset + img.height, (img, (x, y + offset)) :: imgl)) (0, []) imgl in
+      (y + offset + img.height, (img, (x, y + offset)) :: imgl)) (-min_height, []) imgl in
   combine_raw (width, height) imgl
 
 let vertical_sequence offset imgl =

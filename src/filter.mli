@@ -51,3 +51,11 @@ val darkest : Subimage.t -> (int * int * int)
   the background pattern. *)
 val add_background : Subimage.t -> Subimage.t -> Subimage.t
 
+(* From an image and ornament specification, add the ornaments around the image. *)
+val add_ornaments :
+  Subimage.t (* Image to be ornamented. *) ->
+  Subimage.t (* Pattern to fill the inside of the ornament. *) ->
+  Subimage.t -> Subimage.t -> Subimage.t -> Subimage.t -> (* Angles of the ornament (NW, NE, SW, SE). *)
+  Subimage.t -> Subimage.t -> Subimage.t -> Subimage.t -> (* Sides of the ornament (W, E, N, S). *)
+  Subimage.t
+

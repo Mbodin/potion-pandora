@@ -240,9 +240,11 @@ let canard =
     | Standing false -> ([(mk 0, t)], event_flight st [()] [false; false; false; true])
     | Standing true -> ([(mk 1, t)], event_flight st [()] [false; true]))
 
+(*
 let () =
   (* TODO FIXME: There is something very wrong here: it has only 3 states. *)
   print_endline (Animation.print canard)
+*)
 
 let papillon =
   let mk = from Images_coords.papillon in

@@ -340,19 +340,21 @@ let compute_kerning img1 img2 =
           (* We are going to look slightly outside of the bounds of the image, so we extend the
             scope of [is_transparent] accordingly. *)
           let is_transparent img (x, y) =
-            if x = -1 || y = -1 || y = height || x = fst (Subimage.dimensions img) then true
+            if x < 0 || y < 0 || y >= height || x >= fst (Subimage.dimensions img) then true
             else is_transparent img (x, y) in
-          (* Check for all relevant pixels of img2. *)
+          (* Check for all relevant pixels of img2.
+            (This means that if comparing values with another coordinate, it has to be img1's
+            coordinates to be changed, not img2's.) *)
           let for_all_relevant f acc =
             assert (1 - candidate >= 0) ;
             let rec check acc x y =
               assert (y <= height) ;
               let x1 = width1 + distance + x in
               if y = height then acc
-              else if x = 1 - candidate || x1 >= width1 then check acc 0 (y + 1)
+              else if x1 >= width1 + 1 || x > width2 then check acc 0 (y + 1)
               else (
                 assert (y >= 0 && y < height) ;
-                assert (x1 >= 0 && x1 < width1) ;
+                assert (x1 >= 0 && x1 <= width1) (* We are checking around this pixel, so we need to search for more than just the normal pixels. *) ;
                 assert (x >= 0 && x < width2) ;
                 let (continue, acc) = f acc x1 x y in
                 if continue then check acc (x + 1) y
@@ -363,8 +365,8 @@ let compute_kerning img1 img2 =
           let check_up_down dy =
             for_all_relevant (fun b x1 x2 y ->
               assert b ;
-                if not (is_transparent img1 (x1, y))
-                && not (is_transparent img2 (x2, y + dy)) then
+                if not (is_transparent img1 (x1, y + dy))
+                && not (is_transparent img2 (x2, y)) then
                   (false, false)
                 else (true, true)
               ) true in
@@ -376,13 +378,12 @@ let compute_kerning img1 img2 =
               (* Meaning of the accumulator:
                 - None: two touching diagonals or more.
                 - Some false: no touching diagonals.
-                - Some true: exactly one touching diagonal.  *)
-              (* TODO FIXME: For "c" and "o", it seems that it actually accepts two diagonals? *)
+                - Some true: exactly one touching diagonal. *)
               match for_all_relevant (function
                 | None -> assert false
                 | Some already_seen_one -> fun x1 x2 y ->
-                  if not (is_transparent img1 (x1, y))
-                  && not (is_transparent img2 (x2 + dx, y + dy)) then (
+                  if not (is_transparent img1 (x1 + dx, y + dy))
+                  && not (is_transparent img2 (x2, y)) then (
                     if already_seen_one then (false, None)
                     else (true, Some true)
                   ) else (true, Some already_seen_one)) (Some already_seen_one) with
@@ -427,6 +428,7 @@ let set_kerning_str str1 str2 v =
 let () = (* TODO: Define this as a ligature. *)
   set_kerning_str "t" "t" 0
 
+
 (* Possible break-line behaviours. *)
 type breakline =
   | NoBreak (* No line-break can be inserted here. *)
@@ -444,9 +446,9 @@ let parse str : (Subimage.t * int * breakline) option list =
     | [("-", img, _)] -> aux (Some (img, 1, BreakSimple) :: acc) []
     | ("-", img1, _) :: ((_, img2, _) :: _ as l) ->
       aux (Some (img1, get_kerning img1 img2, BreakSimple) :: acc) l
-    | (_, img1, Consonant) :: ((_, img2, Consonant) :: _ as l) ->
+    | (_, img1, Consonant) :: ((_, img2, Consonant) :: (_, _, (Consonant | Vowel)) :: (_, _, (Consonant | Vowel)) :: _ as l) ->
       aux (Some (img1, get_kerning img1 img2, BreakHyphen) :: acc) l
-    | (_, img1, Vowel) :: ((_, img2, Consonant) :: _ as l) ->
+    | (_, img1, Vowel) :: ((_, img2, Consonant) :: (_, _, (Consonant | Vowel)) :: (_, _, (Consonant | Vowel)) :: _ as l) ->
       (* This rule is not always correct, but should be good enough in this context. *)
       aux (Some (img1, get_kerning img1 img2, BreakHyphen) :: acc) l
     | (_, img1, _) :: ((_, img2, _) :: _ as l) ->
@@ -494,6 +496,14 @@ let read : (Subimage.t * int * breakline, bool) Either.t m =
     | None :: l -> ({ st with next_characters = l }, Either.Right true)
     | Some data :: l -> ({ st with next_characters = l }, Either.Left data)
 
+(* Same as [read], but doesn't pop the character from the list of next characters. *)
+let peek : (Subimage.t * int * breakline, bool) Either.t m =
+  fun st ->
+    match st.next_characters with
+    | [] -> (st, Either.Right false)
+    | None :: _ -> (st, Either.Right true)
+    | Some data :: _ -> (st, Either.Left data)
+
 (* Get the current position if we were to stop the line here. *)
 let get_current_position_if_new_line : int m =
   fun st ->
@@ -512,7 +522,7 @@ let get_current_position_if_new_line : int m =
     (st, pos)
 
 (* Whether one can break a line right now. *)
-let can_break_line : bool m =
+let _can_break_line : bool m =
   fun st ->
     let can =
       match st.pending with
@@ -520,6 +530,17 @@ let can_break_line : bool m =
       | (_img, _offset, NoBreak) :: _ -> false
       | (_img, _offset, _) :: _ -> true in
     (st, can)
+
+(* If one can break line given this data, return the list of data that should be inserted
+  to the next characters if actually doing the line break here. *)
+let break_line_modifications (img, offset, break) : (Subimage.t * int * breakline) list option m =
+  match break with
+  | NoBreak -> return None
+  | BreakRemove -> return (Some [])
+  | BreakHyphen ->
+    let k = get_kerning img hyphen_img in
+    return (Some [(img, k, break) ; (hyphen_img, 1, BreakSimple)])
+  | BreakSimple -> return (Some [(img, offset, break)])
 
 (* Commit the currently pending characters. *)
 let commit : unit m =
@@ -573,8 +594,15 @@ let backtrack : bool m =
     | None -> (st, false)
 
 (* Save the current state. *)
-let save : unit m =
+let _save : unit m =
   fun st -> ({ st with backtrack = Some { st with backtrack = None } }, ())
+
+(* Save the current state in which these characters are being added into the next characters. *)
+let save_with l : unit m =
+  fun st ->
+    ({ st with backtrack = Some { st with
+      backtrack = None;
+      next_characters = l @ st.next_characters } }, ())
 
 let render str max_width =
   let rec aux prevent_backtrack : unit m =
@@ -584,23 +612,21 @@ let render str max_width =
       new_line %%
       if b then aux true else return ()
     | Either.Left c ->
+      let* has_saved =
+        let* modifications = break_line_modifications c in
+        match modifications with
+        | None -> return false
+        | Some l ->
+          let l = List.map (fun data -> Some data) l in
+          save_with (l @ [None]) %%
+          return true in
       write c %%
       let* p = get_current_position_if_new_line in
-      if p > max_width && not prevent_backtrack then (
+      let* n = peek in
+      if p > max_width && not prevent_backtrack && n <> Either.Right true then (
         let* _b = backtrack in
-        (* TODO: There are several kinds of newlines, and we need to check for this.
-          In particular, we need to think when exactly it is relevant to save (for a [BreakRemove],
-          it will be typically just before the character). *)
-        let* can = can_break_line in
-        (if can then new_line else return ()) %%
         aux true
-      ) else (
-        let* can = can_break_line in
-        if can then (
-          save %%
-          aux false
-        ) else aux prevent_backtrack
-      ) in
+      ) else aux (if has_saved then false else prevent_backtrack) in
   let (st, ()) =
     let st = {
       previous_lines = [] ;

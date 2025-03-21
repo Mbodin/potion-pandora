@@ -70,7 +70,7 @@ module Launch (I : Interface.T) = struct
     ignore (Store.add store Items.enfant_cerf_volant (350, -50)) ;
     let player = Store.add store Items.perso (0, 0) in
     ignore (Store.add store Items.arbre1_tres_sombre (130, -25)) ;
-    ignore (Store.add store (Items_aux.static (Text.render "Test\nThe quick brown fox jumps over the lazy dog.\nVoix ambiguë d'un cœur qui au zéphyr préfère les jattes de kiwis." 100)) (15, 100)) ;
+    ignore (Store.add store (Items_aux.static (Text.render "Test courgettes\nThe quick brown fox jumps over the lazy dog.\nVoix ambiguë d'un cœur qui au zéphyr préfère les jattes de kiwis." 100)) (15, 100)) ;
     for i = 0 to 25 do
       let c = Char.chr (Char.code 'a' + i) in
       ignore (Store.add store

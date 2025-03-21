@@ -215,3 +215,37 @@ let invert ?palette img =
   done ;
   Subimage.from_image img'
 
+let add_ornaments img pattern angle_NW angle_NE angle_SW angle_SE side_W side_E side_N side_S =
+  (* There are six characteristical distances: we check that the provided ornament are coherent about it. *)
+  let (dist_w, dist_n) = Subimage.dimensions angle_NW in
+  let (dist_e, dist_s) = Subimage.dimensions angle_SE in
+  let em = fst (Subimage.dimensions side_N) in
+  let ex = snd (Subimage.dimensions side_W) in
+  assert ((dist_e, dist_n) = Subimage.dimensions angle_NE) ;
+  assert ((dist_w, dist_s) = Subimage.dimensions angle_SW) ;
+  assert ((dist_w, ex) = Subimage.dimensions side_W) ;
+  assert ((dist_e, ex) = Subimage.dimensions side_E) ;
+  assert ((em, dist_n) = Subimage.dimensions side_N) ;
+  assert ((em, dist_s) = Subimage.dimensions side_S) ;
+  assert (ex > 0 && em > 0) ;
+  let (size_x, size_y) = Subimage.dimensions img in
+  let tiling_x = 1 + size_x / em in
+  let tiling_y = 1 + size_y / ex in
+  let img = Subimage.enlarge img (tiling_x * em, tiling_y * ex) in
+  let img = add_background pattern img in
+  let right_border = dist_w + tiling_x * em in
+  let bottom_border = dist_n + tiling_y * ex in
+  Subimage.combine (
+    [
+      (angle_NW, (0, 0)) ;
+      (angle_NE, (right_border, 0)) ;
+      (angle_SW, (0, bottom_border)) ;
+      (angle_SW, (right_border, bottom_border)) ;
+      (img, (dist_w, dist_n))
+    ]
+    @ List.init tiling_x (fun i -> (side_W, (0, dist_n + i * ex)))
+    @ List.init tiling_x (fun i -> (side_E, (right_border, dist_n + i * ex)))
+    @ List.init tiling_y (fun i -> (side_N, (dist_w + i * em, 0)))
+    @ List.init tiling_y (fun i -> (side_S, (dist_w + i * em, bottom_border)))
+  )
+
