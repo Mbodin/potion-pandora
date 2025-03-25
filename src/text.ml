@@ -4,32 +4,14 @@ let ascii_imgs = Items.ascii
 let extended_characters_imgs = Items.extended_characters
 
 (* The unknown character replacement “�”. *)
-let unknown = List.hd extended_characters_imgs
+let unknown_img = List.hd extended_characters_imgs
 
 (* We assume that all character have the same height (possibly with transparent pixels). *)
-let height = snd (Subimage.dimensions unknown)
+let height = snd (Subimage.dimensions unknown_img)
 
 (* An empty image, the size of a character. *)
 let empty_img =
   Filter.rectangle Filter.transparent (0, height)
-
-(* A raw table of ASCII characters as images. *)
-let ascii_table =
-  let a = Array.make 255 unknown in
-  let start = Char.code ' ' in
-  let finish = Char.code '~' in
-  assert (List.length ascii_imgs = finish - start + 1) ;
-  for i = start to finish do
-    a.(i) <- List.nth ascii_imgs (i - start)
-  done ;
-  a
-
-(* The image of an hyphen. *)
-let hyphen_img = ascii_table.(Char.code '-')
-
-(* The width of an hyphen, in pixels. *)
-let hyphen_width =
-  fst (Subimage.dimensions hyphen_img)
 
 (* Remove the first character of a string. *)
 let tail str = String.sub str 1 (String.length str - 1)
@@ -97,30 +79,103 @@ type kind =
   | OtherKind
   | Newline
 
-(* Table of kinds for ASCII characters. *)
-let kind_table =
-  let a = Array.make 255 OtherKind in
-  for c = Char.code 'a' to Char.code 'z' do
-    a.(c) <- Consonant ;
-    a.(c - Char.code 'a' + Char.code 'A') <- Consonant
-  done ;
-  for c = Char.code '0' to Char.code '9' do
-    a.(c) <- Number
-  done ;
-  List.iter (fun c -> a.(Char.code c) <- Vowel) [
-    'a'; 'e'; 'i'; 'o'; 'u'; 'y';
-    'A'; 'E'; 'I'; 'O'; 'U'; 'Y'
-  ] ;
-  List.iter (fun c -> a.(Char.code c) <- Punctuation) [
-    '!'; '"'; '\''; '('; ')'; ','; '.'; ':'; ';'; '?'; '`'
-  ] ;
-  List.iter (fun c -> a.(Char.code c) <- Newline) [
-    '\r'; '\n'
-  ] ;
-  a
-
 (* LATER: Encode and compress this list. *)
 let character_data = [
+    ([" "; " " (* Non-breaking space *)], OtherKind) ;
+    (["!"], Punctuation) ;
+    (["\""], Punctuation) ;
+    (["#"], OtherKind) ;
+    (["$"], OtherKind) ;
+    (["%"], OtherKind) ;
+    (["&"], OtherKind) ;
+    (["'"; "ʹ"; "ʹ"], Punctuation) ;
+    (["("], Punctuation) ;
+    ([")"], Punctuation) ;
+    (["*"], OtherKind) ;
+    (["+"], OtherKind) ;
+    ([","], Punctuation) ;
+    (["-"], OtherKind) ;
+    (["."], Punctuation) ;
+    (["/"], OtherKind) ;
+    (["0"], Number) ;
+    (["1"], Number) ;
+    (["2"], Number) ;
+    (["3"], Number) ;
+    (["4"], Number) ;
+    (["5"], Number) ;
+    (["6"], Number) ;
+    (["7"], Number) ;
+    (["8"], Number) ;
+    (["9"], Number) ;
+    ([":"], Punctuation) ;
+    ([";"; ";"], Punctuation) ;
+    (["<"], OtherKind) ;
+    (["="], OtherKind) ;
+    ([">"], OtherKind) ;
+    (["?"], Punctuation) ;
+    (["@"], OtherKind) ;
+    (["A"; "Α"], Vowel) ;
+    (["B"; "Β"], Consonant) ;
+    (["C"], Consonant) ;
+    (["D"], Consonant) ;
+    (["E"; "Ε"], Vowel) ;
+    (["F"], Consonant) ;
+    (["G"], Consonant) ;
+    (["H"; "Η" (* Technically this is a greek vowel. *)], Consonant) ;
+    (["I"; "Ι"], Vowel) ;
+    (["J"], Consonant) ;
+    (["K"; "Κ"], Consonant) ;
+    (["L"], Consonant) ;
+    (["M"; "Μ"], Consonant) ;
+    (["N"; "Ν"], Consonant) ;
+    (["O"; "Ο"], Vowel) ;
+    (["P"; "Ρ"], Consonant) ;
+    (["Q"], Consonant) ;
+    (["R"], Consonant) ;
+    (["S"], Consonant) ;
+    (["T"; "Τ"], Consonant) ;
+    (["U"], Vowel) ;
+    (["V"], Consonant) ;
+    (["W"], Consonant) ;
+    (["X"; "Χ"], Consonant) ;
+    (["Y"; "Υ"], Vowel) ;
+    (["Z"; "Ζ"], Consonant) ;
+    (["["], OtherKind) ;
+    (["\\"], OtherKind) ;
+    (["]"], OtherKind) ;
+    (["^"], OtherKind) ;
+    (["_"], OtherKind) ;
+    (["`"], Punctuation) ;
+    (["a"], Vowel) ;
+    (["b"], Consonant) ;
+    (["c"], Consonant) ;
+    (["d"], Consonant) ;
+    (["e"], Vowel) ;
+    (["f"], Consonant) ;
+    (["g"], Consonant) ;
+    (["h"], Consonant) ;
+    (["i"], Vowel) ;
+    (["j"], Consonant) ;
+    (["k"], Consonant) ;
+    (["l"], Consonant) ;
+    (["m"], Consonant) ;
+    (["n"], Consonant) ;
+    (["o"; "ο"], Vowel) ;
+    (["p"], Consonant) ;
+    (["q"], Consonant) ;
+    (["r"], Consonant) ;
+    (["s"], Consonant) ;
+    (["t"], Consonant) ;
+    (["u"], Vowel) ;
+    (["v"], Consonant) ;
+    (["w"], Consonant) ;
+    (["x"], Consonant) ;
+    (["y"], Vowel) ;
+    (["z"], Consonant) ;
+    (["{"], OtherKind) ;
+    (["|"], OtherKind) ;
+    (["}"], OtherKind) ;
+    (["~"], OtherKind) ;
     (["Ã"; "Ã"; "Â"; "Â"; "Ā"; "Ā"; "À"; "À"; "Á"; "Á"; "Ă"; "Ă"; "Ǎ"; "Ǎ"; "Ä"; "Ä"], Vowel) ;
     (["Ĉ"; "Ĉ"; "Ć"; "Ć"; "Č"; "Č"], Consonant) ;
     (["Ẽ"; "Ẽ"; "Ê"; "Ê"; "Ē"; "Ē"; "È"; "È"; "É"; "É"; "Ě"; "Ě"; "Ë"; "Ë"], Vowel) ;
@@ -238,22 +293,27 @@ let character_data = [
 
 (* The data of all images, including ligatures, and so on. *)
 let characters =
-  let get_ascii c = ascii_table.(Char.code c) in
-  let ascii_substrings =
-    SubstringData (Array.mapi (fun i kind ->
-      let img = ascii_table.(i) in
-      NoSubstring (Some (img, kind))) kind_table, None) in
+  (* We remove the special unknown character from the character images. *)
+  let extended_characters_imgs = List.tl extended_characters_imgs in
   let l =
     List.map2 (fun img (strl, kind) -> (strl, img, kind))
-      (List.tl extended_characters_imgs) character_data in
-  List.fold_left (fun substrings (strl, img, kind) ->
-      List.fold_left (fun substrings str ->
-        (add_substring substrings str (img, kind))) substrings strl)
-    ascii_substrings (
-      (["\r\n"; "\n\r"], get_ascii '\n', Newline)
-      :: ([" "] (* Non-breaking space *), get_ascii ' ', OtherKind)
-      :: (["​"] (* Zero-width space *), empty_img, OtherKind)
-      :: l)
+      (ascii_imgs @ extended_characters_imgs) character_data in
+  let characters =
+    List.fold_left (fun substrings (strl, img, kind) ->
+        List.fold_left (fun substrings str ->
+          (add_substring substrings str (img, kind))) substrings strl)
+      (NoSubstring None) (
+        (["\n"; "\r"; "\r\n"; "\n\r"], empty_img, Newline)
+        :: (["​"] (* Zero-width space *), empty_img, OtherKind)
+        :: l) in
+  match characters with
+  | SubstringData (data, None) ->
+    (* We add a default unknown character to the base cases. *)
+    SubstringData (Array.map (function
+      | (NoSubstring None | SubstringData (_, None)) as d ->
+        add_accepted (unknown_img, OtherKind) d
+      | a -> a) data, None)
+  | _ -> assert false
 
 (* Split a string into a list of lexemes, with their string (with one Unicode character),
   image, and kind. *)
@@ -267,6 +327,17 @@ let split_characters : string -> (string * Subimage.t * kind) list =
       | Some (n, (img, kind)) ->
         aux ((String.sub str 0 n, img, kind) :: acc) (String.sub str n (String.length str - n)) in
   aux []
+
+
+(* The image of an hyphen. *)
+let hyphen_img =
+  match split_characters "-" with
+  | [("-", img, OtherKind)] -> img
+  | _ -> assert false
+
+(* The width of an hyphen, in pixels. *)
+let hyphen_width =
+  fst (Subimage.dimensions hyphen_img)
 
 (* Check whether the first argument is a prefix of the second. *)
 let _is_prefix pre str =
