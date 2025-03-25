@@ -81,214 +81,214 @@ type kind =
 
 (* LATER: Encode and compress this list. *)
 let character_data = [
-    ([" "; " " (* Non-breaking space *)], OtherKind) ;
-    (["!"], Punctuation) ;
-    (["\""], Punctuation) ;
-    (["#"], OtherKind) ;
-    (["$"], OtherKind) ;
-    (["%"], OtherKind) ;
-    (["&"], OtherKind) ;
-    (["'"; "ʹ"; "ʹ"], Punctuation) ;
-    (["("], Punctuation) ;
-    ([")"], Punctuation) ;
-    (["*"], OtherKind) ;
-    (["+"], OtherKind) ;
-    ([","], Punctuation) ;
-    (["-"], OtherKind) ;
-    (["."], Punctuation) ;
-    (["/"], OtherKind) ;
-    (["0"], Number) ;
-    (["1"], Number) ;
-    (["2"], Number) ;
-    (["3"], Number) ;
-    (["4"], Number) ;
-    (["5"], Number) ;
-    (["6"], Number) ;
-    (["7"], Number) ;
-    (["8"], Number) ;
-    (["9"], Number) ;
-    ([":"], Punctuation) ;
-    ([";"; ";"], Punctuation) ;
-    (["<"], OtherKind) ;
-    (["="], OtherKind) ;
-    ([">"], OtherKind) ;
-    (["?"], Punctuation) ;
-    (["@"], OtherKind) ;
-    (["A"; "Α"], Vowel) ;
-    (["B"; "Β"], Consonant) ;
-    (["C"], Consonant) ;
-    (["D"], Consonant) ;
-    (["E"; "Ε"], Vowel) ;
-    (["F"], Consonant) ;
-    (["G"], Consonant) ;
-    (["H"; "Η" (* Technically this is a greek vowel. *)], Consonant) ;
-    (["I"; "Ι"], Vowel) ;
-    (["J"], Consonant) ;
-    (["K"; "Κ"], Consonant) ;
-    (["L"], Consonant) ;
-    (["M"; "Μ"], Consonant) ;
-    (["N"; "Ν"], Consonant) ;
-    (["O"; "Ο"], Vowel) ;
-    (["P"; "Ρ"], Consonant) ;
-    (["Q"], Consonant) ;
-    (["R"], Consonant) ;
-    (["S"], Consonant) ;
-    (["T"; "Τ"], Consonant) ;
-    (["U"], Vowel) ;
-    (["V"], Consonant) ;
-    (["W"], Consonant) ;
-    (["X"; "Χ"], Consonant) ;
-    (["Y"; "Υ"], Vowel) ;
-    (["Z"; "Ζ"], Consonant) ;
-    (["["], OtherKind) ;
-    (["\\"], OtherKind) ;
-    (["]"], OtherKind) ;
-    (["^"], OtherKind) ;
-    (["_"], OtherKind) ;
-    (["`"], Punctuation) ;
-    (["a"], Vowel) ;
-    (["b"], Consonant) ;
-    (["c"], Consonant) ;
-    (["d"], Consonant) ;
-    (["e"], Vowel) ;
-    (["f"], Consonant) ;
-    (["g"], Consonant) ;
-    (["h"], Consonant) ;
-    (["i"], Vowel) ;
-    (["j"], Consonant) ;
-    (["k"], Consonant) ;
-    (["l"], Consonant) ;
-    (["m"], Consonant) ;
-    (["n"], Consonant) ;
-    (["o"; "ο"], Vowel) ;
-    (["p"], Consonant) ;
-    (["q"], Consonant) ;
-    (["r"], Consonant) ;
-    (["s"], Consonant) ;
-    (["t"], Consonant) ;
-    (["u"], Vowel) ;
-    (["v"], Consonant) ;
-    (["w"], Consonant) ;
-    (["x"], Consonant) ;
-    (["y"], Vowel) ;
-    (["z"], Consonant) ;
-    (["{"], OtherKind) ;
-    (["|"], OtherKind) ;
-    (["}"], OtherKind) ;
-    (["~"], OtherKind) ;
-    (["Ã"; "Ã"; "Â"; "Â"; "Ā"; "Ā"; "À"; "À"; "Á"; "Á"; "Ă"; "Ă"; "Ǎ"; "Ǎ"; "Ä"; "Ä"], Vowel) ;
-    (["Ĉ"; "Ĉ"; "Ć"; "Ć"; "Č"; "Č"], Consonant) ;
-    (["Ẽ"; "Ẽ"; "Ê"; "Ê"; "Ē"; "Ē"; "È"; "È"; "É"; "É"; "Ě"; "Ě"; "Ë"; "Ë"], Vowel) ;
-    (["Ĝ"; "Ĝ"; "Ǵ"; "Ǵ"; "Ğ"; "Ğ"; "Ǧ"; "Ǧ"], Consonant) ;
-    (["Ĥ"; "Ĥ"], Consonant) ;
-    (["Ĩ"; "Ĩ"; "Î"; "Î"; "Ī"; "Ī"; "Ì"; "Ì"; "Í"; "Í"; "Ĭ"; "Ĭ"; "Ï"; "Ï"], Vowel) ;
-    (["Ĵ"; "Ĵ"; "J́"], Consonant) ;
-    (["Ñ"; "Ñ"; "Ǹ"; "Ǹ"; "Ń"; "Ń"], Consonant) ;
-    (["Õ"; "Õ"; "Ô"; "Ô"; "Ō"; "Ō"; "Ò"; "Ò"; "Ó"; "Ó"; "Ŏ"; "Ŏ"; "Ǒ"; "Ǒ"; "Ö"; "Ö"], Vowel) ;
-    (["Ŝ"; "Ŝ"; "Ś"; "Ś"; "Š"; "Š"], Consonant) ;
-    (["Ũ"; "Ũ"; "Û"; "Û"; "Ū"; "Ū"; "Ù"; "Ù"; "Ú"; "Ú"; "Ŭ"; "Ŭ"; "Ü"; "Ü"], Vowel) ;
-    (["Ỹ"; "Ỹ"; "Ŷ"; "Ŷ"; "Ỳ"; "Ỳ"; "Ý"; "Ý"; "Ÿ"; "Ÿ"], Vowel) ;
-    (["Ẑ"; "Ẑ"; "Ź"; "Ź"; "Z̆"; "Ž"; "Ž"], Consonant) ;
-    (["ã"; "ã"; "â"; "â"; "ā"; "ā"; "à"; "à"; "á"; "á"; "ă"; "ă"; "ǎ"; "ǎ"; "ä"; "ä"], Vowel) ;
-    (["ĉ"; "ĉ"; "ć"; "ć"; "č"; "č"], Consonant) ;
-    (["ẽ"; "ẽ"; "ê"; "ê"; "ē"; "ē"; "è"; "è"; "é"; "é"; "ě"; "ě"; "ë"; "ë"], Vowel) ;
-    (["ĝ"; "ĝ"; "ǵ"; "ǵ"; "ğ"; "ğ"; "ǧ"; "ǧ"], Consonant) ;
-    (["ĥ"; "ĥ"], Consonant) ;
-    (["ĩ"; "ĩ"; "i̇̃"; "î"; "î"; "ī"; "ī"; "ì"; "ì"; "i̇̀"; "í"; "í"; "i̇́"; "ĭ"; "ĭ"; "ï"; "ï"], Vowel) ;
-    (["ĵ"; "ĵ"; "j́"], Consonant) ;
-    (["ñ"; "ñ"; "ǹ"; "ǹ"; "ń"; "ń"], Consonant) ;
-    (["õ"; "õ"; "ô"; "ô"; "ō"; "ō"; "ò"; "ò"; "ó"; "ó"; "ŏ"; "ŏ"; "ǒ"; "ǒ"; "ö"; "ö"], Vowel) ;
-    (["ŝ"; "ŝ"; "ś"; "ś"; "š"; "š"], Consonant) ;
-    (["ũ"; "ũ"; "û"; "û"; "ū"; "ū"; "ù"; "ù"; "ú"; "ú"; "ŭ"; "ŭ"; "ü"; "ü"], Vowel) ;
-    (["ỹ"; "ỹ"; "ŷ"; "ŷ"; "ỳ"; "ỳ"; "ý"; "ý"; "ÿ"; "ÿ"], Vowel) ;
-    (["ẑ"; "ẑ"; "ź"; "ź"; "z̆"; "ž"; "ž"], Consonant) ;
-    (["ẞ"; "ß"], Consonant) ;
-    (["⁰"], Number) ;
-    (["¹"], Number) ;
-    (["²"], Number) ;
-    (["³"], Number) ;
-    (["⁴"], Number) ;
-    (["⁵"], Number) ;
-    (["⁶"], Number) ;
-    (["⁷"], Number) ;
-    (["⁸"], Number) ;
-    (["⁹"], Number) ;
-    (["¿"], Punctuation) ;
-    (["¡"], Punctuation) ;
-    (["ª"], Vowel) ;
-    (["º"], Vowel) ;
-    (["fi"], OtherLetter) ;
-    (["fl"], OtherLetter) ;
-    (["°"], OtherKind) ;
-    (["–"; "֊"; "־"; "᠆"; "‑"; "‒"; "−"; "﹣"], Punctuation) ;
-    (["—"; "﹘"], Punctuation) ;
-    (["🄯"; "(ɔ)"], OtherKind) ;
-    (["->"; "→"; "🡒"; "⟶"; "➙"; "➛"; "➜"; "➔"; "➝"; "➞"; "➺"; "➻"; "⭢"; "🠂"; "🠆"; "🠊"; "🠢"; "🠦"; "🠪"; "🠒"; "🠖"; "🡢"; "🡪"; "🡲"; "➤"; "⮞"; "➢"; "➣"; "⮚"; "🠺"], OtherKind) ;
-    (["<-"; "←"; "🡐"; "⟵"; "⭠"; "🠀"; "🠄"; "🠈"; "🠠"; "🠤"; "🠨"; "🠐"; "🠔"; "🡠"; "🡨"; "🡰"; "⮜"; "⮘"; "🠸"], OtherKind) ;
-    (["↑"; "🡑"; "⭡"; "🠁"; "🠅"; "🠉"; "🠡"; "🠥"; "🠩"; "🠑"; "🠕"; "🡡"; "🡩"; "🡱"; "⮝"; "⮙"; "🠹"], OtherKind) ;
-    (["↓"; "🡓"; "⭣"; "🠃"; "🠇"; "🠋"; "🠣"; "🠧"; "🠫"; "🠓"; "🠗"; "🡣"; "🡫"; "🡳"; "⮟"; "⮛"; "🠻"], OtherKind) ;
-    (["Ą"; "Ą"], Vowel) ;
-    (["ą"; "ą"], Vowel) ;
-    (["Ç"; "Ç"], Consonant) ;
-    (["ç"; "ç"], Consonant) ;
-    (["Ę"; "Ę"], Vowel) ;
-    (["ę"; "ę"], Vowel) ;
-    (["Į"; "Į"], Vowel) ;
-    (["į"; "į"], Vowel) ;
-    (["Ș"; "Ș"; "Ş"; "Ş"], Consonant) ;
-    (["ș"; "ș"; "ş"; "ş"], Consonant) ;
-    (["Ț"; "Ț"; "Ţ"; "Ţ"], Consonant) ;
-    (["ț"; "ț"; "ţ"; "ţ"], Consonant) ;
-    (["Ų"; "Ų"], Vowel) ;
-    (["ų"; "ų"], Vowel) ;
-    (["Z̦"; "Z̧"], Consonant) ;
-    (["z̦"; "z̧"], Consonant) ;
-    (["¬"], OtherKind) ;
-    (["‘"; "‛"], Punctuation) ;
-    (["’"], Punctuation) ;
-    (["‚"], Punctuation) ;
-    (["«"], Punctuation) ;
-    (["»"], Punctuation) ;
-    (["“"; "‟"], Punctuation) ;
-    (["”"], Punctuation) ;
-    (["„"], Punctuation) ;
-    (["·"; "·"; "⸱"; "ꞏ"; "・"; "᛫"; "⋅"], Punctuation) ;
-    (["⚠︎"; "⚠️"; "⚠"], OtherKind) ;
-    (["✴"; "✷"; "✵"], OtherKind) ;
-    (["Æ"], Vowel) ;
-    (["æ"], Vowel) ;
-    (["Œ"], Vowel) ;
-    (["œ"], Vowel) ;
-    (["Ø"], Vowel) ;
-    (["ø"], Vowel) ;
-    (["…"], Vowel) ;
-    (["Ł"], Consonant) ;
-    (["ł"], Consonant) ;
-    (["Ė"; "Ė"], Vowel) ;
-    (["ė"; "ė"], Vowel) ;
-    (["Ċ"; "Ċ"], Consonant) ;
-    (["ċ"; "ċ"], Consonant) ;
-    (["Ż"; "Ż"], Consonant) ;
-    (["ż"; "ż"], Consonant) ;
-    (["Ɣ"], Consonant) ;
-    (["ɣ"], Consonant) ;
-    (["Ɛ"], Vowel) ;
-    (["ɛ"], Vowel) ;
-    (["Đ"], Consonant) ;
-    (["đ"], Consonant) ;
-    (["Ḍ"; "Ḍ"], Consonant) ;
-    (["ḍ"; "ḍ"], Consonant) ;
-    (["Ḥ"; "Ḥ"], Consonant) ;
-    (["ḥ"; "ḥ"], Consonant) ;
-    (["Ṛ"; "Ṛ"], Consonant) ;
-    (["ṛ"; "ṛ"], Consonant) ;
-    (["Ṣ"; "Ṣ"], Consonant) ;
-    (["ṣ"; "ṣ"], Consonant) ;
-    (["Ṭ"; "Ṭ"], Consonant) ;
-    (["ṭ"; "ṭ"], Consonant) ;
-    (["Ẓ"; "Ẓ"], Consonant) ;
-    (["ẓ"; "ẓ"], Consonant) ;
-    (["♡"; "♥"; "❤"; "💓"; "💖"; "💗"; "💝"], OtherKind)
+    ([" "; " " (* Non-breaking space *); "\t"], OtherKind, 1) ;
+    (["!"], Punctuation, 1) ;
+    (["\""], Punctuation, 1) ;
+    (["#"], OtherKind, 1) ;
+    (["$"], OtherKind, 1) ;
+    (["%"], OtherKind, 1) ;
+    (["&"], OtherKind, 1) ;
+    (["'"; "ʹ"; "ʹ"], Punctuation, 1) ;
+    (["("], Punctuation, 1) ;
+    ([")"], Punctuation, 1) ;
+    (["*"], OtherKind, 1) ;
+    (["+"], OtherKind, 1) ;
+    ([","], Punctuation, 1) ;
+    (["-"], OtherKind, 1) ;
+    (["."], Punctuation, 1) ;
+    (["/"], OtherKind, 1) ;
+    (["0"], Number, 1) ;
+    (["1"], Number, 1) ;
+    (["2"], Number, 1) ;
+    (["3"], Number, 1) ;
+    (["4"], Number, 1) ;
+    (["5"], Number, 1) ;
+    (["6"], Number, 1) ;
+    (["7"], Number, 1) ;
+    (["8"], Number, 1) ;
+    (["9"], Number, 1) ;
+    ([":"], Punctuation, 1) ;
+    ([";"; ";"], Punctuation, 1) ;
+    (["<"], OtherKind, 1) ;
+    (["="], OtherKind, 1) ;
+    ([">"], OtherKind, 1) ;
+    (["?"], Punctuation, 1) ;
+    (["@"], OtherKind, 1) ;
+    (["A"; "Α"], Vowel, 1) ;
+    (["B"; "Β"], Consonant, 1) ;
+    (["C"], Consonant, 1) ;
+    (["D"], Consonant, 1) ;
+    (["E"; "Ε"], Vowel, 1) ;
+    (["F"], Consonant, 1) ;
+    (["G"], Consonant, 1) ;
+    (["H"; "Η" (* Technically this is a greek vowel. *)], Consonant, 1) ;
+    (["I"; "Ι"], Vowel, 1) ;
+    (["J"], Consonant, 1) ;
+    (["K"; "Κ"], Consonant, 1) ;
+    (["L"], Consonant, 1) ;
+    (["M"; "Μ"], Consonant, 1) ;
+    (["N"; "Ν"], Consonant, 1) ;
+    (["O"; "Ο"], Vowel, 1) ;
+    (["P"; "Ρ"], Consonant, 1) ;
+    (["Q"], Consonant, 1) ;
+    (["R"], Consonant, 1) ;
+    (["S"], Consonant, 1) ;
+    (["T"; "Τ"], Consonant, 1) ;
+    (["U"], Vowel, 1) ;
+    (["V"], Consonant, 1) ;
+    (["W"], Consonant, 1) ;
+    (["X"; "Χ"], Consonant, 1) ;
+    (["Y"; "Υ"], Vowel, 1) ;
+    (["Z"; "Ζ"], Consonant, 1) ;
+    (["["], OtherKind, 1) ;
+    (["\\"], OtherKind, 1) ;
+    (["]"], OtherKind, 1) ;
+    (["^"], OtherKind, 1) ;
+    (["_"], OtherKind, 1) ;
+    (["`"], Punctuation, 1) ;
+    (["a"], Vowel, 1) ;
+    (["b"], Consonant, 1) ;
+    (["c"], Consonant, 1) ;
+    (["d"], Consonant, 1) ;
+    (["e"], Vowel, 1) ;
+    (["f"], Consonant, 1) ;
+    (["g"], Consonant, 1) ;
+    (["h"], Consonant, 1) ;
+    (["i"], Vowel, 1) ;
+    (["j"], Consonant, 1) ;
+    (["k"], Consonant, 1) ;
+    (["l"], Consonant, 1) ;
+    (["m"], Consonant, 1) ;
+    (["n"], Consonant, 1) ;
+    (["o"; "ο"], Vowel, 1) ;
+    (["p"], Consonant, 1) ;
+    (["q"], Consonant, 1) ;
+    (["r"], Consonant, 1) ;
+    (["s"], Consonant, 1) ;
+    (["t"], Consonant, 1) ;
+    (["u"], Vowel, 1) ;
+    (["v"], Consonant, 1) ;
+    (["w"], Consonant, 1) ;
+    (["x"], Consonant, 1) ;
+    (["y"], Vowel, 1) ;
+    (["z"], Consonant, 1) ;
+    (["{"], OtherKind, 1) ;
+    (["|"], OtherKind, 1) ;
+    (["}"], OtherKind, 1) ;
+    (["~"], OtherKind, 1) ;
+    (["Ã"; "Ã"; "Â"; "Â"; "Ā"; "Ā"; "À"; "À"; "Á"; "Á"; "Ă"; "Ă"; "Ǎ"; "Ǎ"; "Ä"; "Ä"], Vowel, 1) ;
+    (["Ĉ"; "Ĉ"; "Ć"; "Ć"; "Č"; "Č"], Consonant, 1) ;
+    (["Ẽ"; "Ẽ"; "Ê"; "Ê"; "Ē"; "Ē"; "È"; "È"; "É"; "É"; "Ě"; "Ě"; "Ë"; "Ë"], Vowel, 1) ;
+    (["Ĝ"; "Ĝ"; "Ǵ"; "Ǵ"; "Ğ"; "Ğ"; "Ǧ"; "Ǧ"], Consonant, 1) ;
+    (["Ĥ"; "Ĥ"], Consonant, 1) ;
+    (["Ĩ"; "Ĩ"; "Î"; "Î"; "Ī"; "Ī"; "Ì"; "Ì"; "Í"; "Í"; "Ĭ"; "Ĭ"; "Ï"; "Ï"], Vowel, 1) ;
+    (["Ĵ"; "Ĵ"; "J́"], Consonant, 1) ;
+    (["Ñ"; "Ñ"; "Ǹ"; "Ǹ"; "Ń"; "Ń"], Consonant, 1) ;
+    (["Õ"; "Õ"; "Ô"; "Ô"; "Ō"; "Ō"; "Ò"; "Ò"; "Ó"; "Ó"; "Ŏ"; "Ŏ"; "Ǒ"; "Ǒ"; "Ö"; "Ö"], Vowel, 1) ;
+    (["Ŝ"; "Ŝ"; "Ś"; "Ś"; "Š"; "Š"], Consonant, 1) ;
+    (["Ũ"; "Ũ"; "Û"; "Û"; "Ū"; "Ū"; "Ù"; "Ù"; "Ú"; "Ú"; "Ŭ"; "Ŭ"; "Ü"; "Ü"], Vowel, 1) ;
+    (["Ỹ"; "Ỹ"; "Ŷ"; "Ŷ"; "Ỳ"; "Ỳ"; "Ý"; "Ý"; "Ÿ"; "Ÿ"], Vowel, 1) ;
+    (["Ẑ"; "Ẑ"; "Ź"; "Ź"; "Z̆"; "Ž"; "Ž"], Consonant, 1) ;
+    (["ã"; "ã"; "â"; "â"; "ā"; "ā"; "à"; "à"; "á"; "á"; "ă"; "ă"; "ǎ"; "ǎ"; "ä"; "ä"], Vowel, 1) ;
+    (["ĉ"; "ĉ"; "ć"; "ć"; "č"; "č"], Consonant, 1) ;
+    (["ẽ"; "ẽ"; "ê"; "ê"; "ē"; "ē"; "è"; "è"; "é"; "é"; "ě"; "ě"; "ë"; "ë"], Vowel, 1) ;
+    (["ĝ"; "ĝ"; "ǵ"; "ǵ"; "ğ"; "ğ"; "ǧ"; "ǧ"], Consonant, 1) ;
+    (["ĥ"; "ĥ"], Consonant, 1) ;
+    (["ĩ"; "ĩ"; "i̇̃"; "î"; "î"; "ī"; "ī"; "ì"; "ì"; "i̇̀"; "í"; "í"; "i̇́"; "ĭ"; "ĭ"; "ï"; "ï"], Vowel, 1) ;
+    (["ĵ"; "ĵ"; "j́"], Consonant, 1) ;
+    (["ñ"; "ñ"; "ǹ"; "ǹ"; "ń"; "ń"], Consonant, 1) ;
+    (["õ"; "õ"; "ô"; "ô"; "ō"; "ō"; "ò"; "ò"; "ó"; "ó"; "ŏ"; "ŏ"; "ǒ"; "ǒ"; "ö"; "ö"], Vowel, 1) ;
+    (["ŝ"; "ŝ"; "ś"; "ś"; "š"; "š"], Consonant, 1) ;
+    (["ũ"; "ũ"; "û"; "û"; "ū"; "ū"; "ù"; "ù"; "ú"; "ú"; "ŭ"; "ŭ"; "ü"; "ü"], Vowel, 1) ;
+    (["ỹ"; "ỹ"; "ŷ"; "ŷ"; "ỳ"; "ỳ"; "ý"; "ý"; "ÿ"; "ÿ"], Vowel, 1) ;
+    (["ẑ"; "ẑ"; "ź"; "ź"; "z̆"; "ž"; "ž"], Consonant, 1) ;
+    (["ẞ"; "ß"], Consonant, 1) ;
+    (["⁰"], Number, 1) ;
+    (["¹"], Number, 1) ;
+    (["²"], Number, 1) ;
+    (["³"], Number, 1) ;
+    (["⁴"], Number, 1) ;
+    (["⁵"], Number, 1) ;
+    (["⁶"], Number, 1) ;
+    (["⁷"], Number, 1) ;
+    (["⁸"], Number, 1) ;
+    (["⁹"], Number, 1) ;
+    (["¿"], Punctuation, 1) ;
+    (["¡"], Punctuation, 1) ;
+    (["ª"], Vowel, 1) ;
+    (["º"], Vowel, 1) ;
+    (["fi"], OtherLetter, 1) ;
+    (["fl"], OtherLetter, 1) ;
+    (["°"], OtherKind, 1) ;
+    (["–"; "֊"; "־"; "᠆"; "‑"; "‒"; "−"; "﹣"], Punctuation, 1) ;
+    (["—"; "﹘"], Punctuation, 1) ;
+    (["🄯"; "(ɔ)"], OtherKind, 1) ;
+    (["->"; "→"; "🡒"; "⟶"; "➙"; "➛"; "➜"; "➔"; "➝"; "➞"; "➺"; "➻"; "⭢"; "🠂"; "🠆"; "🠊"; "🠢"; "🠦"; "🠪"; "🠒"; "🠖"; "🡢"; "🡪"; "🡲"; "➤"; "⮞"; "➢"; "➣"; "⮚"; "🠺"], OtherKind, 1) ;
+    (["<-"; "←"; "🡐"; "⟵"; "⭠"; "🠀"; "🠄"; "🠈"; "🠠"; "🠤"; "🠨"; "🠐"; "🠔"; "🡠"; "🡨"; "🡰"; "⮜"; "⮘"; "🠸"], OtherKind, 1) ;
+    (["↑"; "🡑"; "⭡"; "🠁"; "🠅"; "🠉"; "🠡"; "🠥"; "🠩"; "🠑"; "🠕"; "🡡"; "🡩"; "🡱"; "⮝"; "⮙"; "🠹"], OtherKind, 1) ;
+    (["↓"; "🡓"; "⭣"; "🠃"; "🠇"; "🠋"; "🠣"; "🠧"; "🠫"; "🠓"; "🠗"; "🡣"; "🡫"; "🡳"; "⮟"; "⮛"; "🠻"], OtherKind, 1) ;
+    (["Ą"; "Ą"], Vowel, 1) ;
+    (["ą"; "ą"], Vowel, 1) ;
+    (["Ç"; "Ç"], Consonant, 1) ;
+    (["ç"; "ç"], Consonant, 1) ;
+    (["Ę"; "Ę"], Vowel, 1) ;
+    (["ę"; "ę"], Vowel, 1) ;
+    (["Į"; "Į"], Vowel, 1) ;
+    (["į"; "į"], Vowel, 1) ;
+    (["Ș"; "Ș"; "Ş"; "Ş"], Consonant, 1) ;
+    (["ș"; "ș"; "ş"; "ş"], Consonant, 1) ;
+    (["Ț"; "Ț"; "Ţ"; "Ţ"], Consonant, 1) ;
+    (["ț"; "ț"; "ţ"; "ţ"], Consonant, 1) ;
+    (["Ų"; "Ų"], Vowel, 1) ;
+    (["ų"; "ų"], Vowel, 1) ;
+    (["Z̦"; "Z̧"], Consonant, 1) ;
+    (["z̦"; "z̧"], Consonant, 1) ;
+    (["¬"], OtherKind, 1) ;
+    (["‘"; "‛"], Punctuation, 1) ;
+    (["’"], Punctuation, 1) ;
+    (["‚"], Punctuation, 1) ;
+    (["«"], Punctuation, 1) ;
+    (["»"], Punctuation, 1) ;
+    (["“"; "‟"], Punctuation, 1) ;
+    (["”"], Punctuation, 1) ;
+    (["„"], Punctuation, 1) ;
+    (["·"; "·"; "⸱"; "ꞏ"; "・"; "᛫"; "⋅"], Punctuation, 1) ;
+    (["⚠︎"; "⚠️"; "⚠"], OtherKind, 1) ;
+    (["✴"; "✷"; "✵"], OtherKind, 1) ;
+    (["Æ"], Vowel, 1) ;
+    (["æ"], Vowel, 1) ;
+    (["Œ"], Vowel, 1) ;
+    (["œ"], Vowel, 1) ;
+    (["Ø"], Vowel, 1) ;
+    (["ø"], Vowel, 1) ;
+    (["…"], Vowel, 1) ;
+    (["Ł"], Consonant, 1) ;
+    (["ł"], Consonant, 1) ;
+    (["Ė"; "Ė"], Vowel, 1) ;
+    (["ė"; "ė"], Vowel, 1) ;
+    (["Ċ"; "Ċ"], Consonant, 1) ;
+    (["ċ"; "ċ"], Consonant, 1) ;
+    (["Ż"; "Ż"], Consonant, 1) ;
+    (["ż"; "ż"], Consonant, 1) ;
+    (["Ɣ"], Consonant, 1) ;
+    (["ɣ"], Consonant, 1) ;
+    (["Ɛ"], Vowel, 1) ;
+    (["ɛ"], Vowel, 1) ;
+    (["Đ"], Consonant, 1) ;
+    (["đ"], Consonant, 1) ;
+    (["Ḍ"; "Ḍ"], Consonant, 1) ;
+    (["ḍ"; "ḍ"], Consonant, 1) ;
+    (["Ḥ"; "Ḥ"], Consonant, 1) ;
+    (["ḥ"; "ḥ"], Consonant, 1) ;
+    (["Ṛ"; "Ṛ"], Consonant, 1) ;
+    (["ṛ"; "ṛ"], Consonant, 1) ;
+    (["Ṣ"; "Ṣ"], Consonant, 1) ;
+    (["ṣ"; "ṣ"], Consonant, 1) ;
+    (["Ṭ"; "Ṭ"], Consonant, 1) ;
+    (["ṭ"; "ṭ"], Consonant, 1) ;
+    (["Ẓ"; "Ẓ"], Consonant, 1) ;
+    (["ẓ"; "ẓ"], Consonant, 1) ;
+    (["♡"; "♥"; "❤"; "💓"; "💖"; "💗"; "💝"], OtherKind, 1)
   ]
 
 (* The data of all images, including ligatures, and so on. *)
@@ -296,28 +296,38 @@ let characters =
   (* We remove the special unknown character from the character images. *)
   let extended_characters_imgs = List.tl extended_characters_imgs in
   let l =
-    List.map2 (fun img (strl, kind) -> (strl, img, kind))
-      (ascii_imgs @ extended_characters_imgs) character_data in
+    let rec aux acc imgs = function
+      | [] -> assert (imgs = []) ; acc
+      | (chars, kind, nb) :: l ->
+        assert (nb > 0) ;
+        let rec extract acc imgs nb =
+          match imgs, nb with
+          | imgs, 0 -> (List.rev acc, imgs)
+          | img :: imgs, nb -> extract (img :: acc) imgs (nb - 1)
+          | _ -> assert false in
+        let (current_imgs, imgs) = extract [] imgs nb in
+        aux ((chars, current_imgs, kind) :: acc) imgs l in
+    aux [] (ascii_imgs @ extended_characters_imgs) character_data in
   let characters =
-    List.fold_left (fun substrings (strl, img, kind) ->
+    List.fold_left (fun substrings (strl, imgs, kind) ->
         List.fold_left (fun substrings str ->
-          (add_substring substrings str (img, kind))) substrings strl)
+          (add_substring substrings str (imgs, kind))) substrings strl)
       (NoSubstring None) (
-        (["\n"; "\r"; "\r\n"; "\n\r"], empty_img, Newline)
-        :: (["​"] (* Zero-width space *), empty_img, OtherKind)
+        (["\n"; "\r"; "\r\n"; "\n\r"], [empty_img], Newline)
+        :: (["​"] (* Zero-width space *), [empty_img], OtherKind)
         :: l) in
   match characters with
   | SubstringData (data, None) ->
     (* We add a default unknown character to the base cases. *)
     SubstringData (Array.map (function
       | (NoSubstring None | SubstringData (_, None)) as d ->
-        add_accepted (unknown_img, OtherKind) d
+        add_accepted ([unknown_img], OtherKind) d
       | a -> a) data, None)
   | _ -> assert false
 
 (* Split a string into a list of lexemes, with their string (with one Unicode character),
   image, and kind. *)
-let split_characters : string -> (string * Subimage.t * kind) list =
+let split_characters : string -> (string * Subimage.t list * kind) list =
   let rec aux acc str =
     if String.length str = 0 then List.rev acc
     else
@@ -332,7 +342,7 @@ let split_characters : string -> (string * Subimage.t * kind) list =
 (* The image of an hyphen. *)
 let hyphen_img =
   match split_characters "-" with
-  | [("-", img, OtherKind)] -> img
+  | [("-", [img], OtherKind)] -> img
   | _ -> assert false
 
 (* The width of an hyphen, in pixels. *)
@@ -352,7 +362,7 @@ let _is_suffix suf str =
 
 (* Compute some kind of “optimal” kerning between two images.
   Exceptions can be declared with the [set_kerning] function below. *)
-let compute_kerning img1 img2 =
+let compute_kerning_single_images img1 img2 =
   assert (height = snd (Subimage.dimensions img1)) ;
   assert (height = snd (Subimage.dimensions img2)) ;
   let width1 = fst (Subimage.dimensions img1) in
@@ -467,34 +477,53 @@ let compute_kerning img1 img2 =
         ) in
       aux candidate
     )
-    (* TODO FIXME: Consider alternative character graphs. *)
 
-module StringPairMap =
+(* Compute the “optimal” kerning between two characters with their alternative graphs.
+  It returns the chosen image for the first character, the list of compatible images for
+  the second character, and the actual kerning. *)
+let compute_kerning imgs1 imgs2 =
+  assert (imgs1 <> []) ;
+  assert (imgs2 <> []) ;
+  List.fold_left (fun current img1 ->
+    List.fold_left (fun (current_img1, current_imgs2, current_v) img2 ->
+      let v = compute_kerning_single_images img1 img2 in
+      if v < current_v then (img1, [img2], v)
+      else if v = current_v && img1 == current_img1 then
+        (current_img1, img2 :: current_imgs2, current_v)
+      else (current_img1, current_imgs2, current_v)) current (List.rev imgs2)) (unknown_img, imgs2, 2) imgs1
+
+module PairMap =
   Map.Make (struct
-    type t = Subimage.t * Subimage.t
+    type t = Subimage.t list * Subimage.t list
     let compare = compare
   end)
 
+let kernings = ref PairMap.empty
 
-let kernings = ref StringPairMap.empty
+(* Raw function to memoise [compute_kerning]. *)
+let set_kerning imgs1 imgs2 (img1, imgs2', v) =
+  kernings := PairMap.add (imgs1, imgs2) (img1, imgs2', v) !kernings
 
-let set_kerning img1 img2 v =
-  kernings := StringPairMap.add (img1, img2) v !kernings
-
-let get_kerning img1 img2 =
-  match StringPairMap.find_opt (img1, img2) !kernings with
+(* Memoise the [compute_kerning] function. *)
+let get_kerning imgs1 imgs2 =
+  match PairMap.find_opt (imgs1, imgs2) !kernings with
   | Some v -> v
   | None ->
-    let v = compute_kerning img1 img2 in
-    set_kerning img1 img2 v ;
+    let v = compute_kerning imgs1 imgs2 in
+    set_kerning imgs1 imgs2 v ;
     v
 
+(* This function overwrites the computed kerning between two characters. *)
 let set_kerning_str str1 str2 v =
-  let get_img str =
+  let get_imgs str =
     match search_string characters str with
     | None -> assert false
-    | Some (_, (img, _)) -> img in
-  set_kerning (get_img str1) (get_img str2) v
+    | Some (_, (imgs, _)) ->
+      assert (imgs <> []) ;
+      imgs in
+  let imgs1 = get_imgs str1 in
+  let imgs2 = get_imgs str2 in
+  set_kerning imgs1 imgs2 (List.hd imgs1, imgs2, v)
 
 let () = (* TODO: Define this as a ligature. *)
   set_kerning_str "t" "t" 0
@@ -513,18 +542,22 @@ let parse str : (Subimage.t * int * breakline) option list =
   let rec aux acc = function
     | [] -> List.rev acc
     | (_, _, Newline) :: l -> aux (None :: acc) l
-    | (" ", img, _) :: l -> aux (Some (img, 0, BreakRemove) :: acc) l
-    | [("-", img, _)] -> aux (Some (img, 1, BreakSimple) :: acc) []
-    | ("-", img1, _) :: ((_, img2, _) :: _ as l) ->
-      aux (Some (img1, get_kerning img1 img2, BreakSimple) :: acc) l
-    | (_, img1, Consonant) :: ((_, img2, Consonant) :: (_, _, (Consonant | Vowel)) :: (_, _, (Consonant | Vowel)) :: _ as l) ->
-      aux (Some (img1, get_kerning img1 img2, BreakHyphen) :: acc) l
-    | (_, img1, Vowel) :: ((_, img2, Consonant) :: (_, _, (Consonant | Vowel)) :: (_, _, (Consonant | Vowel)) :: _ as l) ->
+    | (" ", imgs, _) :: l -> aux (Some (List.hd imgs, 0, BreakRemove) :: acc) l
+    | [("-", imgs, _)] -> aux (Some (List.hd imgs, 1, BreakSimple) :: acc) []
+    | ("-", imgs1, _) :: (str2, imgs2, kind2) :: l ->
+      let (img1, imgs2, v) = get_kerning imgs1 imgs2 in
+      aux (Some (img1, v, BreakSimple) :: acc) ((str2, imgs2, kind2) :: l)
+    | (_, imgs1, Consonant) :: (str2, imgs2, Consonant) :: ((_, _, (Consonant | Vowel)) :: (_, _, (Consonant | Vowel)) :: _ as l) ->
+      let (img1, imgs2, v) = get_kerning imgs1 imgs2 in
+      aux (Some (img1, v, BreakHyphen) :: acc) ((str2, imgs2, Consonant) :: l)
+    | (_, imgs1, Vowel) :: (str2, imgs2, Consonant) :: ((_, _, (Consonant | Vowel)) :: (_, _, (Consonant | Vowel)) :: _ as l) ->
       (* This rule is not always correct, but should be good enough in this context. *)
-      aux (Some (img1, get_kerning img1 img2, BreakHyphen) :: acc) l
-    | (_, img1, _) :: ((_, img2, _) :: _ as l) ->
-      aux (Some (img1, get_kerning img1 img2, NoBreak) :: acc) l
-    | [(_, img, _)] -> aux (Some (img, 0, NoBreak) :: acc) [] in
+      let (img1, imgs2, v) = get_kerning imgs1 imgs2 in
+      aux (Some (img1, v, BreakHyphen) :: acc) ((str2, imgs2, Consonant) :: l)
+    | (_, imgs1, _) :: (str2, imgs2, kind2) :: l ->
+      let (img1, imgs2, v) = get_kerning imgs1 imgs2 in
+      aux (Some (img1, v, NoBreak) :: acc) ((str2, imgs2, kind2) :: l)
+    | [(_, imgs, _)] -> aux (Some (List.hd imgs, 0, NoBreak) :: acc) [] in
   aux [] (split_characters str)
 
 (* We define a small monad for the rendering.
@@ -609,7 +642,7 @@ let break_line_modifications (img, offset, break) : (Subimage.t * int * breaklin
   | NoBreak -> return None
   | BreakRemove -> return (Some [])
   | BreakHyphen ->
-    let k = get_kerning img hyphen_img in
+    let (_, _, k) = get_kerning [img] [hyphen_img] in
     return (Some [(img, k, break) ; (hyphen_img, 1, BreakSimple)])
   | BreakSimple -> return (Some [(img, offset, break)])
 
