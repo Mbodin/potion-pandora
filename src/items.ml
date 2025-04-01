@@ -917,7 +917,9 @@ let bouton_menu_lignes = from Images_coords.boutons 12
 (* * Characters *)
 
 let ascii = fromlist Images_coords.ascii
-let extended_characters = fromlist Images_coords.caracteres
+let diacritiques = fromlist Images_coords.diacritiques
+let symboles = fromlist Images_coords.symboles
+let ligatures = fromlist Images_coords.ligatures
 
 let valider = from Images_coords.grosse_fleche
 

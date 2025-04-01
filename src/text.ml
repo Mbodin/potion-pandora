@@ -1,10 +1,12 @@
 
 (* Raw images of characters. *)
 let ascii_imgs = Items.ascii
-let extended_characters_imgs = Items.extended_characters
+let diacritics_imgs = Items.diacritiques
+let symbols_imgs = Items.symboles
+let ligatures_imgs = Items.ligatures
 
 (* The unknown character replacement “�”. *)
-let unknown_img = List.hd extended_characters_imgs
+let unknown_img = List.hd symbols_imgs
 
 (* We assume that all character have the same height (possibly with transparent pixels). *)
 let height = snd (Subimage.dimensions unknown_img)
@@ -81,6 +83,7 @@ type kind =
 
 (* LATER: Encode and compress this list. *)
 let character_data = [
+    (* ASCII *)
     ([" "; " " (* Non-breaking space *); "\t"], OtherKind, 1) ;
     (["!"], Punctuation, 1) ;
     (["\""], Punctuation, 1) ;
@@ -176,57 +179,51 @@ let character_data = [
     (["|"], OtherKind, 1) ;
     (["}"], OtherKind, 1) ;
     (["~"], OtherKind, 1) ;
-    (["Ã"; "Ã"; "Â"; "Â"; "Ā"; "Ā"; "À"; "À"; "Á"; "Á"; "Ă"; "Ă"; "Ǎ"; "Ǎ"; "Ä"; "Ä"], Vowel, 1) ;
+    (* Diacritics *)
+    (["Ã"; "Ã"; "Â"; "Â"; "Ā"; "Ā"; "À"; "À"; "Á"; "Á"; "Ă"; "Ă"; "Ǎ"; "Ǎ"], Vowel, 1) ;
     (["Ĉ"; "Ĉ"; "Ć"; "Ć"; "Č"; "Č"], Consonant, 1) ;
-    (["Ẽ"; "Ẽ"; "Ê"; "Ê"; "Ē"; "Ē"; "È"; "È"; "É"; "É"; "Ě"; "Ě"; "Ë"; "Ë"], Vowel, 1) ;
+    (["Ẽ"; "Ẽ"; "Ê"; "Ê"; "Ē"; "Ē"; "È"; "È"; "É"; "É"; "Ě"; "Ě"], Vowel, 1) ;
     (["Ĝ"; "Ĝ"; "Ǵ"; "Ǵ"; "Ğ"; "Ğ"; "Ǧ"; "Ǧ"], Consonant, 1) ;
     (["Ĥ"; "Ĥ"], Consonant, 1) ;
-    (["Ĩ"; "Ĩ"; "Î"; "Î"; "Ī"; "Ī"; "Ì"; "Ì"; "Í"; "Í"; "Ĭ"; "Ĭ"; "Ï"; "Ï"], Vowel, 1) ;
+    (["Ĩ"; "Ĩ"; "Î"; "Î"; "Ī"; "Ī"; "Ì"; "Ì"; "Í"; "Í"; "Ĭ"; "Ĭ"], Vowel, 1) ;
     (["Ĵ"; "Ĵ"; "J́"], Consonant, 1) ;
     (["Ñ"; "Ñ"; "Ǹ"; "Ǹ"; "Ń"; "Ń"], Consonant, 1) ;
-    (["Õ"; "Õ"; "Ô"; "Ô"; "Ō"; "Ō"; "Ò"; "Ò"; "Ó"; "Ó"; "Ŏ"; "Ŏ"; "Ǒ"; "Ǒ"; "Ö"; "Ö"], Vowel, 1) ;
+    (["Õ"; "Õ"; "Ô"; "Ô"; "Ō"; "Ō"; "Ò"; "Ò"; "Ó"; "Ó"; "Ŏ"; "Ŏ"; "Ǒ"; "Ǒ"], Vowel, 1) ;
     (["Ŝ"; "Ŝ"; "Ś"; "Ś"; "Š"; "Š"], Consonant, 1) ;
-    (["Ũ"; "Ũ"; "Û"; "Û"; "Ū"; "Ū"; "Ù"; "Ù"; "Ú"; "Ú"; "Ŭ"; "Ŭ"; "Ü"; "Ü"], Vowel, 1) ;
-    (["Ỹ"; "Ỹ"; "Ŷ"; "Ŷ"; "Ỳ"; "Ỳ"; "Ý"; "Ý"; "Ÿ"; "Ÿ"], Vowel, 1) ;
+    (["Ũ"; "Ũ"; "Û"; "Û"; "Ū"; "Ū"; "Ù"; "Ù"; "Ú"; "Ú"; "Ŭ"; "Ŭ"], Vowel, 1) ;
+    (["Ỹ"; "Ỹ"; "Ŷ"; "Ŷ"; "Ỳ"; "Ỳ"; "Ý"; "Ý"], Vowel, 1) ;
     (["Ẑ"; "Ẑ"; "Ź"; "Ź"; "Z̆"; "Ž"; "Ž"], Consonant, 1) ;
-    (["ã"; "ã"; "â"; "â"; "ā"; "ā"; "à"; "à"; "á"; "á"; "ă"; "ă"; "ǎ"; "ǎ"; "ä"; "ä"], Vowel, 1) ;
+    (["ã"; "ã"; "â"; "â"; "ā"; "ā"; "à"; "à"; "á"; "á"; "ă"; "ă"; "ǎ"; "ǎ"], Vowel, 1) ;
     (["ĉ"; "ĉ"; "ć"; "ć"; "č"; "č"], Consonant, 1) ;
-    (["ẽ"; "ẽ"; "ê"; "ê"; "ē"; "ē"; "è"; "è"; "é"; "é"; "ě"; "ě"; "ë"; "ë"], Vowel, 1) ;
+    (["ẽ"; "ẽ"; "ê"; "ê"; "ē"; "ē"; "è"; "è"; "é"; "é"; "ě"; "ě"], Vowel, 1) ;
     (["ĝ"; "ĝ"; "ǵ"; "ǵ"; "ğ"; "ğ"; "ǧ"; "ǧ"], Consonant, 1) ;
     (["ĥ"; "ĥ"], Consonant, 1) ;
-    (["ĩ"; "ĩ"; "i̇̃"; "î"; "î"; "ī"; "ī"; "ì"; "ì"; "i̇̀"; "í"; "í"; "i̇́"; "ĭ"; "ĭ"; "ï"; "ï"], Vowel, 1) ;
+    (["ĩ"; "ĩ"; "i̇̃"; "î"; "î"; "ī"; "ī"; "ì"; "ì"; "i̇̀"; "í"; "í"; "i̇́"; "ĭ"; "ĭ"], Vowel, 1) ;
     (["ĵ"; "ĵ"; "j́"], Consonant, 1) ;
     (["ñ"; "ñ"; "ǹ"; "ǹ"; "ń"; "ń"], Consonant, 1) ;
-    (["õ"; "õ"; "ô"; "ô"; "ō"; "ō"; "ò"; "ò"; "ó"; "ó"; "ŏ"; "ŏ"; "ǒ"; "ǒ"; "ö"; "ö"], Vowel, 1) ;
+    (["õ"; "õ"; "ô"; "ô"; "ō"; "ō"; "ò"; "ò"; "ó"; "ó"; "ŏ"; "ŏ"; "ǒ"; "ǒ"], Vowel, 1) ;
     (["ŝ"; "ŝ"; "ś"; "ś"; "š"; "š"], Consonant, 1) ;
-    (["ũ"; "ũ"; "û"; "û"; "ū"; "ū"; "ù"; "ù"; "ú"; "ú"; "ŭ"; "ŭ"; "ü"; "ü"], Vowel, 1) ;
-    (["ỹ"; "ỹ"; "ŷ"; "ŷ"; "ỳ"; "ỳ"; "ý"; "ý"; "ÿ"; "ÿ"], Vowel, 1) ;
+    (["ũ"; "ũ"; "û"; "û"; "ū"; "ū"; "ù"; "ù"; "ú"; "ú"; "ŭ"; "ŭ"], Vowel, 1) ;
+    (["ỹ"; "ỹ"; "ŷ"; "ŷ"; "ỳ"; "ỳ"; "ý"; "ý"], Vowel, 1) ;
     (["ẑ"; "ẑ"; "ź"; "ź"; "z̆"; "ž"; "ž"], Consonant, 1) ;
-    (["ẞ"; "ß"], Consonant, 1) ;
-    (["⁰"], Number, 1) ;
-    (["¹"], Number, 1) ;
-    (["²"], Number, 1) ;
-    (["³"], Number, 1) ;
-    (["⁴"], Number, 1) ;
-    (["⁵"], Number, 1) ;
-    (["⁶"], Number, 1) ;
-    (["⁷"], Number, 1) ;
-    (["⁸"], Number, 1) ;
-    (["⁹"], Number, 1) ;
-    (["¿"], Punctuation, 1) ;
-    (["¡"], Punctuation, 1) ;
-    (["ª"], Vowel, 1) ;
-    (["º"], Vowel, 1) ;
-    (["fi"], OtherLetter, 1) ;
-    (["fl"], OtherLetter, 1) ;
-    (["°"], OtherKind, 1) ;
-    (["–"; "֊"; "־"; "᠆"; "‑"; "‒"; "−"; "﹣"], Punctuation, 1) ;
-    (["—"; "﹘"], Punctuation, 1) ;
-    (["🄯"; "(ɔ)"], OtherKind, 1) ;
-    (["->"; "→"; "🡒"; "⟶"; "➙"; "➛"; "➜"; "➔"; "➝"; "➞"; "➺"; "➻"; "⭢"; "🠂"; "🠆"; "🠊"; "🠢"; "🠦"; "🠪"; "🠒"; "🠖"; "🡢"; "🡪"; "🡲"; "➤"; "⮞"; "➢"; "➣"; "⮚"; "🠺"], OtherKind, 1) ;
-    (["<-"; "←"; "🡐"; "⟵"; "⭠"; "🠀"; "🠄"; "🠈"; "🠠"; "🠤"; "🠨"; "🠐"; "🠔"; "🡠"; "🡨"; "🡰"; "⮜"; "⮘"; "🠸"], OtherKind, 1) ;
-    (["↑"; "🡑"; "⭡"; "🠁"; "🠅"; "🠉"; "🠡"; "🠥"; "🠩"; "🠑"; "🠕"; "🡡"; "🡩"; "🡱"; "⮝"; "⮙"; "🠹"], OtherKind, 1) ;
-    (["↓"; "🡓"; "⭣"; "🠃"; "🠇"; "🠋"; "🠣"; "🠧"; "🠫"; "🠓"; "🠗"; "🡣"; "🡫"; "🡳"; "⮟"; "⮛"; "🠻"], OtherKind, 1) ;
+    (["Ä"; "Ä"], Vowel, 1) ;
+    (["Ë"; "Ë"], Vowel, 1) ;
+    (["Ï"; "Ï"], Vowel, 1) ;
+    (["Ö"; "Ö"], Vowel, 1) ;
+    (["Ü"; "Ü"], Vowel, 1) ;
+    (["Ÿ"; "Ÿ"], Vowel, 1) ;
+    (["ä"; "ä"], Vowel, 1) ;
+    (["ë"; "ë"], Vowel, 1) ;
+    (["ï"; "ï"], Vowel, 1) ;
+    (["ö"; "ö"], Vowel, 1) ;
+    (["ü"; "ü"], Vowel, 1) ;
+    (["ÿ"; "ÿ"], Vowel, 1) ;
+    (["Ė"; "Ė"], Vowel, 1) ;
+    (["ė"; "ė"], Vowel, 1) ;
+    (["Ċ"; "Ċ"], Consonant, 1) ;
+    (["ċ"; "ċ"], Consonant, 1) ;
+    (["Ż"; "Ż"], Consonant, 1) ;
+    (["ż"; "ż"], Consonant, 1) ;
     (["Ą"; "Ą"], Vowel, 1) ;
     (["ą"; "ą"], Vowel, 1) ;
     (["Ç"; "Ç"], Consonant, 1) ;
@@ -243,6 +240,48 @@ let character_data = [
     (["ų"; "ų"], Vowel, 1) ;
     (["Z̦"; "Z̧"], Consonant, 1) ;
     (["z̦"; "z̧"], Consonant, 1) ;
+    (["Ḍ"; "Ḍ"], Consonant, 1) ;
+    (["ḍ"; "ḍ"], Consonant, 1) ;
+    (["Ḥ"; "Ḥ"], Consonant, 1) ;
+    (["ḥ"; "ḥ"], Consonant, 1) ;
+    (["Ṛ"; "Ṛ"], Consonant, 1) ;
+    (["ṛ"; "ṛ"], Consonant, 1) ;
+    (["Ṣ"; "Ṣ"], Consonant, 1) ;
+    (["ṣ"; "ṣ"], Consonant, 1) ;
+    (["Ṭ"; "Ṭ"], Consonant, 1) ;
+    (["ṭ"; "ṭ"], Consonant, 1) ;
+    (["Ẓ"; "Ẓ"], Consonant, 1) ;
+    (["ẓ"; "ẓ"], Consonant, 1) ;
+    (["Ł"], Consonant, 1) ;
+    (["ł"], Consonant, 1) ;
+    (["Đ"], Consonant, 1) ;
+    (["đ"], Consonant, 1) ;
+    (["Ø"], Vowel, 1) ;
+    (["ø"], Vowel, 1) ;
+    (* Symbols *)
+    (["ẞ"; "ß"], Consonant, 1) ;
+    (["⁰"], Number, 1) ;
+    (["¹"], Number, 1) ;
+    (["²"], Number, 1) ;
+    (["³"], Number, 1) ;
+    (["⁴"], Number, 1) ;
+    (["⁵"], Number, 1) ;
+    (["⁶"], Number, 1) ;
+    (["⁷"], Number, 1) ;
+    (["⁸"], Number, 1) ;
+    (["⁹"], Number, 1) ;
+    (["¿"], Punctuation, 1) ;
+    (["¡"], Punctuation, 1) ;
+    (["ª"], Vowel, 1) ;
+    (["º"], Vowel, 1) ;
+    (["°"], OtherKind, 1) ;
+    (["–"; "֊"; "־"; "᠆"; "‑"; "‒"; "−"; "﹣"], Punctuation, 1) ;
+    (["—"; "﹘"], Punctuation, 1) ;
+    (["🄯"; "(ɔ)"], OtherKind, 1) ;
+    (["->"; "→"; "🡒"; "⟶"; "➙"; "➛"; "➜"; "➔"; "➝"; "➞"; "➺"; "➻"; "⭢"; "🠂"; "🠆"; "🠊"; "🠢"; "🠦"; "🠪"; "🠒"; "🠖"; "🡢"; "🡪"; "🡲"; "➤"; "⮞"; "➢"; "➣"; "⮚"; "🠺"], OtherKind, 1) ;
+    (["<-"; "←"; "🡐"; "⟵"; "⭠"; "🠀"; "🠄"; "🠈"; "🠠"; "🠤"; "🠨"; "🠐"; "🠔"; "🡠"; "🡨"; "🡰"; "⮜"; "⮘"; "🠸"], OtherKind, 1) ;
+    (["↑"; "🡑"; "⭡"; "🠁"; "🠅"; "🠉"; "🠡"; "🠥"; "🠩"; "🠑"; "🠕"; "🡡"; "🡩"; "🡱"; "⮝"; "⮙"; "🠹"], OtherKind, 1) ;
+    (["↓"; "🡓"; "⭣"; "🠃"; "🠇"; "🠋"; "🠣"; "🠧"; "🠫"; "🠓"; "🠗"; "🡣"; "🡫"; "🡳"; "⮟"; "⮛"; "🠻"], OtherKind, 1) ;
     (["¬"], OtherKind, 1) ;
     (["‘"; "‛"], Punctuation, 1) ;
     (["’"], Punctuation, 1) ;
@@ -259,42 +298,35 @@ let character_data = [
     (["æ"], Vowel, 1) ;
     (["Œ"], Vowel, 1) ;
     (["œ"], Vowel, 1) ;
-    (["Ø"], Vowel, 1) ;
-    (["ø"], Vowel, 1) ;
     (["…"], Vowel, 1) ;
-    (["Ł"], Consonant, 1) ;
-    (["ł"], Consonant, 1) ;
-    (["Ė"; "Ė"], Vowel, 1) ;
-    (["ė"; "ė"], Vowel, 1) ;
-    (["Ċ"; "Ċ"], Consonant, 1) ;
-    (["ċ"; "ċ"], Consonant, 1) ;
-    (["Ż"; "Ż"], Consonant, 1) ;
-    (["ż"; "ż"], Consonant, 1) ;
     (["Ɣ"], Consonant, 1) ;
     (["ɣ"], Consonant, 1) ;
     (["Ɛ"], Vowel, 1) ;
     (["ɛ"], Vowel, 1) ;
-    (["Đ"], Consonant, 1) ;
-    (["đ"], Consonant, 1) ;
-    (["Ḍ"; "Ḍ"], Consonant, 1) ;
-    (["ḍ"; "ḍ"], Consonant, 1) ;
-    (["Ḥ"; "Ḥ"], Consonant, 1) ;
-    (["ḥ"; "ḥ"], Consonant, 1) ;
-    (["Ṛ"; "Ṛ"], Consonant, 1) ;
-    (["ṛ"; "ṛ"], Consonant, 1) ;
-    (["Ṣ"; "Ṣ"], Consonant, 1) ;
-    (["ṣ"; "ṣ"], Consonant, 1) ;
-    (["Ṭ"; "Ṭ"], Consonant, 1) ;
-    (["ṭ"; "ṭ"], Consonant, 1) ;
-    (["Ẓ"; "Ẓ"], Consonant, 1) ;
-    (["ẓ"; "ẓ"], Consonant, 1) ;
-    (["♡"; "♥"; "❤"; "💓"; "💖"; "💗"; "💝"], OtherKind, 1)
+    (["∃"], Vowel, 1) ;
+    (["∀"], Vowel, 1) ;
+    (["±"], Vowel, 1) ;
+    (["∞"], Vowel, 1) ;
+    (["♡"; "♥"; "❤"; "💓"; "💖"; "💗"; "💝"], OtherKind, 1) ;
+    (* Ligatures *)
+    (["tt"], OtherLetter, 1) ;
+    (["ttt"], OtherLetter, 1) ;
+    (["TT"], OtherLetter, 1) ;
+    (["TTT"], OtherLetter, 1) ;
+    (["ll"], OtherLetter, 1) ;
+    (["lll"], OtherLetter, 1) ;
+    (["LL"], OtherLetter, 1) ;
+    (["LLL"], OtherLetter, 1) ;
+    (["FF"], OtherLetter, 1) ;
+    (["FFF"], OtherLetter, 1) ;
+    (["EE"], OtherLetter, 1) ;
+    (["EEE"], OtherLetter, 1)
   ]
 
 (* The data of all images, including ligatures, and so on. *)
 let characters =
   (* We remove the special unknown character from the character images. *)
-  let extended_characters_imgs = List.tl extended_characters_imgs in
+  let symbols_imgs = List.tl symbols_imgs in
   let l =
     let rec aux acc imgs = function
       | [] -> assert (imgs = []) ; acc
@@ -307,7 +339,7 @@ let characters =
           | _ -> assert false in
         let (current_imgs, imgs) = extract [] imgs nb in
         aux ((chars, current_imgs, kind) :: acc) imgs l in
-    aux [] (ascii_imgs @ extended_characters_imgs) character_data in
+    aux [] (ascii_imgs @ diacritics_imgs @ symbols_imgs @ ligatures_imgs) character_data in
   let characters =
     List.fold_left (fun substrings (strl, imgs, kind) ->
         List.fold_left (fun substrings str ->
@@ -383,7 +415,7 @@ let compute_kerning_single_images img1 img2 =
   let depth_right img y =
     assert (y >= 0 && y < height) ;
     let rec aux acc x =
-      if x < 0 then acc
+      if x < 0 then (acc + 1)
       else
         if is_transparent img (x, y) then aux (acc + 1) (x - 1)
         else acc in
@@ -391,7 +423,7 @@ let compute_kerning_single_images img1 img2 =
   let depth_left img y =
     assert (y >= 0 && y < height) ;
     let rec aux x =
-      if x = fst (Subimage.dimensions img) then x
+      if x = fst (Subimage.dimensions img) then (x + 1)
       else
         if is_transparent img (x, y) then aux (x + 1)
         else x in
@@ -412,7 +444,7 @@ let compute_kerning_single_images img1 img2 =
           (* The number of pixels we fit in both direction at this y-coordinate. *)
           let dist = depth_right img1 y + depth_left img2 y in
           min acc dist) (width1 + width2) (Items_aux.range 0 (height - 1)) in
-      let candidate = 1 - min (min width1 width2) min_distance in
+      let candidate = 1 - min (min (1 + width1) (1 + width2)) min_distance in
       (* Finally, we check diagonals: we only accept one diagonal-touch between the characters. *)
       let rec aux distance =
         assert (distance <= 1) ;
@@ -432,7 +464,7 @@ let compute_kerning_single_images img1 img2 =
               assert (y <= height) ;
               let x1 = width1 + distance + x in
               if y = height then acc
-              else if x1 >= width1 + 1 || x > width2 then check acc 0 (y + 1)
+              else if x1 >= width1 + 1 || x >= width2 then check acc 0 (y + 1)
               else (
                 assert (y >= 0 && y < height) ;
                 assert (x1 >= 0 && x1 <= width1) (* We are checking around this pixel, so we need to search for more than just the normal pixels. *) ;
@@ -514,7 +546,7 @@ let get_kerning imgs1 imgs2 =
     v
 
 (* This function overwrites the computed kerning between two characters. *)
-let set_kerning_str str1 str2 v =
+let _set_kerning_str str1 str2 v =
   let get_imgs str =
     match search_string characters str with
     | None -> assert false
@@ -524,9 +556,6 @@ let set_kerning_str str1 str2 v =
   let imgs1 = get_imgs str1 in
   let imgs2 = get_imgs str2 in
   set_kerning imgs1 imgs2 (List.hd imgs1, imgs2, v)
-
-let () = (* TODO: Define this as a ligature. *)
-  set_kerning_str "t" "t" 0
 
 
 (* Possible break-line behaviours. *)
