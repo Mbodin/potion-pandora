@@ -59,6 +59,9 @@ let on_quit, call_quit =
 (* Place when the mouse was last pressed down. *)
 let mouse_down = ref None
 
+let to_int (n : Js.number_t) : int =
+  int_of_float (Js.to_float n)
+
 let init width height =
   assert (!global_object = None) ;
   let canvas = Html.createCanvas Html.document in
@@ -77,7 +80,7 @@ let init width height =
   Lwt_js_events.mousedowns canvas
     (fun event _thread ->
       if event##.button = 0 then
-        mouse_down := Some (convert_coords (event##.offsetX, event##.offsetY)) ;
+        mouse_down := Some (convert_coords (to_int event##.offsetX, to_int event##.offsetY)) ;
       return ()
     ) %%
   Lwt_js_events.mousemoves canvas
@@ -85,7 +88,7 @@ let init width height =
       match !mouse_down with
       | None -> return ()
       | Some (init_x, init_y) ->
-        call_move (init_x, init_y) (convert_coords (event##.offsetX, event##.offsetY))
+        call_move (init_x, init_y) (convert_coords (to_int event##.offsetX, to_int event##.offsetY))
     ) %%
   Lwt_js_events.mouseups canvas
     (fun event _thread ->
@@ -93,7 +96,7 @@ let init width height =
         match !mouse_down with
         | None -> return ()
         | Some (init_x, init_y) ->
-          let (x, y) = convert_coords (event##.offsetX, event##.offsetY) in
+          let (x, y) = convert_coords (to_int event##.offsetX, to_int event##.offsetY) in
           if (init_x, init_y) = (x, y) then call_click (x, y)
           else call_drag (init_x, init_y) (x, y)
       ) else return ()
@@ -131,7 +134,7 @@ let write () (r, g, b) (x, y) =
   Html.pixel_set pixel##.data 1 g ;
   Html.pixel_set pixel##.data 2 b ;
   Html.pixel_set pixel##.data 3 255 ;
-  context##putImageData pixel (Float.of_int x) (Float.of_int y) ;
+  context##putImageData pixel (Js.float (Float.of_int x)) (Js.float (Float.of_int y)) ;
   return ()
 
 let quit () =

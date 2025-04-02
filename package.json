@@ -16,11 +16,9 @@
 		"server": "./server.sh"
 	},
 	"dependencies": {
-		"ocaml": "~4.13",
+		"ocaml": "~5.2",
 		"@opam/dune": "~3.17",
-		"@opam/ocamlfind": "1.9.3",
-		"@opam/ocamlbuild": "0.14.2",
-		"@opam/js_of_ocaml": "~5.4",
+		"@opam/js_of_ocaml": "*",
 		"@opam/js_of_ocaml-lwt": "*",
 		"@opam/js_of_ocaml-ppx": "*",
 		"@opam/js_of_ocaml-ppx_deriving_json": "*",
@@ -37,6 +35,6 @@
 		"@opam/ocamlsdl2": "*"
 	},
 	"resolutions": {
-		"@opam/ocamlsdl2": "github:Mbodin/OCamlSDL2#d7c2abb12483ee7fb20df2d20683e3e385b1d014"
+		"@opam/ocamlsdl2": "github:Mbodin/OCamlSDL2#22a4611750636d33a2d89eccfbedec50dcde599d"
 	}
 }

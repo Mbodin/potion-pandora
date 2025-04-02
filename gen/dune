@@ -8,3 +8,9 @@
   (modules incl_png)
   (libraries str))
 
+(executable
+  (name gen_html)
+  (modules gen_html)
+  (preprocess (pps tyxml-ppx))
+  (libraries tyxml))
+
