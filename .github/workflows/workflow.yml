@@ -33,13 +33,17 @@ jobs:
 
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@latest
+      - uses: actions/setup-node@latest
         with:
           node-version: 16
+            
+      - name: Install dependencies.
+        run: sudo apt install libsdl2-dev pkgconf npm
+
       - name: Install esy
         run: npm install -g esy
-      - uses: esy/github-action@v1
+      - uses: esy/github-action@latest
         with:
           cache-key: ${{ hashFiles('esy.lock/index.json') }}
 
@@ -47,7 +51,7 @@ jobs:
         run: esy
 
       - name: Deploying artifact.
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@latest
         with:
           path: _build/default/web
 
@@ -64,5 +68,5 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@latest
 

@@ -33,8 +33,7 @@
 		"@opam/base64": "*",
 		"@opam/ppx_deriving": "*",
 		"@opam/ocamlsdl2": "*",
-		"@opam/ppxlib": "*",
-		"@opam/metaquot": "*"
+		"@opam/ppxlib": "*"
 	},
 	"resolutions": {
 		"@opam/ocamlsdl2": "github:Mbodin/OCamlSDL2#22a4611750636d33a2d89eccfbedec50dcde599d"
