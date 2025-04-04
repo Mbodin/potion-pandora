@@ -33,8 +33,8 @@ jobs:
 
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@latest
-      - uses: actions/setup-node@latest
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v3
         with:
           node-version: 16
             
@@ -43,7 +43,7 @@ jobs:
 
       - name: Install esy
         run: npm install -g esy
-      - uses: esy/github-action@latest
+      - uses: esy/github-action@v2
         with:
           cache-key: ${{ hashFiles('esy.lock/index.json') }}
 
@@ -51,7 +51,7 @@ jobs:
         run: esy
 
       - name: Deploying artifact.
-        uses: actions/upload-pages-artifact@latest
+        uses: actions/upload-pages-artifact@v3
         with:
           path: _build/default/web
 
@@ -68,5 +68,5 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@latest
+        uses: actions/deploy-pages@v4
 

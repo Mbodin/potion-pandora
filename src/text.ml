@@ -81,7 +81,8 @@ type kind =
   | OtherKind
   | Newline
 
-(* LATER: Encode and compress this list. *)
+let%data test = ((), Some ())
+(* TODO: Encode and compress this list. *)
 let character_data = [
     (* ASCII *)
     ([" "; " " (* Non-breaking space *); "\t"], OtherKind, 1) ;

@@ -14,3 +14,11 @@
   (preprocess (pps tyxml-ppx))
   (libraries tyxml))
 
+(library
+  (public_name potion-pandora.ppx_data)
+  (name ppx_data)
+  (modules ppx_data)
+  (kind ppx_rewriter)
+  (preprocess (pps ppxlib.metaquot))
+  (libraries ppxlib potion-pandora.libsave))
+

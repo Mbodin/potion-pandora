@@ -5,6 +5,5 @@
 	(libraries imagelib base64 decompress.zl bigstringaf)
 	(modules_without_implementation save)
 	(preprocess (pps ppx_inline_test))
-  (inline_tests)
-  (flags (:standard -warn-error -A -g)))
+  (inline_tests))
 
