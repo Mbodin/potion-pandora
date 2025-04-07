@@ -81,7 +81,7 @@ type kind =
   | OtherKind
   | Newline
 
-let%data test = ((), Some ())
+let%data test = (Some (true, false), (), Some (), true)
 (* TODO: Encode and compress this list. *)
 let character_data = [
     (* ASCII *)
