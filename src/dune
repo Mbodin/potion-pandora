@@ -9,6 +9,8 @@
       ppx_deriving.enum
       ppx_deriving.show
       potion-pandora.ppx_data))
+  ; LATER: (preprocessor_deps (glob_files ../images/*))
+  (preprocessor_deps all.png)
 	(modules_without_implementation
     interface)
   (inline_tests)

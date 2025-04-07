@@ -2,6 +2,8 @@
 
 let png = "all.png"
 
+(* TODO: clean up *)
+(*
 let prefix = "image"
 
 (* Convert a number into a string using only [a-z]. *)
@@ -33,4 +35,8 @@ let () =
   print_endline (Printf.sprintf "let content = {%s|%s|%s}" id str id) ;
   print_endline "let chunk = ImageUtil.chunk_reader_of_string content" ;
   print_endline "let image = ImageLib.PNG.parsefile chunk"
+*)
+
+let () =
+  print_endline {|let image = [%data_image "all.png"]|}
 

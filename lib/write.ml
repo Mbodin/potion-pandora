@@ -178,17 +178,22 @@ let rec encode_monad : type t. t Save.t -> t -> unit monad =
     encode_positive img.Image.height %%
     let* num_colors = num_colors in
     let num_bits = Read.log2 num_colors in
+    assert (num_bits > 0) ;
     let rec encode_data x y : unit monadbit =
-      if x = img.Image.width then encode_data 0 (y + 1)
-      else if y = img.Image.height then returnbit ()
+      if y = img.Image.height then returnbit ()
+      else if x = img.Image.width then encode_data 0 (y + 1)
       else (
+        assert (x >= 0 && x < img.Image.width) ;
+        assert (y >= 0 && y < img.Image.height) ;
         let (r, g, b, a) = Image.read_rgba img x y (fun r g b a -> (r, g, b, a)) in
         let* color_id = get_color_id r g b a in
         let rec encode_id k m =
+          assert (m >= 0) ;
           if k = 0 then (
             assert (m = 0) ;
             returnbit ()
           ) else (
+            assert (k > 0) ;
             writebit (m mod 2 = 1) %%%
             encode_id (k - 1) (m / 2)
           ) in
