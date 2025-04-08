@@ -11,7 +11,7 @@ type t = {
 let dimensions img =
   (img.width, img.height)
 
-let make ?(bundle = Bundled_image.image) width height position =
+let make ~bundle width height position =
   assert (fst position >= 0 && snd position >= 0) ;
   assert (fst position + width <= bundle.Image.width) ;
   assert (snd position + height <= bundle.Image.height) ;

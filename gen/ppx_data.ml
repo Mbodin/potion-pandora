@@ -157,11 +157,8 @@ let get_colors image =
   let m = ref S.empty in
   for x = 0 to image.Image.width - 1 do
     for y = 0 to image.Image.height - 1 do
-      let c =
-        Image.read_rgba image x y (fun r g b a ->
-          if a = 0 then (0, 0, 0, 0)
-          else (r, g, b, a)) in
-      m := S.add c !m
+      Image.read_rgba image x y (fun r g b a ->
+        if a <> 0 then m := S.add (r, g, b, a) !m)
     done
   done ;
   S.to_list !m

@@ -6,24 +6,23 @@ module ColorMap =
   end)
 
 (* We use a writer monad within this file.
- It stores a list of substrings to be written, in reverse order.
- It also gets the current color mapping. *)
-type 'a monad = int ColorMap.t -> 'a * string list
+ It gets the current buffer and the current color mapping. *)
+type 'a monad = Buffer.t -> int ColorMap.t -> 'a
 
-let return (type t) (x : t) : t monad = fun _colors -> (x, [])
+let return (type t) (x : t) : t monad = fun _buffer _colors -> x
 
 let bind (type a b) (o : a monad) (f : a -> b monad) : b monad =
-  fun colors ->
-    let (a, l1) = o colors in
-    let (r, l2) = f a colors in
-    (r, l2 @ l1)
+  fun buffer colors ->
+    let a = o buffer colors in
+    f a buffer colors
 
 let ( let* ) = bind
 
 let ( %% ) (type t) : unit monad -> t monad -> t monad =
   fun m1 m2 -> bind m1 (fun () -> m2)
 
-let write str : unit monad = fun _colors -> ((), [str])
+let write str : unit monad =
+  fun buffer _colors -> Buffer.add_string buffer str
 
 (* The first identifier is always [0]. *)
 let transparent = 0
@@ -31,35 +30,37 @@ let transparent = 0
 (* Escape the monad. *)
 let escape (type t) : t monad -> t * string =
   fun m ->
+    let buffer = Buffer.create 1024 in
     let colors = ColorMap.add (0, 0, 0, 0) transparent ColorMap.empty in
-    let (t, l) = m colors in
-    (t, String.concat "" (List.rev l))
+    let t = m buffer colors in
+    (t, Buffer.contents buffer)
 
 (* Get the identifier of a color. *)
 let get_color_id r g b a : int monad =
-  fun colors ->
-    if a = 0 then (transparent, [])
+  fun _buffer colors ->
+    if a = 0 then transparent
     else
       match ColorMap.find_opt (r, g, b, a) colors with
-      | Some id -> (id, [])
+      | Some id -> id
       | None -> assert false
 
 (* Add a color to the current palette. *)
 let add_color r g b a (m : 'a monad) : 'a monad =
-  fun colors ->
+  fun buffer colors ->
     let id = ColorMap.cardinal colors in
     let colors = ColorMap.add (r, g, b, a) id colors in
-    m colors
+    m buffer colors
 
 (* Get the current number of registered colors. *)
 let num_colors : int monad =
-  fun colors -> (ColorMap.cardinal colors, [])
+  fun _buffer colors -> ColorMap.cardinal colors
 
 (* Write a single character. *)
-let write_char i = write (String.make 1 i)
+let write_char c : unit monad =
+  fun buffer _ -> Buffer.add_char buffer c
 
 (* Converts 8 bits to a character. *)
-let bits_to_char b1 b2 b3 b4 b5 b6 b7 b8 =
+let bits_to_char b1 b2 b3 b4 b5 b6 b7 b8 : char =
   let i =
     List.fold_left (fun acc b -> 2 * acc + if b then 1 else 0) 0
       [b1; b2; b3; b4; b5; b6; b7; b8] in
@@ -287,7 +288,7 @@ let%test "compress" = check (Compress (List Int)) [-1; 2; -3]
 let%test "compress base64 list base64 compress int" =
   check (Compress (Base64 (List (Base64 (Compress Int))))) [1; -2; 3]
 
-let%test "image" =
+let%test "small image" =
   let img = Image.create_rgb ~alpha:true 1 2 in
   Image.fill_rgb ~alpha:255 img 1 2 3 ;
   let t = Save.(AddColor Image) in
@@ -302,4 +303,27 @@ let%test "image" =
   && img.Image.height = img'.Image.height
   && check_pixel 0 0
   && check_pixel 0 1
+
+let%test "grayscale image" =
+  let img = Image.create_rgb ~alpha:true 100 100 in
+  Image.fill_rgb ~alpha:255 img 128 128 128 ;
+  Image.write_rgba img 0 0 12 12 12 255 ;
+  Image.write_rgba img 1 1 42 42 42 255 ;
+  Image.write_rgba img 0 1 3 3 3 255 ;
+  let add_color c (k, data) = (Save.AddColor k, (c, data)) in
+  let c1 = (3, 3, 3, 255) in
+  let c2 = (12, 12, 12, 255) in
+  let c3 = (42, 42, 42, 255) in
+  let c4 = (128, 128, 128, 255) in
+  let (k, data) =
+    add_color c1 (add_color c2 (add_color c3 (add_color c4 (Save.Image, img)))) in
+  let (c1', (c2', (c3', (c4', (img'))))) = Read.decode k (encode k data) in
+  let check_pixel x y =
+    Image.read_rgba img x y (fun r g b a ->
+      Image.read_rgba img' x y (fun r' g' b' a' ->
+        r = r' && g = g' && b = b' && a = a')) in
+  List.for_all2 (=) [c1; c2; c3; c4] [c1'; c2'; c3'; c4']
+  && img.Image.width = img'.Image.width
+  && img.Image.height = img'.Image.height
+  && List.for_all2 check_pixel [0; 0; 0; 1; 1; 1; 2; 2; 2] [0; 1; 2; 0; 1; 2; 0; 1; 2]
 

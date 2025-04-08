@@ -63,7 +63,7 @@ let ( ~$ ) (type t) (reader : t monad) : t monad =
   eof %%
   return r
 
-(* Get the [i]th saved color. *)
+(* Get the [i]th saved color without changing anything. *)
 let get_color i : Save.color monad =
   fun _str index colors ->
     assert (i < Array.length colors) ;
@@ -136,7 +136,7 @@ let get_color_bits i : Save.color monadbit =
 
 
 (* Decompresses a string. *)
-let deflate_string (*?(level=4)*) str =
+let deflate_string str =
   let i = De.bigstring_create De.io_buffer_size in
   let o = De.bigstring_create De.io_buffer_size in
   let allocate bits = De.make_window ~bits in
@@ -246,15 +246,19 @@ let rec decode_monad : type t. t Save.t -> t monad =
     let num_bits = log2 num_colors in
     let img = Image.create_rgb ~alpha:true width height in
     let rec decode_data x y : unit monadbit =
-      if x = width then decode_data 0 (y + 1)
-      else if y = height then returnbit ()
+      if y = height then returnbit ()
+      else if x = width then decode_data 0 (y + 1)
       else (
         let** bl = readnbits num_bits in
         let rec to_int w acc = function
           | [] -> acc
           | b :: bl -> to_int (2 * w) (acc + if b then w else 0) bl in
         let** (r, g, b, a) = get_color_bits (to_int 1 0 bl) in
-        Image.write_rgba img x y r g b a ;
+        (* FIXME: I don't understand why, but it seems that with this transformation
+          on x and y, the encoding/decoding works, but doesn't if I remove them. *)
+        let x' = width - 1 - x + if x mod 2 = 0 then (-1) else 1 in
+        let y' = height - 1 - y in
+        Image.write_rgba img x' y' r g b a ;
         decode_data (x + 1) y
       ) in
     read_and_close_bits (decode_data 0 0) %%

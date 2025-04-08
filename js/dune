@@ -4,5 +4,6 @@
 	(libraries lwt potion_pandora js_of_ocaml-lwt)
   (preprocess (pps lwt_ppx js_of_ocaml-ppx))
 	(modes js)
+  ; (js_of_ocaml (flags --no-inline --pretty))
   (flags (:standard -warn-error -A)))
 

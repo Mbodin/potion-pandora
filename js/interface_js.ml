@@ -53,7 +53,7 @@ let on_drag, call_drag =
 let on_key_pressed, call_key_pressed =
   set_event (fun _ -> return ())
 
-let on_quit, call_quit =
+let on_quit, _call_quit =
   set_event (fun () -> return ())
 
 (* Place when the mouse was last pressed down. *)

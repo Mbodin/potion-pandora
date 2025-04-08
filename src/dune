@@ -21,8 +21,3 @@
   (deps (:gen ../gen/bundle_png.exe) (glob_files ../images/*))
 	(action (with-stdout-to images_coords.ml (run %{gen}))))
 
-(rule
-	(target bundled_image.ml)
-  (deps (:gen ../gen/incl_png.exe) all.png)
-	(action (with-stdout-to %{target} (run %{gen}))))
-

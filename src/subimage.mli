@@ -9,11 +9,9 @@ type t
 (* Conversion of types of images. *)
 val from_image : Image.image -> t
 
-(* Given the width, height, and (x, y) position of the image part in the program data,
-  store the corresponding subimage.
-  The optional argument is there to extract an image from another image then the default
-  bundle for Bundled_image. *)
-val make : ?bundle:Image.image -> int -> int -> (int * int) -> t
+(* Given the width, height, and (x, y) position of the image part in the provided bundled image,
+  build the corresponding subimage. *)
+val make : bundle:Image.image -> int -> int -> (int * int) -> t
 
 (* Extract a subimage from a subimage, provided the sub-subimage width, height, and
  coordinates (in the provided subimage). *)

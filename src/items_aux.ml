@@ -1,4 +1,13 @@
 
+let bundled_image : Image.image = [%data_image "all.png"]
+
+(* TODO: This should be the same than all.png. *)
+let () =
+  let image = ImageLib.PNG.bytes_of_png bundled_image in
+  let channel = open_out_bin "all2.png" in
+  output_bytes channel image ;
+  close_out channel
+
 let range a b =
   if a > b then []
   else List.init (b - a + 1) (fun c -> c + a)
@@ -14,11 +23,11 @@ let once s =
 let from_coords ~bundle ((width, height), (x, y)) =
   Subimage.make ~bundle width height (x, y)
 
-let from ?(bundle = Bundled_image.image) coords i =
+let from ?(bundle = bundled_image) coords i =
   assert (i < List.length coords) ;
   from_coords ~bundle (List.nth coords i)
 
-let fromlist ?(bundle = Bundled_image.image) coords =
+let fromlist ?(bundle = bundled_image) coords =
   List.map (from_coords ~bundle) coords
 
 let to_sequence time l =
