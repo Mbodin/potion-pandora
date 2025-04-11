@@ -20,65 +20,69 @@ let%test "log2 128" = log2 128 = 7
 
 type colors = Save.color array
 
+(* We always assume that the fully transparent color is declared. *)
 let initial_colors : colors = Array.make 1 (0, 0, 0, 0)
 
 (* We use a reader monad within this file.
  It takes as argument the string being read, the current index, as well as a mapping of colors,
- and returns the current index. *)
-type 'a monad = string -> int -> colors -> 'a * int
+ and returns the current index.
+ For performance reason, we generalize the monad to take other state in parameter. *)
+type ('a, 'b) monad_gen = 'b -> string -> int -> colors -> 'a * 'b * int
+type 'a monad = ('a, unit) monad_gen
 
-let return (type t) (x : t) : t monad = fun _str index _colors -> (x, index)
+let return (type g) (type t) (x : t) : (t, g) monad_gen =
+  fun g _str index _colors -> (x, g, index)
 
-let bind (type a b) (m : a monad) (f : a -> b monad) : b monad =
-  fun str index colors ->
-    let (a, index) = m str index colors in
-    f a str index colors
+let bind (type g) (type a b) (m : (a, g) monad_gen) (f : a -> (b, g) monad_gen) : (b, g) monad_gen =
+  fun g str index colors ->
+    let (a, g, index) = m g str index colors in
+    f a g str index colors
 
 let ( let* ) = bind
 
-let ( %% ) (type t) : unit monad -> t monad -> t monad =
+let ( %% ) (type g) (type t) : (unit, g) monad_gen -> (t, g) monad_gen -> (t, g) monad_gen =
   fun m1 m2 -> bind m1 (fun () -> m2)
 
 (* Read the current character. *)
-let read : char monad =
-  fun str index _colors ->
+let read (type g) : (char, g) monad_gen =
+  fun g str index _colors ->
     assert (index < String.length str) ;
-    (str.[index], index + 1)
+    (str.[index], g, index + 1)
 
 (* Read a string of size n. *)
-let readn n : string monad =
-  fun str index _colors ->
+let readn (type g) n : (string, g) monad_gen =
+  fun g str index _colors ->
     assert (index + n <= String.length str) ;
-    (String.sub str index n, index + n)
+    (String.sub str index n, g, index + n)
 
 (* Check that no characters are left. *)
-let eof : unit monad =
-  fun str index _colors ->
+let eof (type g) : (unit, g) monad_gen =
+  fun g str index _colors ->
     assert (index = String.length str) ;
-    ((), index)
+    ((), g, index)
 
 (* Forces the reader to fully read its input string. *)
-let ( ~$ ) (type t) (reader : t monad) : t monad =
+let ( ~$ ) (type g) (type t) (reader : (t, g) monad_gen) : (t, g) monad_gen =
   let* r = reader in
   eof %%
   return r
 
 (* Get the [i]th saved color without changing anything. *)
-let get_color i : Save.color monad =
-  fun _str index colors ->
+let get_color (type g) i : (Save.color, g) monad_gen =
+  fun g _str index colors ->
     assert (i < Array.length colors) ;
-    (colors.(i), index)
+    (colors.(i), g, index)
 
 (* Add a color to the current palette. *)
-let add_color r g b a (m : 'a monad) : 'a monad =
-  fun str index colors ->
+let add_color (type g) (type t) r g b a (m : (t, g) monad_gen) : (t, g) monad_gen =
+  fun gt str index colors ->
     let colors = Array.append colors (Array.make 1 (r, g, b, a)) in
-    m str index colors
+    m gt str index colors
 
 (* Get the current number of registered colors. *)
-let num_colors : int monad =
-  fun _str index colors ->
-    (Array.length colors, index)
+let num_colors (type g) : (int, g) monad_gen =
+  fun g _str index colors ->
+    (Array.length colors, g, index)
 
 let char_to_bits c =
   let i = Char.code c in
@@ -89,50 +93,31 @@ let char_to_bits c =
 
 (* A monad to read individual bits.
  The input list is strictly bounded by 8: it is the leftover of a previous read. *)
-type 'a monadbit = bool list -> ('a * bool list) monad
+type 'a monad_bit = ('a, bool list) monad_gen
 
-let returnbit (type t) (x : t) : t monadbit = fun bl -> return (x, bl)
-
-let bindbit (type a b) (m : a monadbit) (f : a -> b monadbit) : b monadbit =
-  fun bl ->
-    assert (List.length bl < 8) ;
-    let* (a, bl) = m bl in
-    f a bl
-
-let ( let** ) = bindbit
-
-let readbit : bool monadbit = function
-  | b :: bl -> return (b, bl)
-  | [] ->
-    let* c = read in
+let read_bit : bool monad_bit = function
+  | b :: bl -> return b bl
+  | [] -> fun str index colors ->
+    let (c, (), index) = read () str index colors in
     match char_to_bits c with
     | [] -> assert false
-    | b :: bl -> return (b, bl)
+    | b :: bl -> (b, bl, index)
 
-let readnbits : int -> bool list monadbit =
+let readnbits : int -> bool list monad_bit =
   let rec aux acc = function
-  | 0 -> returnbit (List.rev acc)
+  | 0 -> return (List.rev acc)
   | n ->
-    let** b = readbit in
+    let* b = read_bit in
     aux (b :: acc) (n - 1) in
   aux []
 
 (* Check that no bits are left when closing the monad. *)
-let read_and_close_bits (type t) (k : t monadbit) : t monad =
-  let* (r, bl) = k [] in
-  (* There might have been additionnal bits, for padding, but they should all be false. *)
-  assert (List.for_all (not) bl) ;
-  return r
-
-let _eofbits : unit monadbit = fun bl ->
-  assert (List.for_all (not) bl) ;
-  eof %%
-  return ((), [])
-
-let get_color_bits i : Save.color monadbit =
-  fun bl ->
-    let* color = get_color i in
-    return (color, bl)
+let read_and_close_bits (type t) (k : t monad_bit) : t monad =
+  fun () str index colors ->
+    let (r, bl, index) = k [] str index colors in
+    (* There might have been additionnal bits, for padding, but they should all be false. *)
+    assert (List.for_all (not) bl) ;
+    (r, (), index)
 
 
 (* Decompresses a string. *)
@@ -245,20 +230,17 @@ let rec decode_monad : type t. t Save.t -> t monad =
     let* num_colors = num_colors in
     let num_bits = log2 num_colors in
     let img = Image.create_rgb ~alpha:true width height in
-    let rec decode_data x y : unit monadbit =
-      if y = height then returnbit ()
+    let rec decode_data x y : unit monad_bit =
+      if y = height then return ()
       else if x = width then decode_data 0 (y + 1)
       else (
-        let** bl = readnbits num_bits in
+        let* bl = readnbits num_bits in
+        assert (List.length bl = num_bits) ;
         let rec to_int w acc = function
           | [] -> acc
           | b :: bl -> to_int (2 * w) (acc + if b then w else 0) bl in
-        let** (r, g, b, a) = get_color_bits (to_int 1 0 bl) in
-        (* FIXME: I don't understand why, but it seems that with this transformation
-          on x and y, the encoding/decoding works, but doesn't if I remove them. *)
-        let x' = width - 1 - x + if x mod 2 = 0 then (-1) else 1 in
-        let y' = height - 1 - y in
-        Image.write_rgba img x' y' r g b a ;
+        let* (r, g, b, a) = get_color (to_int 1 0 bl) in
+        Image.write_rgba img x y r g b a ;
         decode_data (x + 1) y
       ) in
     read_and_close_bits (decode_data 0 0) %%
@@ -267,16 +249,16 @@ let rec decode_monad : type t. t Save.t -> t monad =
     let* size = decode_positive in
     let* str = readn size in
     let str = Base64.decode_exn str in
-    let (r, _index) = ~$ (decode_monad s) str 0 initial_colors in
+    let (r, (), _index) = ~$ (decode_monad s) () str 0 initial_colors in
     return r
   | Save.Compress s ->
     let* size = decode_positive in
     let* str = readn size in
     let str = deflate_string str in
-    let (r, _index) = ~$ (decode_monad s) str 0 initial_colors in
+    let (r, (), _index) = ~$ (decode_monad s) () str 0 initial_colors in
     return r
 
 let decode (type t) (s : t Save.t) str =
-  let (r, _index) = ~$ (decode_monad s) str 0 initial_colors in
+  let (r, (), _index) = ~$ (decode_monad s) () str 0 initial_colors in
   r
 

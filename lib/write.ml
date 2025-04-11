@@ -6,25 +6,29 @@ module ColorMap =
   end)
 
 (* We use a writer monad within this file.
- It gets the current buffer and the current color mapping. *)
-type 'a monad = Buffer.t -> int ColorMap.t -> 'a
+ It gets the current buffer and the current color mapping.
+ [monad_gen] also incorporates an optionnal state. *)
+type ('a, 'b) monad_gen = 'b -> Buffer.t -> int ColorMap.t -> 'a * 'b
+type 'a monad = ('a, unit) monad_gen
 
-let return (type t) (x : t) : t monad = fun _buffer _colors -> x
+let return (type st t) (x : t) : (t, st) monad_gen = fun st _buffer _colors -> (x, st)
 
-let bind (type a b) (o : a monad) (f : a -> b monad) : b monad =
-  fun buffer colors ->
-    let a = o buffer colors in
-    f a buffer colors
+let bind (type st a b) (o : (a, st) monad_gen) (f : a -> (b, st) monad_gen) : (b, st) monad_gen =
+  fun st buffer colors ->
+    let (a, st) = o st buffer colors in
+    f a st buffer colors
 
 let ( let* ) = bind
 
-let ( %% ) (type t) : unit monad -> t monad -> t monad =
+let ( %% ) (type st t) : (unit, st) monad_gen -> (t, st) monad_gen -> (t, st) monad_gen =
   fun m1 m2 -> bind m1 (fun () -> m2)
 
-let write str : unit monad =
-  fun buffer _colors -> Buffer.add_string buffer str
+let write (type st) str : (unit, st) monad_gen =
+  fun st buffer _colors ->
+    Buffer.add_string buffer str ;
+    ((), st)
 
-(* The first identifier is always [0]. *)
+(* The first identifier is always [0], and it always encodes a fully transparent pixel. *)
 let transparent = 0
 
 (* Escape the monad. *)
@@ -32,32 +36,34 @@ let escape (type t) : t monad -> t * string =
   fun m ->
     let buffer = Buffer.create 1024 in
     let colors = ColorMap.add (0, 0, 0, 0) transparent ColorMap.empty in
-    let t = m buffer colors in
+    let (t, ()) = m () buffer colors in
     (t, Buffer.contents buffer)
 
 (* Get the identifier of a color. *)
-let get_color_id r g b a : int monad =
-  fun _buffer colors ->
-    if a = 0 then transparent
+let get_color_id (type st) r g b a : (int, st) monad_gen =
+  fun st _buffer colors ->
+    if a = 0 then (transparent, st)
     else
       match ColorMap.find_opt (r, g, b, a) colors with
-      | Some id -> id
+      | Some id -> (id, st)
       | None -> assert false
 
 (* Add a color to the current palette. *)
-let add_color r g b a (m : 'a monad) : 'a monad =
-  fun buffer colors ->
+let add_color (type st t) r g b a (m : (t, st) monad_gen) : (t, st) monad_gen =
+  fun st buffer colors ->
     let id = ColorMap.cardinal colors in
     let colors = ColorMap.add (r, g, b, a) id colors in
-    m buffer colors
+    m st buffer colors
 
 (* Get the current number of registered colors. *)
-let num_colors : int monad =
-  fun _buffer colors -> ColorMap.cardinal colors
+let num_colors (type st) : (int, st) monad_gen =
+  fun st _buffer colors -> (ColorMap.cardinal colors, st)
 
 (* Write a single character. *)
-let write_char c : unit monad =
-  fun buffer _ -> Buffer.add_char buffer c
+let write_char (type st) c : (unit, st) monad_gen =
+  fun st buffer _colors ->
+    Buffer.add_char buffer c ;
+    ((), st)
 
 (* Converts 8 bits to a character. *)
 let bits_to_char b1 b2 b3 b4 b5 b6 b7 b8 : char =
@@ -67,42 +73,36 @@ let bits_to_char b1 b2 b3 b4 b5 b6 b7 b8 : char =
   Char.chr i
 
 (* A monad to write individual bits (in forward order). *)
-type 'a monadbit = ('a * bool list) monad
+type 'a monadbit = ('a, bool list) monad_gen
 
-let returnbit (type t) (x : t) : t monadbit = return (x, [])
-
-let bindbit (type a b) (m : a monadbit) (f : a -> b monadbit) : b monadbit =
-  let* (a, bl1) = m in
-  let* (b, bl2) = f a in
-  let rec aux = function
-    | b1 :: b2 :: b3 :: b4 :: b5 :: b6 :: b7 :: b8 :: bl ->
-      let c = bits_to_char b1 b2 b3 b4 b5 b6 b7 b8 in
-      write (String.make 1 c) %%
-      aux bl
-    | bl -> return (b, bl) in
-  aux (bl1 @ bl2)
-
-let ( %%% ) (type t) : unit monadbit -> t monadbit -> t monadbit =
-  fun m1 m2 -> bindbit m1 (fun () -> m2)
-
-let writebits (lb : bool list) : unit monadbit = return ((), lb)
+let flushbits : unit monadbit =
+  fun bl buffer colors ->
+    let rec aux : bool list -> bool list monad = function
+      | b1 :: b2 :: b3 :: b4 :: b5 :: b6 :: b7 :: b8 :: bl ->
+        write_char (bits_to_char b1 b2 b3 b4 b5 b6 b7 b8) %%
+        aux bl
+      | bl -> return bl in
+    let (bl, ()) = aux bl () buffer colors in
+    ((), bl)
+    
+let writebits (bl : bool list) : unit monadbit =
+  (fun bl0 _buffer _colors -> ((), bl0 @ bl)) %%
+  flushbits
 
 let writebit (b : bool) : unit monadbit = writebits [b]
 
 let escapebits (type t) (m : t monadbit) : t monad =
-  let m =
-    (* This flushes the waiting bits if possible. *)
-    bindbit m returnbit in
-  let* (r, bl) = m in
-  let rec aux = function
-    | [] -> return r
-    | [b1; b2; b3; b4; b5; b6; b7; b8] ->
-      write_char (bits_to_char b1 b2 b3 b4 b5 b6 b7 b8) %%
-      return r
-    | _b1 :: _b2 :: _b3 :: _b4 :: _b5 :: _b6 :: _b7 :: _b8 :: _ -> assert false
-    | bl -> (* We fill-in the remaining bits with false. *)
-      aux (bl @ [false]) in
-  aux bl
+  fun () buffer colors ->
+    let (r, bl) = m [] buffer colors in
+    let rec aux = function
+      | [] -> return r
+      | [b1; b2; b3; b4; b5; b6; b7; b8] ->
+        write_char (bits_to_char b1 b2 b3 b4 b5 b6 b7 b8) %%
+        return r
+      | _b1 :: _b2 :: _b3 :: _b4 :: _b5 :: _b6 :: _b7 :: _b8 :: _ -> assert false
+      | bl -> (* We fill-in the remaining bits with false. *)
+        aux (bl @ [false]) in
+    aux bl () buffer colors
 
 
 (* Compresses a string. *)
@@ -181,24 +181,25 @@ let rec encode_monad : type t. t Save.t -> t -> unit monad =
     let num_bits = Read.log2 num_colors in
     assert (num_bits > 0) ;
     let rec encode_data x y : unit monadbit =
-      if y = img.Image.height then returnbit ()
+      if y = img.Image.height then return ()
       else if x = img.Image.width then encode_data 0 (y + 1)
       else (
         assert (x >= 0 && x < img.Image.width) ;
         assert (y >= 0 && y < img.Image.height) ;
         let (r, g, b, a) = Image.read_rgba img x y (fun r g b a -> (r, g, b, a)) in
         let* color_id = get_color_id r g b a in
+        assert (color_id < num_colors) ;
         let rec encode_id k m =
           assert (m >= 0) ;
           if k = 0 then (
             assert (m = 0) ;
-            returnbit ()
+            return ()
           ) else (
             assert (k > 0) ;
-            writebit (m mod 2 = 1) %%%
+            writebit (m mod 2 = 1) %%
             encode_id (k - 1) (m / 2)
           ) in
-        encode_id num_bits color_id %%%
+        encode_id num_bits color_id %%
         encode_data (x + 1) y
       ) in
     escapebits (encode_data 0 0)
@@ -288,21 +289,26 @@ let%test "compress" = check (Compress (List Int)) [-1; 2; -3]
 let%test "compress base64 list base64 compress int" =
   check (Compress (Base64 (List (Base64 (Compress Int))))) [1; -2; 3]
 
+let check_image img1 img2 =
+  let check_pixel x y =
+    Image.read_rgba img1 x y (fun r g b a ->
+      Image.read_rgba img2 x y (fun r' g' b' a' ->
+        r = r' && g = g' && b = b' && a = a')) in
+  let rec check_all width height x y =
+    if y = height then true
+    else if x = width then check_all width height 0 (y + 1)
+    else (check_pixel x y && check_all width height (x + 1) y) in
+  img1.Image.width = img1.Image.width
+  && img1.Image.height = img2.Image.height
+  && check_all img1.Image.width img1.Image.height 0 0
+
 let%test "small image" =
   let img = Image.create_rgb ~alpha:true 1 2 in
   Image.fill_rgb ~alpha:255 img 1 2 3 ;
   let t = Save.(AddColor Image) in
   let color = (1, 2, 3, 255) in
   let (color', img') = Read.decode t (encode t (color, img)) in
-  let check_pixel x y =
-    Image.read_rgba img x y (fun r g b a ->
-      Image.read_rgba img' x y (fun r' g' b' a' ->
-        r = r' && g = g' && b = b' && a = a')) in
-  color = color'
-  && img.Image.width = img'.Image.width
-  && img.Image.height = img'.Image.height
-  && check_pixel 0 0
-  && check_pixel 0 1
+  color = color' && check_image img img'
 
 let%test "grayscale image" =
   let img = Image.create_rgb ~alpha:true 100 100 in
@@ -317,13 +323,16 @@ let%test "grayscale image" =
   let c4 = (128, 128, 128, 255) in
   let (k, data) =
     add_color c1 (add_color c2 (add_color c3 (add_color c4 (Save.Image, img)))) in
-  let (c1', (c2', (c3', (c4', (img'))))) = Read.decode k (encode k data) in
-  let check_pixel x y =
-    Image.read_rgba img x y (fun r g b a ->
-      Image.read_rgba img' x y (fun r' g' b' a' ->
-        r = r' && g = g' && b = b' && a = a')) in
+  let (c1', (c2', (c3', (c4', img')))) = Read.decode k (encode k data) in
   List.for_all2 (=) [c1; c2; c3; c4] [c1'; c2'; c3'; c4']
-  && img.Image.width = img'.Image.width
-  && img.Image.height = img'.Image.height
-  && List.for_all2 check_pixel [0; 0; 0; 1; 1; 1; 2; 2; 2] [0; 1; 2; 0; 1; 2; 0; 1; 2]
+  && check_image img img'
+
+let%test "horizontal large image" =
+  let img = Image.create_rgb ~alpha:true 1000 1 in
+  Image.fill_rgb ~alpha:255 img 1 1 1 ;
+  Image.write_rgba img 20 0 0 0 0 0 ;
+  let t = Save.(AddColor Image) in
+  let color = (1, 1, 1, 255) in
+  let (color', img') = Read.decode t (encode t (color, img)) in
+  color = color' && check_image img img'
 

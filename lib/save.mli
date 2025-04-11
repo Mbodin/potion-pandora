@@ -12,6 +12,7 @@ type 'a t =
   | Option : 'a t -> 'a option t
   | List : 'a t -> 'a list t
   | Array : 'a t -> 'a array t
+  (* | Inductive : 'a inductive_descr array -> 'a t *)
   | AddColor : 'a t -> (color * 'a) t (* Add a color to the available colors within. *)
   | Image : Image.image t (* All the image's (non-transparent) colors must have been encoded before. *)
   | Base64 : 'a t -> 'a t

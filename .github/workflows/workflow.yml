@@ -38,6 +38,8 @@ jobs:
         with:
           node-version: 16
 
+      - name: Updating packages.
+        run: sudo apt update
       - name: Install dependencies.
         run: sudo apt install -y npm pkgconf libsdl2-2.0-0 libsdl2-dev libsdl2-image-dev
 
