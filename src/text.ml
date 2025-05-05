@@ -72,7 +72,7 @@ let rec search_string data str =
 module StringMap = Map.Make (String)
 
 (* The kind of character. *)
-type kind =
+type%datatype kind =
   | Vowel
   | Consonant
   | OtherLetter
@@ -81,9 +81,7 @@ type kind =
   | OtherKind
   | Newline
 
-let%data test = (Some (true, false), (), Some (), true, [true], "42", 12, [|(13, 24)|])
-(* TODO: Encode and compress this list. *)
-let character_data = [
+let%data character_data = [
     (* ASCII *)
     ([" "; " " (* Non-breaking space *); "\t"], OtherKind, 1) ;
     (["!"], Punctuation, 1) ;

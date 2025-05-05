@@ -20,9 +20,20 @@ let make_pat ~loc ppat_desc : Ppxlib_ast.Ast.pattern = {
   ppat_attributes = []
 }
 
+module SMap = Map.Make (String)
+
+(* A global map explaining how constructors are represented. *)
+let constructor_map = ref SMap.empty
+
+(* For each type, a function converting each identifier back to the original constructor. *)
+let type_map = ref SMap.empty
+
+
 (* The function [get_data] returns a triple of a save kind, the corresponding data,
   and a function expression to convert this data into what is actually expected at this
-  place of the program. *)
+  place of the program.
+  Sometimes a subexpression is not enough to infer its full type by itself, and hence the
+  corresponding conversion to its original type is lacking. *)
 type get_data_ret = C : ('a Save.t * expression) option * 'a -> get_data_ret
 
 let rec get_data expr : get_data_ret =
@@ -95,6 +106,13 @@ let rec get_data expr : get_data_ret =
     C (Option.map (fun (k, convert) ->
         (Save.Array k, [%expr Array.map [%e convert]])) k, Array.of_list (List.rev l))
 
+  | { pexp_desc = Pexp_construct ({ txt = Lident c ; _ }, None) ; _ }
+    when SMap.mem c !constructor_map ->
+    (* We represent this constructor as an integer. *)
+    let (typ, id) = SMap.find c !constructor_map in
+    let convert = SMap.find typ !type_map in
+    C (Some (Save.Int, convert), id)
+
   | _ ->
     Ppxlib.Location.raise_errorf ~loc "ppx_data: unable to deal with this kind of expression."
 
@@ -136,6 +154,47 @@ let expand_data ~loc ~path pattern expr =
         pvb_expr = encode_data ~loc:expr.pexp_loc (get_data expr) ;
         pvb_attributes = [] ;
         pvb_loc = loc
+      }]) ;
+    pstr_loc = loc
+  }
+
+let expand_data_type ~loc ~path type_name constructors =
+  ignore path ;
+  List.iteri (fun i c ->
+    constructor_map := SMap.add c (type_name, i) !constructor_map) constructors ;
+  type_map :=
+    SMap.add type_name
+      (make_expr ~loc (Pexp_function (
+        List.mapi (fun id c -> {
+            pc_lhs = make_pat ~loc (Ppat_constant (Pconst_integer (Int.to_string id, None))) ;
+            pc_guard = None ;
+            pc_rhs = make_expr ~loc (Pexp_construct ({ txt = Lident c ; loc }, None))
+          }) constructors
+        @ [{
+          pc_lhs = make_pat ~loc Ppat_any ;
+          pc_guard = None ;
+          pc_rhs = [%expr assert false ]
+        }]
+    ))) !type_map ;
+  {
+    pstr_desc =
+      Pstr_type (Nonrecursive, [{
+        ptype_name = { txt = type_name ; loc } ;
+        ptype_params = [] ;
+        ptype_cstrs = [] ;
+        ptype_private = Public ;
+        ptype_manifest = None ;
+        ptype_attributes = [] ;
+        ptype_loc = loc ;
+	      ptype_kind =
+          Ptype_variant (List.map (fun c -> {
+              pcd_name = { txt = c ; loc } ;
+              pcd_vars = [] ;
+              pcd_args = Pcstr_tuple [] ;
+              pcd_res = None ;
+              pcd_loc = loc ;
+              pcd_attributes = []
+            }) constructors)
       }]) ;
     pstr_loc = loc
   }
@@ -184,8 +243,20 @@ let expand_image ~loc ~path str =
 let data_extension =
   Extension.declare "data"
     Extension.Context.Structure_item
-    Ast_pattern.(pstr @@ (pstr_value drop ((value_binding ~pat:__ ~expr:__) ^:: nil)) ^:: nil)
+    Ast_pattern.(pstr @@ (pstr_value nonrecursive (
+      value_binding ~pat:__ ~expr:__
+      ^:: nil)) ^:: nil)
     expand_data
+
+let data_type_extension =
+  Extension.declare "datatype"
+    Extension.Context.Structure_item
+    Ast_pattern.(pstr @@ (pstr_type drop (
+      type_declaration ~name:__ ~params:nil ~cstrs:nil ~private_:public ~manifest:none
+      ~kind:(ptype_variant (many (
+        constructor_declaration ~name:__ ~vars:nil ~args:(pcstr_tuple nil) ~res:none)))
+      ^:: nil)) ^:: nil)
+    expand_data_type
 
 let image_extension =
   Extension.declare "data_image"
@@ -194,8 +265,9 @@ let image_extension =
     expand_image
 
 let data_rule = Context_free.Rule.extension data_extension
+let data_type_rule = Context_free.Rule.extension data_type_extension
 let image_rule = Context_free.Rule.extension image_extension
 
 let () =
-  Driver.register_transformation ~rules:[data_rule; image_rule] "ppx_data"
+  Driver.register_transformation ~rules:[data_rule; data_type_rule; image_rule] "ppx_data"
 
