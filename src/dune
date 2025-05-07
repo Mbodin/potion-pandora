@@ -8,7 +8,8 @@
       ppx_inline_test
       ppx_deriving.enum
       ppx_deriving.show
-      potion-pandora.ppx_data))
+      potion-pandora.ppx_data
+      potion-pandora.ppx_inline))
   ; LATER: (preprocessor_deps (glob_files ../images/*))
   (preprocessor_deps all.png)
 	(modules_without_implementation

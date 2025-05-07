@@ -4,6 +4,6 @@
   (name libsave)
 	(libraries imagelib base64 decompress.zl bigstringaf)
 	(modules_without_implementation save)
-	(preprocess (pps ppx_inline_test))
+	(preprocess (pps ppx_inline_test potion-pandora.ppx_inline))
   (inline_tests))
 

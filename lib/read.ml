@@ -26,22 +26,22 @@ let initial_colors : colors = Array.make 1 (0, 0, 0, 0)
 (* We use a reader monad within this file.
  It takes as argument the string being read, the current index, as well as a mapping of colors,
  and returns the current index.
- For performance reason, we generalize the monad to take other state in parameter. *)
+ We generalize the monad a bit to take another state in parameter. *)
 type ('a, 'b) monad_gen = 'b -> string -> int -> colors -> 'a * 'b * int
 type 'a monad = ('a, unit) monad_gen
 
-let return (type g) (type t) (x : t) : (t, g) monad_gen =
+let%inline return (type g) (type t) (x : t) : (t, g) monad_gen =
   fun g _str index _colors -> (x, g, index)
 
-let bind (type g) (type a b) (m : (a, g) monad_gen) (f : a -> (b, g) monad_gen) : (b, g) monad_gen =
+let%inline bind (type g) (type a b) (m : (a, g) monad_gen) (f : a -> (b, g) monad_gen) : (b, g) monad_gen =
   fun g str index colors ->
     let (a, g, index) = m g str index colors in
     f a g str index colors
 
-let ( let* ) = bind
+let%inline ( let* ) = bind
 
-let ( %% ) (type g) (type t) : (unit, g) monad_gen -> (t, g) monad_gen -> (t, g) monad_gen =
-  fun m1 m2 -> bind m1 (fun () -> m2)
+let%inline ( %% ) (type g) (type t) : (unit, g) monad_gen -> (t, g) monad_gen -> (t, g) monad_gen =
+  fun m1 m2 -> let* () = m1 in m2
 
 (* Read the current character. *)
 let read (type g) : (char, g) monad_gen =
@@ -175,7 +175,7 @@ let decode_int : int monad =
     )
   )
 
-let rec decode_monad : type t. t Save.t -> t monad =
+let%inline_within rec decode_monad : type t. t Save.t -> t monad =
   let decode_list (type t) (s : t Save.t) : t list monad =
     let* size = decode_positive in
     let rec aux (acc : t list) : int -> t list monad = function

@@ -22,3 +22,11 @@
   (preprocess (pps ppxlib.metaquot))
   (libraries ppxlib ppxlib.metaquot_lifters potion-pandora.libsave))
 
+(library
+  (public_name potion-pandora.ppx_inline)
+  (name ppx_inline)
+  (modules ppx_inline)
+  (kind ppx_rewriter)
+  (preprocess (pps ppxlib.metaquot))
+  (libraries ppxlib ppxlib.metaquot_lifters))
+

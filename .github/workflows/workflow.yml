@@ -41,15 +41,18 @@ jobs:
       - name: Updating packages.
         run: sudo apt update
       - name: Install dependencies.
-        run: sudo apt install -y npm pkgconf libsdl2-2.0-0 libsdl2-dev libsdl2-image-dev
+        run: sudo apt install -y npm pkgconf libsdl2-2.0-0 libsdl2-dev libsdl2-image-dev sdl2-config
 
-      - name: Install esy
+      - name: Installing esy.
         run: npm install -g esy
       - uses: esy/github-action@master
         with:
           cache-key: ${{ hashFiles('esy.lock/index.json') }}
 
-      - name: Compiling the project
+      - name: Checking environment.
+        run: sdl2-config --static-libs || sdl2-config --libs
+
+      - name: Compiling the project.
         run: esy
 
       - name: Deploying artifact.

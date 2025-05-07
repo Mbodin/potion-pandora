@@ -22,7 +22,8 @@ let init width height =
       ~title:"Potion Pandora"
       ~flags:[Sdlwindow.Shown] in
   let renderer =
-    Sdlrender.create_renderer ~win:window ~index:(-1) ~flags:[Sdlrender.Accelerated] in
+    let open Sdlrender in
+    create_renderer ~win:window ~index:(-1) ~flags:[Accelerated; PresentVSync] in
   let image = Image.create_rgb width height in
   Image.fill_rgb image 0 0 0 ;
   { renderer ; image }
