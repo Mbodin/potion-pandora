@@ -6,6 +6,8 @@ let dump in_path =
   Format.printf "%a\n" Pprintast.structure ast
 
 let () =
-  assert (Array.length Sys.argv = 2) ;
-  dump Sys.argv.(1)
+  if Array.length Sys.argv = 2 then
+    dump Sys.argv.(1)
+  else
+    print_endline "Example usage: esy dune exec gen/print_pp.exe _build/default/lib/read.pp.ml"
 
