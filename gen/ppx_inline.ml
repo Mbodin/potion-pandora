@@ -46,29 +46,34 @@ let expand_fun_decl ~loc ~path x expr =
 
 (** Return all the names within a pattern. *)
 let pattern_names =
-  let o =
+  let traverse =
     object
       inherit [string list] Ast_traverse.fold as super
       method! pattern p acc =
         let acc = super#pattern p acc in
         match p.ppat_desc with
         | Ppat_var { txt = x ; _ } -> x :: acc
+        | Ppat_alias (_, { txt = x ; _ }) -> x :: acc
         | _ -> acc
     end in
   fun p ->
-    let l = o#pattern p [] in
+    let l = traverse#pattern p [] in
     List.sort_uniq compare l
+(* FIXME: Does [pattern_names [%pat (a, b, c)]] indeed includes [a], [b], and [c]? *)
+(* TODO: Currently each [bind] in read.ml includes a [let (a, ...) = ??] which is not replaced and leads to an [(a, a)] instead of an [(a, b)]. *)
 
 (** Return a fresh name starting by its argument. *)
 let fresh_name =
   let counter = ref 0 in
   fun n ->
     incr counter ;
-    Printf.sprintf "%s_gen_%i" n !counter
+    let r = Printf.sprintf "%s_gen_%i" n !counter in
+    print_endline (Printf.sprintf "Debug: %s -> %s." n r) ;
+    r
 
 (** Given an environment mapping names to other names, replaces all occurences of these. *)
-let replace_names, replace_names_pat =
-  let o =
+let (replace_names, replace_names_pat) =
+  let traverse =
     object (self)
       inherit [_] Ast_traverse.map_with_context as super
       method! pattern env p =
@@ -77,6 +82,12 @@ let replace_names, replace_names_pat =
           begin match SMap.find_opt x env with
           | None -> p
           | Some x' -> { p with ppat_desc = Ppat_var { txt = x' ; loc } }
+          end
+        | Ppat_alias (p', { txt = x ; loc }) ->
+          let p' = self#pattern env p' in
+          begin match SMap.find_opt x env with
+          | None -> p'
+          | Some x' -> { p with ppat_desc = Ppat_alias (p', { txt = x' ; loc }) }
           end
         | _ -> super#pattern env p
       method! expression env e =
@@ -88,7 +99,7 @@ let replace_names, replace_names_pat =
           end
         | _ -> super#expression env e
     end in
-  o#expression, o#pattern
+  (traverse#expression, traverse#pattern)
 
 (** Remove all occurences of a type in an expression, replacing it with an any ([_]) type. *)
 let remove_type name =
@@ -100,6 +111,91 @@ let remove_type name =
         Ptyp_any
       | t -> super#core_type_desc t
   end#expression
+
+(** Rewrite an expression to make sure that it only introduces fresh identifiers. *)
+let rewrite_fresh =
+  let traverse =
+    object (self)
+      inherit Ast_traverse.map as super
+      method! expression e =
+        let shadow_cases =
+          List.map (fun { pc_lhs ; pc_guard ; pc_rhs } ->
+            let names = pattern_names pc_lhs in
+            (* We create an environment replacing all local names by new fresh ones. *)
+            let env_names =
+              List.fold_left (fun e n ->
+                SMap.add n (fresh_name n) e) SMap.empty names in
+            {
+              pc_lhs = replace_names_pat env_names pc_lhs ;
+              pc_guard =
+                Option.map (fun e -> self#expression (replace_names env_names e)) pc_guard ;
+              pc_rhs = self#expression (replace_names env_names pc_rhs)
+            }) in
+        match e.pexp_desc with
+        | Pexp_let (rf, vbs, e1) ->
+          let names =
+            let l = List.fold_left (fun l vb -> pattern_names vb.pvb_pat @ l) [] vbs in
+            List.sort_uniq compare l in
+          let env_names =
+            List.fold_left (fun e n ->
+              SMap.add n (fresh_name n) e) SMap.empty names in
+          let vbs =
+            List.map (fun vb ->
+              let expr = vb.pvb_expr in
+              let expr =
+                match rf with
+                | Nonrecursive -> expr
+                | Recursive -> replace_names env_names expr in
+              let expr = self#expression expr in
+              { vb with
+                  pvb_pat = replace_names_pat env_names vb.pvb_pat ;
+                  pvb_expr = expr }) vbs in
+          let e1 = replace_names env_names e1 in
+          { e with pexp_desc = Pexp_let (rf, vbs, e1) }
+        | Pexp_fun (lbl, eo1, p, e2) ->
+          let names = pattern_names p in
+          let env_names =
+            List.fold_left (fun e n ->
+              SMap.add n (fresh_name n) e) SMap.empty names in
+          let eo1 = Option.map (fun e -> self#expression (replace_names env_names e)) eo1 in
+          let p = replace_names_pat env_names p in
+          let e2 = self#expression (replace_names env_names e2) in
+          { e with pexp_desc = Pexp_fun (lbl, eo1, p, e2) }
+        | Pexp_for (p, e1, e2, dir, e3) ->
+          let names = pattern_names p in
+          let env_names =
+            List.fold_left (fun e n ->
+              SMap.add n (fresh_name n) e) SMap.empty names in
+          let p = replace_names_pat env_names p in
+          let e1 = self#expression e1 in
+          let e2 = self#expression e2 in
+          let e3 = self#expression (replace_names env_names e3) in
+          { e with pexp_desc = Pexp_for (p, e1, e2, dir, e3) }
+        | Pexp_letop { let_ = let1 ; ands = lets2 ; body = e3 } ->
+          let names =
+            let l = List.fold_left (fun l bo -> pattern_names bo.pbop_pat @ l) [] (let1 :: lets2) in
+            List.sort_uniq compare l in
+          print_endline ("Debug: letop names: " ^ String.concat ";" names) ;
+          let env_names =
+            List.fold_left (fun e n ->
+              SMap.add n (fresh_name n) e) SMap.empty names in
+          let map_let binding =
+            { binding with
+                pbop_pat = replace_names_pat env_names binding.pbop_pat ;
+                pbop_exp = self#expression binding.pbop_exp } in
+          let let1 = map_let let1 in
+          let lets2 = List.map map_let lets2 in
+          let e3 = self#expression (replace_names env_names e3) in
+          { e with pexp_desc = Pexp_letop { let_ = let1 ; ands = lets2 ; body = e3 } }
+        | Pexp_function cases -> { e with pexp_desc = Pexp_function (shadow_cases cases) }
+        | Pexp_match (e1, cases) ->
+          { e with pexp_desc = Pexp_match (self#expression e1, shadow_cases cases) }
+        | Pexp_try (e1, cases) ->
+          { e with pexp_desc = Pexp_try (self#expression e1, shadow_cases cases) }
+
+        | _ -> super#expression e
+    end in
+  traverse#expression
 
 (** Inline the functions given in the environment.
   The environment maps names to pairs of locality and terms. *)
@@ -142,27 +238,38 @@ let inline_within =
             | args, { pexp_desc = Pexp_newtype ({ txt = t ; _ }, e_inner) ; _ } ->
               print_endline "Debug: newtype" ;
               aux env args (remove_type t e_inner)
-            | args, { pexp_desc = Pexp_constraint (e_inner, _) ; _ } ->
+            | args, { pexp_desc = Pexp_constraint (e_inner, ty) ; _ } ->
               print_endline "Debug: constraint" ;
-              aux env args e_inner
+              { e with pexp_desc = Pexp_constraint (aux env args e_inner, ty) }
             | (lbl1, arg1) :: args, { pexp_desc =
                 Pexp_fun (lbl2, None, { ppat_desc =
                   (Ppat_var { txt = x ; _ }
-                  | Ppat_constraint ({ ppat_desc = Ppat_var { txt = x ; _ } }, _)) ; _ }, e_inner) ; _ }
+                  | Ppat_constraint ({ ppat_desc = Ppat_var { txt = x ; _ } }, _)) ; _ },
+                  e_inner) ; _ }
               when lbl1 = lbl2 ->
-              print_endline (Printf.sprintf "Debug: adding local %s." x) ;
-              let env = SMap.add x (Local, arg1) env in
+              let x' = fresh_name x in
+              print_endline (Printf.sprintf "Debug: adding local %s -> %s." x x') ;
+              let env_name = SMap.add x x' SMap.empty in
+              let e_inner = replace_names env_name e_inner in
+              let env = SMap.add x' (Local, arg1) env in
               aux env args e_inner
             | [], e -> self#expression env e
             | args, e ->
               super#expression env (make_expr ~loc (Pexp_apply (e, args))) in
           let (_locality, e_inlined) = SMap.find x env in
+          let e_inlined = rewrite_fresh e_inlined in
           aux env args e_inlined
         | Pexp_letop {
             let_ = { pbop_op = { txt = op ; _ } ; pbop_pat = p ; pbop_exp = e1 ; _ } ;
             ands = [] ; body = e2 }
           when SMap.mem op env ->
           print_endline "Debug: letop" ;
+          let names = pattern_names p in
+          let env_names =
+            List.fold_left (fun e n ->
+              SMap.add n (fresh_name n) e) SMap.empty names in
+          let p = replace_names_pat env_names p in
+          let e2 = replace_names env_names e2 in
           self#expression env (make_expr ~loc (Pexp_apply (
             make_expr ~loc (Pexp_ident { txt = Lident op ; loc }),
             [(Nolabel, e1) ; (Nolabel, make_expr ~loc (Pexp_fun (Nolabel, None, p, e2)))])))
@@ -191,6 +298,7 @@ let inline_within =
           let names =
             let l = List.fold_left (fun l bo -> pattern_names bo.pbop_pat @ l) [] (let1 :: lets2) in
             List.sort_uniq compare l in
+          print_endline ("Debug: letop names: " ^ String.concat ";" names) ;
           let env_names =
             List.fold_left (fun e n ->
               SMap.add n (fresh_name n) e) SMap.empty names in
