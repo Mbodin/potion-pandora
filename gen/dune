@@ -27,6 +27,7 @@
   (name ppx_inline)
   (modules ppx_inline)
   (kind ppx_rewriter)
-  (preprocess (pps ppxlib.metaquot))
+  (inline_tests)
+  (preprocess (pps ppxlib.metaquot ppx_inline_test))
   (libraries ppxlib ppxlib.metaquot_lifters))
 
