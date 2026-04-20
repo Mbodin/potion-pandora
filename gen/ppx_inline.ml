@@ -222,10 +222,6 @@ let rewrite_fresh =
     end in
   traverse#expression
 
-(* FIXME: We still have an issue with terms like [let* a = read in let a = f a in ... a]: it yields
- [fun ... -> let (a_gen1, ...) = let (a_gen2, ...) = f a_gen1 in ... a_gen1] instead of
- [fun ... -> let (a_gen1, ...) = let (a_gen2, ...) = f a_gen1 in ... a_gen2]. *)
-
 (** Inline the functions given in the environment.
   The environment maps names to pairs of locality and terms. *)
 let inline_within =
@@ -234,20 +230,6 @@ let inline_within =
       inherit [_] Ast_traverse.map_with_context as super
       method! expression env e =
         let loc = e.pexp_loc in
-        (* (* FIXME: Still useful? *)
-        let shadow_cases env =
-          List.map (fun { pc_lhs ; pc_guard ; pc_rhs } ->
-            let names = pattern_names pc_lhs in
-            (* We create an environment replacing all local names by new fresh ones. *)
-            let env_names =
-              List.fold_left (fun e n ->
-                SMap.add n (fresh_name n) e) SMap.empty names in
-            {
-              pc_lhs = replace_names_pat env_names pc_lhs ;
-              pc_guard =
-                Option.map (fun e -> self#expression env (replace_names env_names e)) pc_guard ;
-              pc_rhs = self#expression env (replace_names env_names pc_rhs)
-            }) in *)
         match e.pexp_desc with
         | Pexp_ident { txt = Lident x ; _ }
             when match SMap.find_opt x env with
@@ -260,6 +242,7 @@ let inline_within =
             when SMap.mem x env ->
           print_endline (Printf.sprintf "Debug: apply with %s" x) ;
           let (_locality, e_inlined) = SMap.find x env in
+          let e_inlined = rewrite_fresh e_inlined in
           let rec aux env args e =
             match args, e with
             | args, { pexp_desc = Pexp_ident { txt = Lident x ; _ } ; _ } when SMap.mem x env ->
@@ -269,7 +252,7 @@ let inline_within =
             | args, { pexp_desc = Pexp_newtype ({ txt = t ; _ }, e_inner) ; _ } ->
               aux env args (remove_type t e_inner)
             | args, { pexp_desc = Pexp_constraint (e_inner, ty) ; _ } ->
-              { e with pexp_desc = Pexp_constraint (aux env args e_inner, ty) }
+              aux env args e_inner
             | (lbl1, arg1) :: args, { pexp_desc =
                 Pexp_fun (lbl2, None, { ppat_desc =
                   (Ppat_var { txt = x ; _ }
@@ -298,49 +281,6 @@ let inline_within =
           self#expression env (make_expr ~loc (Pexp_apply (
             make_expr ~loc (Pexp_ident { txt = Lident op ; loc }),
             [(Nolabel, e1) ; (Nolabel, make_expr ~loc (Pexp_fun (Nolabel, None, p, e2)))])))
-
-          (* (* FIXME: Still useful? *)
-        (* Dealing with shadowing. *)
-        | Pexp_fun (lbl, eo1, p, e2) ->
-          let names = pattern_names p in
-          let env_names =
-            List.fold_left (fun e n ->
-              SMap.add n (fresh_name n) e) SMap.empty names in
-          let eo1 = Option.map (fun e -> self#expression env (replace_names env_names e)) eo1 in
-          let p = replace_names_pat env_names p in
-          let e2 = self#expression env (replace_names env_names e2) in
-          make_expr ~loc (Pexp_fun (lbl, eo1, p, e2))
-        | Pexp_for (p, e1, e2, dir, e3) ->
-          let names = pattern_names p in
-          let env_names =
-            List.fold_left (fun e n ->
-              SMap.add n (fresh_name n) e) SMap.empty names in
-          let p = replace_names_pat env_names p in
-          let e1 = self#expression env e1 in
-          let e2 = self#expression env e2 in
-          let e3 = self#expression env (replace_names env_names e3) in
-          make_expr ~loc (Pexp_for (p, e1, e2, dir, e3))
-        | Pexp_letop { let_ = let1 ; ands = lets2 ; body = e3 } ->
-          let names =
-            let l = List.fold_left (fun l bo -> pattern_names bo.pbop_pat @ l) [] (let1 :: lets2) in
-            List.sort_uniq compare l in
-          let env_names =
-            List.fold_left (fun e n ->
-              SMap.add n (fresh_name n) e) SMap.empty names in
-          let map_let binding =
-            { binding with
-                pbop_pat = replace_names_pat env_names binding.pbop_pat ;
-                pbop_exp = self#expression env binding.pbop_exp } in
-          let let1 = map_let let1 in
-          let lets2 = List.map map_let lets2 in
-          let e3 = self#expression env (replace_names env_names e3) in
-          make_expr ~loc (Pexp_letop { let_ = let1 ; ands = lets2 ; body = e3 })
-        | Pexp_function cases -> make_expr ~loc (Pexp_function (shadow_cases env cases))
-        | Pexp_match (e1, cases) ->
-          make_expr ~loc (Pexp_match (self#expression env e1, shadow_cases env cases))
-        | Pexp_try (e1, cases) ->
-          make_expr ~loc (Pexp_try (self#expression env e1, shadow_cases env cases))
-          *)
 
         | _ -> super#expression env e
     end in
