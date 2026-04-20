@@ -15,7 +15,7 @@ binary data in an ASCII string format by translating it into a radix-64
 representation.  It is specified in RFC 4648.
 """
 depends: [
-  "ocaml" {>= "4.03.0"}
+  "ocaml" {>= "4.07.0"}
   "dune" {>= "2.3"}
   "fmt" {with-test & >= "0.8.7"}
   "bos" {with-test}
@@ -27,12 +27,13 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
+x-maintenance-intent: [ "(latest)" ]
 url {
   src:
-    "https://github.com/mirage/ocaml-base64/releases/download/v3.5.1/base64-3.5.1.tbz"
+    "https://github.com/mirage/ocaml-base64/releases/download/v3.5.2/base64-3.5.2.tbz"
   checksum: [
-    "sha256=d8fedaa59bd12feae7acc08b5928dd478aac523f4ca8d240470d2500651c65ed"
-    "sha512=278bd2029800d90ed88ff59b9de723013e645523556a1667b64178d6b5058a7d6da91efffef3589c35569b5fa10ddee74c93f5a3d156b9146c8af5b7fe44aeaf"
+    "sha256=b3f5ce301aa72c7032ef90be2332d72ff3962922c00ee2aec6bcade187a2f59b"
+    "sha512=82148a1fefec9493aaeac032c8d46b9548369d7fd90a57865e009a32c8a0eef950f0f8dbb52b74bb46880a590a0b49f2daa7ab4857233734aee8e383f5a164ec"
   ]
 }
-x-commit-hash: "084346f14ed1e6706d733402dd6ff65b0dc4f718"
+x-commit-hash: "edc588cb89f699e17ea13494898cca4bd7d46b8b"

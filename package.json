@@ -22,6 +22,7 @@
 		"@opam/js_of_ocaml-lwt": "*",
 		"@opam/js_of_ocaml-ppx": "*",
 		"@opam/js_of_ocaml-ppx_deriving_json": "*",
+		"@opam/ocaml-compiler-libs": "*",
 		"@opam/lwt_ppx": "*",
 		"@opam/tyxml": "*",
 		"@opam/tyxml-ppx": "*",

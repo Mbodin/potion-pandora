@@ -40,9 +40,9 @@ dev-repo: "git+https://github.com/ocaml-community/sedlex.git"
 doc: "https://ocaml-community.github.io/sedlex/index.html"
 url {
   src:
-    "https://github.com/ocaml-community/sedlex/archive/refs/tags/v3.4.tar.gz"
+    "https://github.com/ocaml-community/sedlex/archive/refs/tags/v3.7.tar.gz"
   checksum: [
-    "md5=5c655398261226dd99b1231df3f729e1"
-    "sha512=7e5f6e93e7791058b54bcd66f0e28f8ff72e6ea759a172cf6d8d7055d352d3a4e5c23f15278e254870a0ff1caed8948e77c6fde997c2b8bd81d3484198ddd484"
+    "md5=893790268f68a1bb60dcc139f390a2d3"
+    "sha512=053bceea4944309705e6b8014381711a2c4f7f0ab235cd239e2d2f5a2dbd3efe1b1c2d533631a8545dacf563cdb5b7469fe53982ef79ace270ee8a4a471f1fe2"
   ]
 }

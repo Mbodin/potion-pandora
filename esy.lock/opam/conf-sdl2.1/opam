@@ -12,7 +12,7 @@ build: [
   "--personality=x86_64-w64-mingw32"
     {os = "win32" & os-distribution != "cygwinports" &
      host-arch-x86_64:installed}
-  "pkg-config" {os != "win32" | os-distribution != "cygwin"}
+  "pkg-config" {os != "win32" | os-distribution = "cygwinports"}
   "sdl2"
 ]
 depexts: [
@@ -20,8 +20,9 @@ depexts: [
   ["sdl2"] {os-distribution = "arch"}
   ["libsdl2-dev"] {os-family = "debian"}
   ["libsdl2-dev"] {os-family = "ubuntu"}
-  ["SDL2-devel"] {os-distribution = "fedora"}
-  ["SDL2-devel" "libwayland-egl" "adwaita-cursor-theme"] {os-distribution = "fedora" & (os-version = "37" | os-version = "36")}
+  ["sdl2-compat-devel"] {os-family = "fedora" & os-version >= "42"}
+  ["SDL2-devel"] {os-family = "fedora" & os-version < "42"}
+  ["SDL2-devel" "libwayland-egl" "adwaita-cursor-theme"] {os-family = "fedora" & (os-version = "37" | os-version = "36")}
   ["epel-release" "SDL2-devel"] {os-distribution = "centos"}
   ["SDL2-devel"] {os-distribution = "ol"}
   ["sdl2"] {os = "freebsd"}

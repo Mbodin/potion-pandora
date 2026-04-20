@@ -11,11 +11,11 @@ build: [
 ]
 depends: [
   "ocaml"               {>= "5.1.0"}
-  "base"                {>= "v0.17" & < "v0.18"}
-  "jane-street-headers" {>= "v0.17" & < "v0.18"}
-  "jst-config"          {>= "v0.17" & < "v0.18"}
-  "ppx_base"            {>= "v0.17" & < "v0.18"}
-  "ppx_optcomp"         {>= "v0.17" & < "v0.18"}
+  "base"                {>= "v0.17" & < "v0.18~"}
+  "jane-street-headers" {>= "v0.17" & < "v0.18~"}
+  "jst-config"          {>= "v0.17" & < "v0.18~"}
+  "ppx_base"            {>= "v0.17" & < "v0.18~"}
+  "ppx_optcomp"         {>= "v0.17" & < "v0.18~"}
   "dune"                {>= "3.11.0"}
 ]
 available: arch != "x86_32"
@@ -28,3 +28,5 @@ url {
 src: "https://github.com/janestreet/time_now/archive/refs/tags/v0.17.0.tar.gz"
 checksum: "sha256=fc85d6e46c4eb9370de9385f7bbfa6d57b4e48a9e96b20009007226b73f9530c"
 }
+x-maintenance-intent: ["(latest)"]
+

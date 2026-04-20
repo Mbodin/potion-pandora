@@ -11,8 +11,8 @@ build: [
 ]
 depends: [
   "ocaml"       {>= "5.1.0"}
-  "base"        {>= "v0.17" & < "v0.18"}
-  "ppxlib_jane" {>= "v0.17" & < "v0.18"}
+  "base"        {>= "v0.17" & < "v0.18~"}
+  "ppxlib_jane" {>= "v0.17" & < "v0.18~"}
   "dune"        {>= "3.11.0"}
   "ppxlib"      {>= "0.28.0"}
 ]
@@ -25,3 +25,5 @@ url {
 src: "https://github.com/janestreet/ppx_compare/archive/refs/tags/v0.17.0.tar.gz"
 checksum: "sha256=f0b23eb78082ef4dc71a66939bbc63c6b0cc2cf6a4744a906b7a2c016cbe3098"
 }
+x-maintenance-intent: ["(latest)"]
+
