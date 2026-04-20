@@ -1,7 +1,9 @@
-(* Although the ocamlc compiler is able to inline function without any issue, js_of_ocaml isn't able
+(** Although the ocamlc compiler is able to inline function without any issue, js_of_ocaml isn't able
  to do it properly, and this causes issues with JavaScript's small stack, especially in the context
  of monadic code.
  To circumvent this issue, this ppx rewriter enables to mark some functions for inlining. *)
+
+(* TODO: also replace [let rec f = fun a b c -> ...] with let rec f a b c = ...] as well as the inner calls. *)
 
 open Ppxlib
 
@@ -44,7 +46,6 @@ let function_map = ref SMap.empty
 (** Add the function to the global functions to be inlined. *)
 let expand_fun_decl ~loc ~path x expr =
   ignore path ;
-  print_endline (Printf.sprintf "Debug: adding %s." x) ;
   function_map := SMap.add x (Global, expr) !function_map ; {
     pstr_desc =
       Pstr_value (Nonrecursive, [{
@@ -160,7 +161,6 @@ let rewrite_fresh =
           let names =
             let l = List.fold_left (fun l vb -> pattern_names vb.pvb_pat @ l) [] vbs in
             List.sort_uniq compare l in
-          print_endline ("Debug: let names: " ^ String.concat ";" names) ;
           let env_names =
             List.fold_left (fun e n ->
               SMap.add n (fresh_name n) e) SMap.empty names in
@@ -200,7 +200,6 @@ let rewrite_fresh =
           let names =
             let l = List.fold_left (fun l bo -> pattern_names bo.pbop_pat @ l) [] (let1 :: lets2) in
             List.sort_uniq compare l in
-          print_endline ("Debug: letop names: " ^ String.concat ";" names) ;
           let env_names =
             List.fold_left (fun e n ->
               SMap.add n (fresh_name n) e) SMap.empty names in
@@ -240,7 +239,6 @@ let inline_within =
           super#expression env e_inlined
         | Pexp_apply ({ pexp_desc = Pexp_ident { txt = Lident x ; _ } ; _ }, args)
             when SMap.mem x env ->
-          print_endline (Printf.sprintf "Debug: apply with %s" x) ;
           let (_locality, e_inlined) = SMap.find x env in
           let e_inlined = rewrite_fresh e_inlined in
           let rec aux env args e =
@@ -251,7 +249,8 @@ let inline_within =
               aux env args e_inlined
             | args, { pexp_desc = Pexp_newtype ({ txt = t ; _ }, e_inner) ; _ } ->
               aux env args (remove_type t e_inner)
-            | args, { pexp_desc = Pexp_constraint (e_inner, ty) ; _ } ->
+            | args, { pexp_desc = Pexp_constraint (e_inner, _ty) ; _ } ->
+              (* This function changes the term too much for the type to still make sense. *)
               aux env args e_inner
             | (lbl1, arg1) :: args, { pexp_desc =
                 Pexp_fun (lbl2, None, { ppat_desc =
@@ -287,7 +286,6 @@ let inline_within =
   traverse#expression
 
 let expand_inline_within ~loc ~path rf pat expr =
-  print_endline "Debug: expand_inline_within" ;
   ignore path ; {
     pstr_desc =
       Pstr_value (rf, [{

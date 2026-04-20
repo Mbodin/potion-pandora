@@ -18,11 +18,7 @@ module type T = sig
   (* Furthermore, results are allowed to be embedded within a monad.
     Technically, this also means that the type t could be stored within a state monad within m,
     but we keep it appart for simplicity (it can be instantiated by unit if needed be). *)
-  type _ m
-
-  (* The monadic operators. *)
-  val return : 'a -> 'a m
-  val ( let* ) : 'a m -> ('a -> 'b m) -> 'b m
+  include Monad.T
 
   (* To be called once: it ensures that the monadic computation is executed.
    It is meant to be instantiable by Lwt_main. *)

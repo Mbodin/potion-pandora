@@ -15,7 +15,7 @@
 	(modules_without_implementation
     interface)
   (inline_tests)
-  (flags (:standard -warn-error -A -g)))
+  (flags (:standard -warn-error -A -g))) ; LATER: remove the -g option.
 
 (rule
 	(targets images_coords.ml all.png)

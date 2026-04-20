@@ -1,4 +1,24 @@
 
+module Ops (I : Interface.T) = struct
+
+  module Ops = Monad.Ops (I)
+  open Ops
+
+  let display_image interface img (coord_x, coord_y) =
+    let (dim_x, dim_y) = Subimage.dimensions img in
+    let min_x = max 0 (-coord_x) in
+    let min_y = max 0 (-coord_y) in
+    for_ min_x (dim_x - 1) (fun x ->
+      for_ min_y (dim_y - 1) (fun y ->
+        let (r, g, b, a) = Subimage.read img (x, y) in
+        match a with
+        | 0 -> I.return ()
+        | 255 -> I.write interface (r, g, b) (coord_x + x, coord_y + y)
+        | _ -> assert false))
+
+end
+
+
 module SplitVertical (I : Interface.T) = struct
 
   (* Functions to be called when the appropriate event occurs. *)
@@ -32,7 +52,7 @@ module SplitVertical (I : Interface.T) = struct
     | WaitingBoth (* None of Up.init and [Down.init] has been called. *)
     | WaitingDown of (int * int) (* Only [Up.init] has been called. *)
     | WaitingUp of (int * int) (* Only [Down.init] has been called. *)
-    | State of I.t * half_state * half_state (* Both has been called and the canvas are ready. *)
+    | State of I.t * half_state * half_state (* Both has been called and both canvas are ready. *)
     | ClosedUp of half_state (* [Up.quit] has been called: we continue to store down's state. *)
     | ClosedDown of half_state (* [Down.quit] has been called: we continue to store up's state. *)
     | Closed (* Both [Up.quit] and [Down.quit] have been called. *)
@@ -64,8 +84,8 @@ module SplitVertical (I : Interface.T) = struct
 
   (* Check if a global coordinate is within the down interface. *)
   let is_down (x, y) =
-    let (_t, st_up, st_down) = get_states () in
-    y >= st_up.height && y < st_up.height + st_down.height
+    let (_t, _st_up, st_down) = get_states () in
+    y >= st_down.shift_y && y < st_down.shift_y + st_down.height
     && x >= st_down.shift_x && x - st_down.shift_x < st_down.width
 
   (* Convert a global coordinate into the local up one. *)
@@ -75,8 +95,8 @@ module SplitVertical (I : Interface.T) = struct
 
   (* Convert a global coordinate into the local down one. *)
   let convert_down (x, y) =
-    let (_t, st_up, st_down) = get_states () in
-    (x - st_down.shift_x, y - st_up.height)
+    let (_t, _st_up, st_down) = get_states () in
+    (x - st_down.shift_x, y - st_down.shift_y)
 
   (* Convert a local up coordinate into the global one. *)
   let convert_up_inv (x, y) =
@@ -86,9 +106,9 @@ module SplitVertical (I : Interface.T) = struct
 
   (* Convert a local down coordinate into the global one. *)
   let convert_down_inv (x, y) =
-    let (_t, st_up, st_down) = get_states () in
+    let (_t, _st_up, st_down) = get_states () in
     assert (x >= 0 && y >= 0 && x < st_down.width && y < st_down.height) ;
-    (x + st_down.shift_x, y + st_up.height)
+    (x + st_down.shift_x, y + st_down.shift_y)
 
   (* Set up the [I.on_*] functions to call the relevant function stored in the state. *)
   let setup_on_events () : unit m =
@@ -390,7 +410,7 @@ module SelectButtons (B : ButtonInputs) (I : Interface.T) = struct
         match B.buttons with
         | [] -> () (* No buttons are provided.  I guess that's fine. *)
         | (_img, actions) :: _ -> actions.on_press false in
-      let toggles = List.map (fun _ -> ref (fun b -> assert false)) B.buttons in
+      let toggles = List.map (fun _ -> ref (fun _b -> assert false)) B.buttons in
       (* Reset all buttons except one. *)
       let set_index i =
         let rec aux i = function

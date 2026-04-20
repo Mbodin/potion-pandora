@@ -14,40 +14,24 @@ module Engine (D : Display) (I : Interface.T) = struct
   let load st =
     level := st
 
-  (* For-loops within monads. *)
-  let rec for_ min max f =
-    let open I in
-    if min > max then return ()
-    else
-      let* () = f min in
-      for_ (min + 1) max f
+  module MonadOps = Monad.Ops (I)
+  open MonadOps
+  module ScreenOps = Screen.Ops (I)
 
-  (* Iteration on lists within monads. *)
-  let iter_ f l =
-    let open I in
-    List.fold_left (fun u v ->
-      let* () = u in
-      f v) (return ()) l
-
-  (* Display an Animation.image into the interface with its lower left corner at
+  (* Display a Subimage.t into the interface with its lower left corner at
     the provided coordinates.
     The interface coordinates and the image coordinates (0 is up) are different
     from the game coordinates (0 is down), so some computations have to take place. *)
   let display_image img (coord_x, coord_y) =
     let (dim_x, dim_y) = Subimage.dimensions img in
-    let min_x = max 0 (-coord_x) in
-    let max_x = min (dim_x - 1) (D.width - coord_x - 1) in
-    let min_y = max 0 (dim_y + coord_y - D.height) in
-    let max_y = min (dim_y - 1) (dim_y + coord_y - 1) in
+    let img =
+      Subimage.sub img
+        (min (dim_x - 1) (D.width - coord_x - 1))
+        (min (dim_y - 1) (dim_y + coord_y - 1))
+        (0, 0) in
     let open I in
     let* interface in
-    for_ min_x max_x (fun x ->
-      for_ min_y max_y (fun y ->
-        let (r, g, b, a) = Subimage.read img (x, y) in
-        match a with
-        | 0 -> return ()
-        | 255 -> I.write interface (r, g, b) (coord_x + x, D.height - dim_y - coord_y + y)
-        | _ -> assert false))
+    ScreenOps.display_image interface img (coord_x, D.height - dim_y - coord_y)
 
   let step screen_coords =
     let open I in
