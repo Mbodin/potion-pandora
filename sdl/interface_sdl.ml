@@ -28,6 +28,9 @@ let init width height =
   Image.fill_rgb image 0 0 0 ;
   { renderer ; image }
 
+let dimensions { image ; _ } =
+  (image.Image.width, image.Image.height)
+
 let write { image ; _ } (r, g, b) (x, y) =
   assert (x >= 0 && y >= 0) ;
   assert (x < image.Image.width && y < image.Image.height) ;

@@ -5,9 +5,22 @@
 module Ops (I : Interface.T) : sig
 
   (* Display a Subimage.t into the interface with its upper left corner at
-    the provided coordinates.
-    The image must fit in the screen. *)
+    the provided coordinates. *)
   val display_image : I.t -> Subimage.t -> (int * int) -> unit I.m
+
+  (* Display an horizontal line of this color at the given y-coordinate, and between the two
+    x-coordinates (included). *)
+  val horizontal_line : I.t -> (int * int * int) -> y:int -> int -> int -> unit I.m
+
+  (* Display a vertical line of this color at the given x-coordinate, and between the two
+    y-coordinates (included). *)
+  val vertical_line : I.t -> (int * int * int) -> x:int -> int -> int -> unit I.m
+
+  (* Draw an (empty) rectangle of this color around these dimensions. *)
+  val rectangle : I.t -> (int * int * int) -> (int * int) -> (int * int) -> unit I.m
+
+  (* Fill a rectangle of this color around these dimensions. *)
+  val fill : I.t -> (int * int * int) -> (int * int) -> (int * int) -> unit I.m
 
 end
 
@@ -20,27 +33,39 @@ module SplitVertical : Interface.T -> sig
   end
 
 
-type button_actions = {
-  on_press : bool -> unit (* Called when a button is pressed.  The boolean states whether it was triggerred by the user or by internal functions. *) ;
-  on_release : bool -> unit (* Called when a button is released. *) ;
-  set_toggle : (bool -> unit) -> unit (* Called once with a function to set a button (true then means pressed).  Calling the provided function will call on_press or on_release with false. *)
+(* Actions associated to each button.
+  The 'unit type argument is used to encode monadic returns. *)
+type 'unit button_actions = {
+  on_press : bool -> 'unit (* Called when a button is pressed.  The boolean states whether it was triggerred by the user or by internal functions. *) ;
+  on_release : bool -> 'unit (* Called when a button is released. *) ;
+  set_toggle : (bool -> 'unit) -> 'unit (* Called once with a function to set a button (true then means pressed).  Calling the provided function will call on_press or on_release with false. *)
 }
+
+(* A description of buttons and their actions. *)
+module type ButtonInputs = sig
+  type _ m
+  val width : int
+  val height : int
+  val buttons : (Subimage.t * unit m button_actions) list m
+end
 
 (* Given a list of buttons and target width and height, fit these buttons to the screen.
   To deal with their effects, functions must be provided to react when these buttons are
   pressed or released, or to toggle their state. *)
-module Buttons : sig
-    val width : int
-    val height : int
-    val buttons : (Subimage.t * button_actions) list
-  end -> Interface.T -> sig (* Empty, as everything is dealt with the button actions. *) end
+module Buttons (I : Interface.T) :
+  (ButtonInputs with type 'a m = 'a I.m) ->
+  sig
+    (* This is just a token to be chained.  Every action is dealt within the button actions. *)
+    val u : unit I.m
+  end
 
 (* Similar to Buttons, but forcing exactly one button to be pressed at the same time.
   The initial pressed button is the first of the list, and its associated on_press event is
   triggered right away (with false). *)
-module SelectButtons : sig
-    val width : int
-    val height : int
-    val buttons : (Subimage.t * button_actions) list
-  end -> Interface.T -> sig (* Again, empty *) end
+module SelectButtons (I : Interface.T) :
+  (ButtonInputs with type 'a m = 'a I.m) ->
+  sig
+    (* Again, just a token *)
+    val u : unit I.m
+  end
 

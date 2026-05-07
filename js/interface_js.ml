@@ -27,6 +27,10 @@ let get_object () =
   | None -> failwith "Uninitialised interface."
   | Some obj -> obj
 
+let dimensions () =
+  let { width ; height ; _ } = get_object () in
+  return (width, height)
+
 (* Given a canvas coordinate, computes in which pixel of the canvas it happened. *)
 let convert_coords (x, y) =
   let { width ; height ; canvas ; _ } = get_object () in

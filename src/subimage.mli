@@ -42,6 +42,10 @@ val combine_vertically : (int * t) list -> t
 
 (* Create an image from the provided image of the provided dimensions.
   These dimensions must be larger than the image.
-  The image will be centered. *)
+  The image will be centered.
+  The border will be transparent. *)
 val enlarge : t -> (int * int) -> t
+
+(* Apply a function mapping each (r, g, b, a) pixel into another (r, g, b, a) value into an image. *)
+val map : ((int * int * int * int) -> (int * int * int * int)) -> t -> t
 

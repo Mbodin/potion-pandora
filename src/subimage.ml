@@ -117,3 +117,14 @@ let vertical_sequence offset imgl =
     let offset = if i = 0 then 0 else offset in
     (offset, img)) imgl)
 
+let map f img =
+  let result = Image.create_rgb ~alpha:true img.width img.height in
+  for x = 0 to img.width - 1 do
+    for y = 0 to img.height - 1 do
+      let (r, g, b, a) = read img (x, y) in
+      let (r, g, b, a) = f (r, g, b, a) in
+      Image.write_rgba result x y r g b a
+    done
+  done ;
+  from_image result
+

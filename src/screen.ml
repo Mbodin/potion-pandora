@@ -1,20 +1,59 @@
 
 module Ops (I : Interface.T) = struct
 
+  open I
+
   module Ops = Monad.Ops (I)
-  open Ops
+  include Ops
 
   let display_image interface img (coord_x, coord_y) =
     let (dim_x, dim_y) = Subimage.dimensions img in
+    let* (width, height) = dimensions interface in
     let min_x = max 0 (-coord_x) in
     let min_y = max 0 (-coord_y) in
-    for_ min_x (dim_x - 1) (fun x ->
-      for_ min_y (dim_y - 1) (fun y ->
+    let max_x = min (dim_x - 1) (width - 1 - coord_x) in
+    let max_y = min (dim_y - 1) (height - 1 - coord_y) in
+    for_ min_x max_x (fun x ->
+      for_ min_y max_y (fun y ->
         let (r, g, b, a) = Subimage.read img (x, y) in
         match a with
-        | 0 -> I.return ()
-        | 255 -> I.write interface (r, g, b) (coord_x + x, coord_y + y)
+        | 0 -> return ()
+        | 255 -> write interface (r, g, b) (coord_x + x, coord_y + y)
         | _ -> assert false))
+
+  let horizontal_line interface color ~y x1 x2 =
+    let* (width, height) = dimensions interface in
+    if y >= 0 && y < height then
+      let (x1, x2) = (min x1 x2, max x1 x2) in
+      let x1 = max 0 x1 in
+      let x2 = min x2 (width - 1) in
+      for_ x1 x2 (fun x ->
+        write interface color (x, y))
+    else return ()
+
+  let vertical_line interface color ~x y1 y2 =
+    let* (width, height) = dimensions interface in
+    if x >= 0 && x < width then
+      let (y1, y2) = (min y1 y2, max y1 y2) in
+      let y1 = max 0 y1 in
+      let y2 = min y2 (height - 1) in
+      for_ y1 y2 (fun y ->
+        write interface color (x, y))
+    else return ()
+
+  let rectangle interface color (x1, y1) (x2, y2) =
+    horizontal_line interface color ~y:y1 x1 x2 %%
+    horizontal_line interface color ~y:y2 x1 x2 %%
+    vertical_line interface color ~x:x1 y1 y2 %%
+    vertical_line interface color ~x:x2 y1 y2
+
+  let fill interface color (x1, y1) (x2, y2) =
+    let* (width, height) = dimensions interface in
+    let (x1, x2) = (min x1 x2, max x1 x2) in
+    let x1 = max 0 x1 in
+    let x2 = min x2 (width - 1) in
+    for_ x1 x2 (fun x ->
+      vertical_line interface color ~x y1 y2)
 
 end
 
@@ -159,7 +198,7 @@ module SplitVertical (I : Interface.T) = struct
 
   (* Build a [State _] from both up and down dimensions and store it into [global_state]. *)
   let make_state (x_up, y_up) (x_down, y_down) : unit m =
-    let dim_x = max x_up x_down in
+    let dim_x = max x_up x_down in (* FIXME: Do we want to fail if x_up <> x_down? *)
     let* t = I.init dim_x (y_up + y_down) in
     let setup shift_y (x, y) = {
       shift_x = (dim_x - x) / 2 ;
@@ -215,6 +254,22 @@ module SplitVertical (I : Interface.T) = struct
     let run = run
 
     let init = proj (set_state_up, set_state_down)
+
+    let dimensions_up () =
+      match !global_state with
+      | State (_t, st_up, _st_down) ->
+        return (st_up.width, st_up.height)
+      | WaitingDown dim_up -> return dim_up
+      | _ -> failwith "SplitVertical.dimensions_up: not ready"
+
+    let dimensions_down () =
+      match !global_state with
+      | State (_t, _st_up, st_down) ->
+        return (st_down.width, st_down.height)
+      | WaitingUp dim_down -> return dim_down
+      | _ -> failwith "SplitVertical.dimensions_down: not ready"
+
+    let dimensions = proj (dimensions_up, dimensions_down)
 
     let run_quit st =
       match st.event_functions.event_quit with
@@ -281,136 +336,192 @@ module SplitVertical (I : Interface.T) = struct
 end
 
 
-
-type button_actions = {
-  on_press : bool -> unit ;
-  on_release : bool -> unit ;
-  set_toggle : (bool -> unit) -> unit
+type 'unit button_actions = {
+  on_press : bool -> 'unit ;
+  on_release : bool -> 'unit ;
+  set_toggle : (bool -> 'unit) -> 'unit
 }
 
 module type ButtonInputs = sig
+  type _ m
   val width : int
   val height : int
-  val buttons : (Subimage.t * button_actions) list
+  val buttons : (Subimage.t * unit m button_actions) list m
 end
 
-module Buttons (B : ButtonInputs) (I : Interface.T) = struct
+module Buttons (I : Interface.T) (B : ButtonInputs with type 'a m = 'a I.m) = struct
 
-  (* (Maximal) dimension of buttons. *)
-  let (dimx, dimy) =
-    List.fold_left (fun (dimx, dimy) (img, _actions) ->
-      let (dimx', dimy') = Subimage.dimensions img in
-      (max dimx dimx', max dimy dimy')) (0, 0) B.buttons
+  open I
 
-  (* We then resize each image to have all of then the same dimensions. *)
-  let buttons =
-    List.map (fun (img, actions) ->
-      (Subimage.enlarge img (dimx, dimy), actions)) B.buttons
+  module Ops = Ops (I)
+  open Ops
 
-  (* We now compute the disposition of buttons, and in particular how many
-    buttons should be placed per line. *)
-  let (button_per_lines, nb_lines) =
-    let aspect_ratio (width, height) = Float.of_int width /. Float.of_int height in
-    let target_aspect_ratio = aspect_ratio (B.width, B.height) in
-    let nb_buttons = List.length B.buttons in
-    assert (nb_buttons >= 1) ;
-    let nb_line button_per_lines =
-      (nb_buttons / button_per_lines)
-      + if nb_buttons mod button_per_lines = 0 then 0 else 1 in
-    (* Given a configuration, the minimal dimension of the interface. *)
-    let minimal_dimensions button_per_lines =
-      (* We draw lines between each buttons, hence the +1s. *)
-      let width = button_per_lines * (1 + dimx) + 1 in
-      let height = nb_line button_per_lines * (1 + dimy) + 1 in
-      (width, height) in
-    (* Whether a configuration can indeed be drawn within the constraints. *)
-    let valid button_per_lines =
-      let (w, h) = minimal_dimensions button_per_lines in
-      w <= B.width && h <= B.height in
-    let better_than nb1 nb2 =
-      match valid nb1, valid nb2 with
-      | false, false -> assert false
-      | true, false -> true
-      | false, true -> false
-      | true, true ->
-        let a1 = aspect_ratio (minimal_dimensions nb1) in
-        let a2 = aspect_ratio (minimal_dimensions nb2) in
-        Float.abs (a1 -. target_aspect_ratio) <= Float.abs (a2 -. target_aspect_ratio) in
-    let rec aux nb_min nb_max =
-      if nb_min + 1 <= nb_max then (
-        if better_than nb_min nb_max then nb_min else nb_max
-      ) else (
-        let middle = (nb_max + nb_max) / 2 in
-        if better_than middle (middle + 1) then
-          aux nb_min middle
-        else aux (middle + 1) nb_max
-      ) in
-    let nb = aux 1 nb_buttons in
-    (nb, nb_line nb)
+  let u =
+    let* buttons = B.buttons in
 
-  (* The interface will use a bright and a dark color for its display. *)
-  let bright_color =
-    List.fold_left (fun (r, g, b) (img, _actions) ->
-      let (r', g', b') = Filter.brightest img in
-      if r + g + b < r' + g' + b' then (r', g', b') else (r, g, b)) (0, 0, 0) B.buttons
-  let dark_color =
-    List.fold_left (fun (r, g, b) (img, _actions) ->
-      let (r', g', b') = Filter.darkest img in
-      if r + g + b > r' + g' + b' then (r', g', b') else (r, g, b)) (255, 255, 255) B.buttons
+    (* (Maximal) dimension of buttons. *)
+    let (dimx, dimy) =
+        List.fold_left (fun (dimx, dimy) (img, _actions) ->
+          let (dimx', dimy') = Subimage.dimensions img in
+          (max dimx dimx', max dimy dimy')) (0, 0) buttons in
 
-  let interface =
-    let open I in
-    let* interface = init B.width B.height in
-    let rec fill_dark x y =
-      if x = B.width then fill_dark 0 (y + 1)
-      else if y = B.height then return ()
-      else (
-        let* () = write interface dark_color (x, y) in
-        fill_dark (x + 1) y
-      ) in
-    let* () = fill_dark 0 0 in
-    (* TODO: Draw lines and buttons. *)
-    let* () = flush interface in
-    return interface
+    (* The interface will use a bright and a dark color for its display. *)
+    let bright_color =
+      List.fold_left (fun (r, g, b) (img, _actions) ->
+        let (r', g', b') = Filter.brightest img in
+        if r + g + b < r' + g' + b' then (r', g', b') else (r, g, b)) (0, 0, 0) buttons in
+    let dark_color =
+      List.fold_left (fun (r, g, b) (img, _actions) ->
+        let (r', g', b') = Filter.darkest img in
+        if r + g + b > r' + g' + b' then (r', g', b') else (r, g, b)) (255, 255, 255) buttons in
 
-  (* The button statuses: true for pressed. *)
-  let state =
-    Array.of_list (List.map (fun (_img, actions) ->
-      (ref false, actions.on_press, actions.on_release)) B.buttons)
+    (* We then resize each image to have all of then the same dimensions.
+     We also convert the list of images into an array. *)
+    let buttons_img =
+      Array.of_list (List.map (fun (img, _actions) ->
+          let img = Subimage.enlarge img (dimx, dimy) in
+          let img_invert =
+            Subimage.map (fun (r, g, b, a) ->
+              let c = (r, g, b) in
+              let return (r, g, b) = (r, g, b, a) in
+              if c = bright_color then return dark_color
+              else if c = dark_color then return bright_color
+              else return c) img in
+          (img, img_invert)) buttons) in
 
-  let toggle i b =
-    let (status, on_press, on_release) = state.(i) in
-    if !status <> b then (
-      status := b ;
-      (* TODO: Redraw the corresponding button *)
-      (if b then on_press else on_release) false
-    )
+    let nb_buttons = Array.length buttons_img in
 
-  let () =
-    List.iteri (fun i (_img, actions) ->
-      actions.set_toggle (toggle i)) B.buttons
+    (* We now compute the disposition of buttons, and in particular how many
+      buttons should be placed per line. *)
+    let (button_per_lines, nb_lines) =
+      let aspect_ratio (width, height) = Float.of_int width /. Float.of_int height in
+      let target_aspect_ratio = aspect_ratio (B.width, B.height) in
+      assert (nb_buttons >= 1) ;
+      let nb_line button_per_lines =
+        (nb_buttons / button_per_lines)
+        + if nb_buttons mod button_per_lines = 0 then 0 else 1 in
+      (* Given a configuration, the minimal dimension of the interface. *)
+      let minimal_dimensions button_per_lines =
+        (* We draw lines between each buttons, hence the +1s. *)
+        let width = button_per_lines * (1 + dimx) + 1 in
+        let height = nb_line button_per_lines * (1 + dimy) + 1 in
+        (width, height) in
+      (* Whether a configuration can indeed be drawn within the constraints. *)
+      let valid button_per_lines =
+        let (w, h) = minimal_dimensions button_per_lines in
+        w <= B.width && h <= B.height in
+      let better_than nb1 nb2 =
+        match valid nb1, valid nb2 with
+        | false, false -> assert false
+        | true, false -> true
+        | false, true -> false
+        | true, true ->
+          let a1 = aspect_ratio (minimal_dimensions nb1) in
+          let a2 = aspect_ratio (minimal_dimensions nb2) in
+          Float.abs (a1 -. target_aspect_ratio) <= Float.abs (a2 -. target_aspect_ratio) in
+      let rec aux nb_min nb_max =
+        if nb_min + 1 <= nb_max then (
+          if better_than nb_min nb_max then nb_min else nb_max
+        ) else (
+          let middle = (nb_max + nb_max) / 2 in
+          if better_than middle (middle + 1) then
+            aux nb_min middle
+          else aux (middle + 1) nb_max
+        ) in
+      let nb = aux 1 nb_buttons in
+      (nb, nb_line nb) in
+
+    let nb_buttons_on_line y =
+      if y = nb_lines - 1 then (
+        let m = nb_buttons mod button_per_lines in
+        if m = 0 then button_per_lines
+        else m
+      ) else button_per_lines in
+
+    (* The button statuses: true for pressed. *)
+    let state =
+      Array.of_list (List.map (fun (_img, actions) ->
+        (ref false, actions.on_press, actions.on_release)) buttons) in
+
+    let interface =
+      let* interface = init B.width B.height in
+      (* Drawing lines and buttons. *)
+      fill interface dark_color (1, 1) (B.width - 2, B.height - 2) %%
+      for_ 0 (nb_lines - 1) (fun y ->
+        let pixel_at_y y = (B.height * y) / nb_lines in
+        let py_begin = pixel_at_y y in
+        let py_end = pixel_at_y (y + 1) - 1 in
+        horizontal_line interface bright_color ~y:py_begin 0 (B.width - 1) %%
+        let nb_buttons_on_this_line = nb_buttons_on_line y in
+        for_ 0 (nb_buttons_on_this_line - 1) (fun x ->
+          let b =
+            let i = y * button_per_lines + x in
+            fst buttons_img.(i) in
+          let pixel_at_x x = (B.width * x) / nb_buttons_on_this_line in
+          let px_begin = pixel_at_x x in
+          let px_end = pixel_at_x (x + 1) - 1 in
+          vertical_line interface bright_color ~x:px_begin (py_begin + 1) (py_end - 1) %%
+          display_image interface b
+            ((px_end - px_begin) / 2 - dimx / 2,
+             (py_end - py_begin) / 2 - dimy / 2))) %%
+      horizontal_line interface bright_color ~y:(B.height - 1) 0 (B.width - 1) %%
+      flush interface %%
+      return interface in
+
+    let toggle i b =
+      let (status, on_press, on_release) = state.(i) in
+      if !status <> b then (
+        status := b ;
+        (* Redrawing the corresponding button *)
+        let y = i / button_per_lines in
+        let x = i mod button_per_lines in
+        let nb_buttons_on_this_line = nb_buttons_on_line y in
+        let pixel_at_y y = (B.height * y) / nb_lines in
+        let py_begin = pixel_at_y y in
+        let py_end = pixel_at_y (y + 1) - 1 in
+        let pixel_at_x x = (B.width * x) / nb_buttons_on_this_line in
+        let px_begin = pixel_at_x x in
+        let px_end = pixel_at_x (x + 1) - 1 in
+        let* interface in
+        fill interface (if b then bright_color else dark_color)
+          (px_begin + 1, py_begin + 1) (px_end - 1, py_end - 1) %%
+        display_image interface
+          ((if b then fst else snd) buttons_img.(i))
+          ((px_end - px_begin) / 2 - dimx / 2,
+           (py_end - py_begin) / 2 - dimy / 2) %%
+        (if b then on_press else on_release) false
+      ) else return () in
+
+    (* Associating each button to its corresponding toggling action. *)
+    iteri_ (fun i (_img, actions) ->
+      actions.set_toggle (toggle i)) buttons
 
   (* TODO: React to a click. *)
 
 end
 
 
+module SelectButtons (I : Interface.T) (B : ButtonInputs with type 'a m = 'a I.m) = struct
 
-module SelectButtons (B : ButtonInputs) (I : Interface.T) = struct
+  module Ops = Monad.Ops (I)
+  open Ops
 
   module B' = struct
+
+    type 'a m = 'a I.m
 
     let width = B.width
     let height = B.height
 
     let buttons =
+      let* buttons = B.buttons in
       (* The currently pressed button, as its place within B.buttons. *)
       let current = ref 0 in
-      let () =
-        match B.buttons with
-        | [] -> () (* No buttons are provided.  I guess that's fine. *)
+      let* () =
+        match buttons with
+        | [] -> return () (* No buttons are provided.  I guess that's fine. *)
         | (_img, actions) :: _ -> actions.on_press false in
-      let toggles = List.map (fun _ -> ref (fun _b -> assert false)) B.buttons in
+      let toggles = List.map (fun _ -> ref (fun _b -> assert false)) buttons in
       (* Reset all buttons except one. *)
       let set_index i =
         let rec aux i = function
@@ -419,26 +530,29 @@ module SelectButtons (B : ButtonInputs) (I : Interface.T) = struct
             !toggle (i = 0) ;
             aux (i - 1) l in
         aux i toggles in
-      List.mapi (fun index ((img, actions), toggle) ->
+      list_mapi_ (fun index ((img, actions), toggle) ->
         let on_press _ =
           if !current <> index then (
             current := index ;
             set_index index
-          ) in
+          ) ;
+          return () in
         let on_release _ =
           (* On can't release a button in this setting, so we just cancel the action. *)
           !toggle true in
         (* When we receive a message to toggle a button, we apply it. *)
-        actions.set_toggle (fun b -> if b then on_press false) ;
-        (img, {
+        actions.set_toggle (fun b -> if b then on_press false else return ()) %%
+        return (img, {
           on_press ;
           on_release ;
-          set_toggle = (fun f -> toggle := f)
-         })) (List.combine B.buttons toggles)
+          set_toggle = (fun f -> toggle := f ; return ())
+         })) (List.combine buttons toggles)
 
   end
 
-  module Run = Buttons (B') (I)
+  module Run = Buttons (I) (B')
+
+  let u = Run.u
 
 end
 

@@ -24,11 +24,6 @@ module Engine (D : Display) (I : Interface.T) = struct
     from the game coordinates (0 is down), so some computations have to take place. *)
   let display_image img (coord_x, coord_y) =
     let (dim_x, dim_y) = Subimage.dimensions img in
-    let img =
-      Subimage.sub img
-        (min (dim_x - 1) (D.width - coord_x - 1))
-        (min (dim_y - 1) (dim_y + coord_y - 1))
-        (0, 0) in
     let open I in
     let* interface in
     ScreenOps.display_image interface img (coord_x, D.height - dim_y - coord_y)

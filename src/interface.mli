@@ -28,6 +28,9 @@ module type T = sig
     To be called only once, and at the very beginning. *)
   val init : int -> int -> t m
 
+  (* Return the width and height of the screen. *)
+  val dimensions : t -> (int * int) m
+
   (* Invalidate all objects created with this interface.
     To be called once, and at the very end. *)
   val quit : t -> unit m
