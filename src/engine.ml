@@ -23,7 +23,7 @@ module Engine (D : Display) (I : Interface.T) = struct
     The interface coordinates and the image coordinates (0 is up) are different
     from the game coordinates (0 is down), so some computations have to take place. *)
   let display_image img (coord_x, coord_y) =
-    let (dim_x, dim_y) = Subimage.dimensions img in
+    let (_dim_x, dim_y) = Subimage.dimensions img in
     let open I in
     let* interface in
     ScreenOps.display_image interface img (coord_x, D.height - dim_y - coord_y)

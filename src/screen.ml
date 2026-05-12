@@ -48,7 +48,7 @@ module Ops (I : Interface.T) = struct
     vertical_line interface color ~x:x2 y1 y2
 
   let fill interface color (x1, y1) (x2, y2) =
-    let* (width, height) = dimensions interface in
+    let* (width, _height) = dimensions interface in
     let (x1, x2) = (min x1 x2, max x1 x2) in
     let x1 = max 0 x1 in
     let x2 = min x2 (width - 1) in
@@ -291,7 +291,7 @@ module SplitVertical (I : Interface.T) = struct
       match !global_state with
       | State (_t, st_up, st_down) ->
         let* () = run_quit st_down in
-        return (global_state := ClosedUp st_up)
+        return (global_state := ClosedDown st_up)
       | ClosedUp st_down ->
         let* () = run_quit st_down in
         return (global_state := Closed)
@@ -305,7 +305,7 @@ module SplitVertical (I : Interface.T) = struct
     let convert_coord_inv = proj (convert_up_inv, convert_down_inv)
 
     let write =
-      call proj (fun t st rgb xy ->
+      call proj (fun t _st rgb xy ->
         if is_in xy then I.write t rgb (convert_coord_inv xy)
         else return  ())
 
@@ -525,9 +525,9 @@ module SelectButtons (I : Interface.T) (B : ButtonInputs with type 'a m = 'a I.m
       (* Reset all buttons except one. *)
       let set_index i =
         let rec aux i = function
-          | [] -> assert (i < 0)
+          | [] -> return (assert (i < 0))
           | toggle :: l ->
-            !toggle (i = 0) ;
+            !toggle (i = 0) %%
             aux (i - 1) l in
         aux i toggles in
       list_mapi_ (fun index ((img, actions), toggle) ->
@@ -535,8 +535,7 @@ module SelectButtons (I : Interface.T) (B : ButtonInputs with type 'a m = 'a I.m
           if !current <> index then (
             current := index ;
             set_index index
-          ) ;
-          return () in
+          ) else return () in
         let on_release _ =
           (* On can't release a button in this setting, so we just cancel the action. *)
           !toggle true in

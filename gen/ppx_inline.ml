@@ -35,6 +35,21 @@ let make_pat ~loc ppat_desc : Ppxlib_ast.Ast.pattern = {
   ppat_attributes = []
 }
 
+let add_debug str e =
+  let loc = e.pexp_loc in
+  let str = Pconst_string (str, loc, None) in
+  let attr = {
+    attr_name = { txt = "debug" ; loc } ;
+    attr_payload =
+      PStr [{
+        pstr_loc = loc ;
+        pstr_desc = Pstr_eval (make_expr ~loc (Pexp_constant str), [])
+      }] ;
+    attr_loc = loc
+  } in
+  { e with pexp_attributes = attr :: e.pexp_attributes }
+
+
 (** Whether a function is local or global. *)
 type locality =
   | Local
@@ -42,6 +57,10 @@ type locality =
 
 (** The functions to be inlined and their associated expression. *)
 let function_map = ref SMap.empty
+
+(** Mostly for debugging purposes: print the environment. *)
+let print_env env =
+  String.concat " ; " (List.map (fun (f, _locality) -> f) (SMap.to_list env))
 
 (** Add the function to the global functions to be inlined. *)
 let expand_fun_decl ~loc ~path x expr =
@@ -247,11 +266,21 @@ let inline_within =
               let (_locality, e_inlined) = SMap.find x env in
               let e_inlined = rewrite_fresh e_inlined in
               aux env args e_inlined
+            | [], e -> self#expression env e
             | args, { pexp_desc = Pexp_newtype ({ txt = t ; _ }, e_inner) ; _ } ->
               aux env args (remove_type t e_inner)
-            | args, { pexp_desc = Pexp_constraint (e_inner, _ty) ; _ } ->
-              (* This function changes the term too much for the type to still make sense. *)
-              aux env args e_inner
+            | args, { pexp_desc = Pexp_constraint (e_inner, ty) ; _ } ->
+              (* We need to dispatch the types to the additional arguments. *)
+              let (args, ty') =
+                let rec aux acc args ty =
+                  match args, ty with
+                  | [], ty -> (List.rev acc, ty)
+                  | (lbl1, arg) :: args', { ptyp_desc = Ptyp_arrow (lbl2, ty_arg, ty') ; _ }
+                    when lbl1 = lbl2 ->
+                    aux ((lbl1, make_expr ~loc (Pexp_constraint (arg, ty_arg))) :: acc) args' ty'
+                  | _, _ -> (List.rev_append acc args, [%type: _]) in
+                aux [] args ty in
+              make_expr ~loc (Pexp_constraint (aux env args e_inner, ty'))
             | (lbl1, arg1) :: args, { pexp_desc =
                 Pexp_fun (lbl2, None, { ppat_desc =
                   (Ppat_var { txt = x ; _ }
@@ -263,9 +292,11 @@ let inline_within =
               let e_inner = replace_names env_name e_inner in
               let env = SMap.add x' (Local, arg1) env in
               aux env args e_inner
-            | [], e -> self#expression env e
-            | args, e ->
-              super#expression env (make_expr ~loc (Pexp_apply (e, args))) in
+            | args, { pexp_desc = Pexp_apply (e, args') ; _ } -> aux env (args' @ args) e
+            | args, { pexp_desc = Pexp_let (rf, vs, e) ; _ } ->
+              let vs = List.map (super#value_binding env) vs in
+              make_expr ~loc (Pexp_let (rf, vs, aux env args e))
+            | args, e -> super#expression env (make_expr ~loc (Pexp_apply (e, args))) in
           aux env args e_inlined
         | Pexp_letop {
             let_ = { pbop_op = { txt = op ; loc } ; pbop_pat = p ; pbop_exp = e1 ; _ } ;
