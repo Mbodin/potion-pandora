@@ -52,3 +52,13 @@ module Ops (M : T) = struct
 
 end
 
+
+module Pure = struct
+
+  type 'a m = 'a
+
+  let return x = x
+  let ( let* ) x f = f x
+
+end
+

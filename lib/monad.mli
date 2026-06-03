@@ -32,3 +32,7 @@ module Ops (M : T) : sig
 
 end
 
+(* Simple monads *)
+
+module Pure : T with type 'a m = 'a
+

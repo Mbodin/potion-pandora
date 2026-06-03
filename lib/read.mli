@@ -1,6 +1,10 @@
 
-(* Decode a type from a string, assuming that the string is valid. *)
-val decode : 'a Save.t -> string -> 'a
+module Make (M : Monad.T) : sig
+
+  (* Decode a type from a string, assuming that the string is valid. *)
+  val decode : 'a Save.t -> string -> 'a M.m
+
+end
 
 (* Converts a character into a list of 8 bits.
  It is meant to be an internal function, left here to test its interaction with the Write module. *)

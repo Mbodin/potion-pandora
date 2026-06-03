@@ -3,18 +3,25 @@
 (* All the numbers from the first to the second, included. *)
 val range : int -> int -> int list
 
+module Make (M : Libsave.Monad.T) : sig
+
+  (* Takes the nth coordinates of a list from Images_coords and convert it into an image. *)
+  val from : ?bundle:Image.image -> Images_coords.coords list -> int -> Subimage.t M.m
+
+  (* Same than [from], but directly converts the full list. *)
+  val fromlist : ?bundle:Image.image -> Images_coords.coords list -> Subimage.t list M.m
+
+  (* When the raw image list contains a single static image. *)
+  val static_unique : Images_coords.coords list -> Animation.t M.m
+
+end
+
 (* Some functions imported from [Animation]. *)
 val static : Subimage.t -> Animation.t
 val loop : Animation.sequence -> Animation.t
 
 (* Plays a sequence once, then stays transparent. *)
 val once : Animation.sequence -> Animation.t
-
-(* Takes the nth coordinates of a list from Images_coords and convert it into an image. *)
-val from : ?bundle:Image.image -> Images_coords.coords list -> int -> Subimage.t
-
-(* Same than [from], but directly converts the full list. *)
-val fromlist : ?bundle:Image.image -> Images_coords.coords list -> Subimage.t list
 
 (* Convert a list of images into a sequence staying that time per picture. *)
 val to_sequence : float -> Subimage.t list -> Animation.sequence
@@ -37,9 +44,6 @@ val rwind : Subimage.t -> Animation.sequence -> Animation.t
 
 (* An object that reacts to explosions, to get into a new final state. *)
 val rexplosions : Subimage.t -> Animation.sequence -> Subimage.t -> Animation.t
-
-(* When the raw image list contains a single static image. *)
-val static_unique : Images_coords.coords list -> Animation.t
 
 (* Useful function to use [Animation.nd_transitions]: given the current state and a list of
    weighed next transitions, it only reacts to [Event.Tau]. *)

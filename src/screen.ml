@@ -3,7 +3,7 @@ module Ops (I : Interface.T) = struct
 
   open I
 
-  module Ops = Monad.Ops (I)
+  module Ops = Libsave.Monad.Ops (I)
   include Ops
 
   let display_image interface img (coord_x, coord_y) =
@@ -503,7 +503,7 @@ end
 
 module SelectButtons (I : Interface.T) (B : ButtonInputs with type 'a m = 'a I.m) = struct
 
-  module Ops = Monad.Ops (I)
+  module Ops = Libsave.Monad.Ops (I)
   open Ops
 
   module B' = struct

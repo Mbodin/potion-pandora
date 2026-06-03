@@ -235,8 +235,10 @@ let%test "bits_to_char char_to_bits one false 6" =
   test_bits_to_char true true true true true false true true
 
 
+module ReadTest = Read.Make (Monad.Pure)
+
 let check (type t) (s : t Save.t) (e : t) =
-  e = Read.decode s (encode s e)
+  e = ReadTest.decode s (encode s e)
 
 let%test "unit" = check Unit ()
 

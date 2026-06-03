@@ -14,7 +14,7 @@ module Engine (D : Display) (I : Interface.T) = struct
   let load st =
     level := st
 
-  module MonadOps = Monad.Ops (I)
+  module MonadOps = Libsave.Monad.Ops (I)
   open MonadOps
   module ScreenOps = Screen.Ops (I)
 

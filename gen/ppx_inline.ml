@@ -389,6 +389,8 @@ type argument =
 (** Due to the way some monads are built, inlining them often lead to unnecessarily deep
   function abstractions. This can confuse js_of_ocaml. This function thus tries to move
   them as far as possible to the outside, as is more usual. *)
+(* Note: as-is, it doesn't add arguments to identifiers (by locally performing eta-expansions),
+ which makes the usefulness of this filter very low. *)
 let move_abstractions_up expr =
   (* If the computed arguments can't be merged, this function completes the externalised arguments
     of the expression [e] back into the returned expression. *)

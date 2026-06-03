@@ -1,6 +1,7 @@
 open Ppxlib
 open Libsave
 
+(* Requires a [Read] module to be defined as [Libsave.Read (Monad)], as well as an opened monad. *)
 
 (* * Raw Data *)
 
@@ -35,6 +36,7 @@ let type_map = ref SMap.empty
   Sometimes a subexpression is not enough to infer its full type by itself, and hence the
   corresponding conversion to its original type is lacking. *)
 type get_data_ret = C : ('a Save.t * expression) option * 'a -> get_data_ret
+(* TODO: the expression needs to be monadic. *)
 
 let rec get_data expr : get_data_ret =
   let loc = expr.pexp_loc in
@@ -142,8 +144,7 @@ let encode_data ~loc data =
     | None -> Ppxlib.Location.raise_errorf ~loc "ppx_data: Unable to determine the type of data." in
   let kind = Save.Base64 (Save.Compress kind) in
   let str = Write.encode kind data in
-  let e =
-    [%expr Libsave.Read.decode [%e convert_kind ~loc kind] [%e convert_str ~loc str]] in
+  let e = [%expr Read.decode [%e convert_kind ~loc kind] [%e convert_str ~loc str]] in
   make_expr ~loc (Pexp_apply (decode, [(Nolabel, e)]))
 
 let expand_data ~loc ~path pattern expr =
