@@ -311,17 +311,97 @@ let inline_within =
           self#expression env (make_expr ~loc (Pexp_apply (
             make_expr ~loc (Pexp_ident { txt = Lident op ; loc }),
             [(Nolabel, e1) ; (Nolabel, make_expr ~loc (Pexp_fun (Nolabel, None, p, e2)))])))
-
         | _ -> super#expression env e
     end in
   traverse#expression
+
+(** Whether an expression may perform side effects. *)
+let side_effect =
+  let traverse =
+    object (self)
+      inherit [_] Ast_traverse.lift
+      method! expression e =
+        let aux_option = function
+          | None -> false
+          | Some e -> self#expression e in
+        match e.pexp_desc with
+        | Pexp_ident _
+        | Pexp_constant _ -> false
+        | Pexp_let (_rf, vbs, e) ->
+          self#expression e
+          || List.exists (fun (vb : value_binding) ->
+               self#expression vb.pvb_expr) vbs
+        | Pexp_function cases ->
+          List.exists (fun case ->
+            aux_option case.pc_guard
+            || self#expression case.pc_rhs) cases
+        | Pexp_fun (_, eo, _, e) ->
+          aux_option eo || self#expression e
+        | Pexp_apply (e, es) ->
+          self#expression e
+          || List.exists (fun (_, e) -> self#expression e) es
+        | Pexp_match (e, cases) ->
+          self#expression e
+          || List.exists (fun case ->
+               aux_option case.pc_guard
+               || self#expression case.pc_rhs) cases
+        | Pexp_tuple es -> List.exists self#expression es
+        | Pexp_construct (_, eo)
+        | Pexp_variant (_, eo) -> aux_option eo
+        | Pexp_record (fes, eo) ->
+          aux_option eo
+          || List.exists (fun (_f, e) -> self#expression e) fes
+        | Pexp_field (e, _) -> self#expression e
+        | Pexp_array es -> List.exists self#expression es
+        | Pexp_ifthenelse (b, e1, eo2) ->
+          self#expression b
+          || self#expression e1
+          || aux_option eo2
+        | Pexp_constraint (e, _) -> self#expression e
+        | Pexp_newtype (_, e) -> self#expression e
+        | Pexp_open (_, e) -> self#expression e
+        | _ -> true
+      method other _ = true
+      method int _ = false
+      method string _ = false
+      method bool _ = false
+      method char _ = false
+      method array = Array.exists
+      method float _ = false
+      method int32 _ = false
+      method int64 _ = false
+      method nativeint _ = false
+      method unit _ = false
+      method record = List.exists snd
+      method tuple = List.exists (fun b -> b)
+      method constr _ = self#tuple
+    end in
+  traverse#expression
+
+(** Due to the way some monads are built, inlining them often lead to unnecessarily deep
+  function abstractions. This can confuse js_of_ocaml. This function thus tries to move
+  them as far as possible to the outside, as is more usual. *)
+let move_abstractions_up expr = (*
+  let traverse =
+    object (self)
+      inherit [_] Ast_traverse.lift as super
+      method! expression e =
+        let loc = e.pexp_loc in
+        match e.pexp_desc with
+        | Pexp_ident _ -> ([], e)
+        | 
+        | _ ->
+          let (_args, e) = super#expression e in
+          ([], e)
+    end in
+  snd (traverse#expression expr) *) expr
 
 let expand_inline_within ~loc ~path rf pat expr =
   ignore path ; {
     pstr_desc =
       Pstr_value (rf, [{
         pvb_pat = pat ;
-        pvb_expr = inline_within !function_map expr ;
+        pvb_expr = move_abstractions_up (inline_within !function_map expr) ;
         pvb_attributes = [] ;
         pvb_loc = loc
       }]) ;

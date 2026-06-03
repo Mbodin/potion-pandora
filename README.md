@@ -36,5 +36,5 @@ firefox localhost:8000 &
 
 This work in under the Creative Commons Attribution (CC-BY) licence.
 See [LICENSE](./LICENSE) for more information.
-Copyright (C) 2024 Martin Bodin
+Copyright (C) 2024–2026 Martin Bodin
 
