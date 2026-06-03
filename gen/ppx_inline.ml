@@ -3,7 +3,20 @@
  of monadic code.
  To circumvent this issue, this ppx rewriter enables to mark some functions for inlining. *)
 
-(* TODO: also replace [let rec f = fun a b c -> ...] with let rec f a b c = ...] as well as the inner calls. *)
+module List = struct
+  include List
+
+  (* Return the n-th first elements of the list, as well as the sequence. *)
+  let rec cut_at n l =
+    if n = 0 then ([], l)
+    else
+      match l with
+      | [] -> ([], [])
+      | x :: l ->
+        let (hd, tl) = cut_at (n - 1) l in
+        (x :: hd, tl)
+
+end
 
 open Ppxlib
 
@@ -35,6 +48,7 @@ let make_pat ~loc ppat_desc : Ppxlib_ast.Ast.pattern = {
   ppat_attributes = []
 }
 
+(* Add a [@debug "str"] attribute to an expression. *)
 let add_debug str e =
   let loc = e.pexp_loc in
   let str = Pconst_string (str, loc, None) in
@@ -49,6 +63,14 @@ let add_debug str e =
   } in
   { e with pexp_attributes = attr :: e.pexp_attributes }
 
+(* Build a let-expression. *)
+let let_expr ~loc p v e =
+  make_expr ~loc (Pexp_let (Nonrecursive, [{
+      pvb_pat = p ;
+      pvb_expr = v ;
+      pvb_attributes = [] ;
+      pvb_loc = loc
+    }], e))
 
 (** Whether a function is local or global. *)
 type locality =
@@ -316,85 +338,163 @@ let inline_within =
   traverse#expression
 
 (** Whether an expression may perform side effects. *)
-let side_effect =
-  let traverse =
-    object (self)
-      inherit [_] Ast_traverse.lift
-      method! expression e =
-        let aux_option = function
-          | None -> false
-          | Some e -> self#expression e in
-        match e.pexp_desc with
-        | Pexp_ident _
-        | Pexp_constant _ -> false
-        | Pexp_let (_rf, vbs, e) ->
-          self#expression e
-          || List.exists (fun (vb : value_binding) ->
-               self#expression vb.pvb_expr) vbs
-        | Pexp_function cases ->
-          List.exists (fun case ->
-            aux_option case.pc_guard
-            || self#expression case.pc_rhs) cases
-        | Pexp_fun (_, eo, _, e) ->
-          aux_option eo || self#expression e
-        | Pexp_apply (e, es) ->
-          self#expression e
-          || List.exists (fun (_, e) -> self#expression e) es
-        | Pexp_match (e, cases) ->
-          self#expression e
-          || List.exists (fun case ->
-               aux_option case.pc_guard
-               || self#expression case.pc_rhs) cases
-        | Pexp_tuple es -> List.exists self#expression es
-        | Pexp_construct (_, eo)
-        | Pexp_variant (_, eo) -> aux_option eo
-        | Pexp_record (fes, eo) ->
-          aux_option eo
-          || List.exists (fun (_f, e) -> self#expression e) fes
-        | Pexp_field (e, _) -> self#expression e
-        | Pexp_array es -> List.exists self#expression es
-        | Pexp_ifthenelse (b, e1, eo2) ->
-          self#expression b
-          || self#expression e1
-          || aux_option eo2
-        | Pexp_constraint (e, _) -> self#expression e
-        | Pexp_newtype (_, e) -> self#expression e
-        | Pexp_open (_, e) -> self#expression e
-        | _ -> true
-      method other _ = true
-      method int _ = false
-      method string _ = false
-      method bool _ = false
-      method char _ = false
-      method array = Array.exists
-      method float _ = false
-      method int32 _ = false
-      method int64 _ = false
-      method nativeint _ = false
-      method unit _ = false
-      method record = List.exists snd
-      method tuple = List.exists (fun b -> b)
-      method constr _ = self#tuple
-    end in
-  traverse#expression
+let rec side_effect e =
+  let aux_option = function
+    | None -> false
+    | Some e -> side_effect e in
+  match e.pexp_desc with
+  | Pexp_ident { txt = Lident x ; _ } ->
+    not (List.mem x ["=" ; "+"; "-"; "*"; "+."; "-."; "*."; "/."])
+  | Pexp_constant _ -> false
+  | Pexp_let (_rf, vbs, e) ->
+    side_effect e
+    || List.exists (fun (vb : value_binding) ->
+         side_effect vb.pvb_expr) vbs
+  | Pexp_function cases ->
+    List.exists (fun case ->
+      aux_option case.pc_guard
+      || side_effect case.pc_rhs) cases
+  | Pexp_fun (_, eo, _, e) ->
+    aux_option eo || side_effect e
+  | Pexp_apply (e, es) ->
+    side_effect e
+    || List.exists (fun (_, e) -> side_effect e) es
+  | Pexp_match (e, cases) ->
+    side_effect e
+    || List.exists (fun case ->
+         aux_option case.pc_guard
+         || side_effect case.pc_rhs) cases
+  | Pexp_tuple es -> List.exists side_effect es
+  | Pexp_construct (_, eo)
+  | Pexp_variant (_, eo) -> aux_option eo
+  | Pexp_record (fes, eo) ->
+    aux_option eo
+    || List.exists (fun (_f, e) -> side_effect e) fes
+  | Pexp_field (e, _) -> side_effect e
+  | Pexp_array es -> List.exists side_effect es
+  | Pexp_ifthenelse (b, e1, eo2) ->
+    side_effect b
+    || side_effect e1
+    || aux_option eo2
+  | Pexp_constraint (e, _) -> side_effect e
+  | Pexp_newtype (_, e) -> side_effect e
+  | Pexp_open (_, e) -> side_effect e
+  | _ -> true
+
+(** Types returned by the auxiliary function below. *)
+type argument =
+  | Arg_var of Asttypes.arg_label * expression option * string
+  | Arg_type of string
 
 (** Due to the way some monads are built, inlining them often lead to unnecessarily deep
   function abstractions. This can confuse js_of_ocaml. This function thus tries to move
   them as far as possible to the outside, as is more usual. *)
-let move_abstractions_up expr = (*
-  let traverse =
-    object (self)
-      inherit [_] Ast_traverse.lift as super
-      method! expression e =
-        let loc = e.pexp_loc in
-        match e.pexp_desc with
-        | Pexp_ident _ -> ([], e)
-        | 
-        | _ ->
-          let (_args, e) = super#expression e in
-          ([], e)
-    end in
-  snd (traverse#expression expr) *) expr
+let move_abstractions_up expr =
+  (* If the computed arguments can't be merged, this function completes the externalised arguments
+    of the expression [e] back into the returned expression. *)
+  let rec complete_function args e =
+    let loc = e.pexp_loc in
+    match args with
+    | [] -> e
+    | a :: args ->
+        let e = complete_function args e in
+        match a with
+        | Arg_var (lbl, eo, x) ->
+          make_expr ~loc (Pexp_fun (lbl, eo, make_pat ~loc (Ppat_var { txt = x ; loc }), e))
+        | Arg_type t -> make_expr ~loc (Pexp_newtype ({ txt = t ; loc }, e)) in
+  (* In the case in which there are several expressions that need to agree on the externalised
+    arguments.  This function takes the list of pairs args/expression and return a unified list of
+    arguments and a new list of expressions. *)
+  let merge_args_exp = function
+    | [] -> ([], [])
+    | (args0, e0) :: args_es ->
+      let i =
+        List.fold_left (fun i (args, _e) ->
+          min i (List.length args)) (List.length args0) args_es in
+      let (main_args, args0) = List.cut_at i args0 in
+      let e0 = complete_function args0 e0 in
+      let es =
+        List.map (fun (args, e) ->
+          let (external_args, args) = List.cut_at i args in
+          let e = complete_function args e in
+          let rec complete main_args external_args e =
+            match main_args, external_args with
+            | [], [] -> e
+            | Arg_var (lbl1, eo1, x1) :: main_args, Arg_var (lbl2, eo2, x2) :: external_args ->
+              assert (lbl1 = lbl2 && eo1 = eo2) ;
+              let e =
+                let loc = e.pexp_loc in
+                let_expr ~loc
+                  (make_pat ~loc (Ppat_var { txt = x2 ; loc }))
+                  (make_expr ~loc (Pexp_ident { txt = Lident x1 ; loc })) e in
+              complete main_args external_args e
+            | Arg_type t1 :: main_args, Arg_type t2 :: external_args ->
+              let e = if t1 = t2 then e else remove_type t2 e in
+              complete main_args external_args e
+            | _, _ -> assert false in
+          complete main_args external_args e) args_es in
+      (main_args, e0 :: es) in
+  let rec aux e =
+    (* To merge [case list] (like in the Function or Match case). *)
+    let cases_case cases =
+      if List.exists (fun case ->
+           match case.pc_guard with
+           | None -> false
+           | Some e -> side_effect e) cases then ([], cases)
+      else
+        let (args, es) = merge_args_exp (List.map (fun case -> aux case.pc_rhs) cases) in
+        let cases =
+          List.map2 (fun e case -> { case with pc_rhs = e }) es cases in
+        (args, cases) in
+    let loc = e.pexp_loc in
+    match e.pexp_desc with
+    | Pexp_let (rf, vbs, e') ->
+      if List.exists (fun vb -> side_effect vb.pvb_expr) vbs then ([], e)
+      else
+        let (args, e') = aux e' in
+        (args, make_expr ~loc (Pexp_let (rf, vbs, e')))
+    | Pexp_function cases ->
+      let (args, cases) = cases_case cases in
+      (args, make_expr ~loc (Pexp_function cases))
+    | Pexp_fun (lbl, eo, { ppat_desc = Ppat_var { txt = x ; _ } ; _ }, e') ->
+      let (args, e') = aux e' in
+      (Arg_var (lbl, eo, x) :: args, e')
+    | Pexp_fun (lbl, eo, p, e') ->
+      let (args, e') = aux e' in
+      let x = fresh_name "x" in
+      let e' =
+        let loc = e'.pexp_loc in
+        let_expr ~loc p (make_expr ~loc (Pexp_ident { txt = Lident x ; loc })) e' in
+      (Arg_var (lbl, eo, x) :: args, e')
+    | Pexp_match (e', cases) ->
+      if side_effect e' then ([], e)
+      else
+        let (args, cases) = cases_case cases in
+        (args, make_expr ~loc (Pexp_match (e', cases)))
+    | Pexp_ifthenelse (b, e1, Some e2) ->
+      if side_effect b then ([], e)
+      else
+        let (args, es) = merge_args_exp [aux e1; aux e2] in
+        let (e1, e2) =
+          match es with
+          | [e1 ; e2] -> (e1, e2)
+          | _ -> assert false in
+        (args, make_expr ~loc (Pexp_ifthenelse (b, e1, Some e2)))
+    | Pexp_constraint (e', t) ->
+      let (args, e') = aux e' in
+      if args = [] then ([], e)
+      else (
+        let rec aux args t e' =
+          let loc = e'.pexp_loc in
+          match args, t.ptyp_desc with
+          | [], _ -> make_expr ~loc (Pexp_constraint (e', t))
+          | Arg_var (lbl1, _, _) :: args, Ptyp_arrow (lbl2, _, t2) when lbl1 = lbl2 -> aux args t2 e'
+          | _, _ -> e' (* Giving up. *) in
+        (args, aux args t e')
+      )
+    | _ -> ([], e) in
+  let (args, e) = aux expr in
+  complete_function args e
 
 let expand_inline_within ~loc ~path rf pat expr =
   ignore path ; {
