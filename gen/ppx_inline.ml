@@ -344,21 +344,21 @@ let rec side_effect e =
     | Some e -> side_effect e in
   match e.pexp_desc with
   | Pexp_ident { txt = Lident x ; _ } ->
-    not (List.mem x ["=" ; "+"; "-"; "*"; "+."; "-."; "*."; "/."])
+    not (List.mem x ["=" ; "+"; "-"; "*"; "+."; "-."; "*."; "/."; "<"; ">"; "<="; ">="])
   | Pexp_constant _ -> false
-  | Pexp_let (_rf, vbs, e) ->
+  | Pexp_let (_rf, _vbs, e) ->
     side_effect e
-    || List.exists (fun (vb : value_binding) ->
-         side_effect vb.pvb_expr) vbs
+    (* || List.exists (fun (vb : value_binding) ->
+         side_effect vb.pvb_expr) vbs *)
   | Pexp_function cases ->
     List.exists (fun case ->
       aux_option case.pc_guard
       || side_effect case.pc_rhs) cases
   | Pexp_fun (_, eo, _, e) ->
     aux_option eo || side_effect e
-  | Pexp_apply (e, es) ->
+  | Pexp_apply (e, _es) ->
     side_effect e
-    || List.exists (fun (_, e) -> side_effect e) es
+    (* || List.exists (fun (_, e) -> side_effect e) es *)
   | Pexp_match (e, cases) ->
     side_effect e
     || List.exists (fun case ->
@@ -372,9 +372,9 @@ let rec side_effect e =
     || List.exists (fun (_f, e) -> side_effect e) fes
   | Pexp_field (e, _) -> side_effect e
   | Pexp_array es -> List.exists side_effect es
-  | Pexp_ifthenelse (b, e1, eo2) ->
-    side_effect b
-    || side_effect e1
+  | Pexp_ifthenelse (_b, e1, eo2) ->
+    (* side_effect b
+    || *) side_effect e1
     || aux_option eo2
   | Pexp_constraint (e, _) -> side_effect e
   | Pexp_newtype (_, e) -> side_effect e
@@ -385,6 +385,15 @@ let rec side_effect e =
 type argument =
   | Arg_var of Asttypes.arg_label * expression option * string
   | Arg_type of string
+
+let is_assert_false e =
+  match e.pexp_desc with
+  | Pexp_assert { pexp_desc = Pexp_construct ({ txt = Lident "false" ; _ }, None) ; _ } -> true
+  | _ -> false
+
+let%test "is_assert_false" =
+  let loc = Location.none in
+  is_assert_false [%expr assert false]
 
 (** Due to the way some monads are built, inlining them often lead to unnecessarily deep
   function abstractions. This can confuse js_of_ocaml. This function thus tries to move
@@ -405,35 +414,46 @@ let move_abstractions_up expr =
   (* In the case in which there are several expressions that need to agree on the externalised
     arguments.  This function takes the list of pairs args/expression and return a unified list of
     arguments and a new list of expressions. *)
-  let merge_args_exp = function
-    | [] -> ([], [])
-    | (args0, e0) :: args_es ->
-      let i =
-        List.fold_left (fun i (args, _e) ->
-          min i (List.length args)) (List.length args0) args_es in
-      let (main_args, args0) = List.cut_at i args0 in
-      let e0 = complete_function args0 e0 in
+  let merge_args_exp args_es =
+    if args_es = [] then ([], [])
+    else (
+      let (_i, main_args) =
+        (* Note that this won't always be compatible with GADT generating functions. *)
+        List.fold_left (fun (i, main_args) (args, _e) ->
+          let i' = List.length args in
+          if i' > i then (i', args)
+          else (i, main_args)) (0, []) args_es in
       let es =
         List.map (fun (args, e) ->
-          let (external_args, args) = List.cut_at i args in
-          let e = complete_function args e in
-          let rec complete main_args external_args e =
-            match main_args, external_args with
+          let rec complete main_args args e =
+            let loc = e.pexp_loc in
+            match main_args, args with
             | [], [] -> e
-            | Arg_var (lbl1, eo1, x1) :: main_args, Arg_var (lbl2, eo2, x2) :: external_args ->
+            | Arg_var (lbl1, eo1, x1) :: main_args, Arg_var (lbl2, eo2, x2) :: args ->
               assert (lbl1 = lbl2 && eo1 = eo2) ;
               let e =
-                let loc = e.pexp_loc in
                 let_expr ~loc
                   (make_pat ~loc (Ppat_var { txt = x2 ; loc }))
                   (make_expr ~loc (Pexp_ident { txt = Lident x1 ; loc })) e in
-              complete main_args external_args e
-            | Arg_type t1 :: main_args, Arg_type t2 :: external_args ->
+              complete main_args args e
+            | Arg_type t1 :: main_args, Arg_type t2 :: args ->
               let e = if t1 = t2 then e else remove_type t2 e in
-              complete main_args external_args e
-            | _, _ -> assert false in
-          complete main_args external_args e) args_es in
-      (main_args, e0 :: es) in
+              complete main_args args e
+            | Arg_var (lbl, eo, x) :: main_args, [] ->
+              let lbl =
+                match lbl, eo with
+                | Optional l, Some _ -> Labelled l
+                | _, Some _ -> assert false
+                | _, _ -> lbl in
+              complete main_args []
+                (make_expr ~loc (Pexp_apply (e,
+                  [(lbl, make_expr ~loc (Pexp_ident { txt = Lident x ; loc }))])))
+            | Arg_type _t :: main_args, [] -> complete main_args [] e
+            | _, _ -> failwith "Mismatching argument kinds." in
+          if is_assert_false e then e
+          else complete main_args args e) args_es in
+      (main_args, es)
+    ) in
   let rec aux e =
     (* To merge [case list] (like in the Function or Match case). *)
     let cases_case cases =
@@ -449,13 +469,20 @@ let move_abstractions_up expr =
     let loc = e.pexp_loc in
     match e.pexp_desc with
     | Pexp_let (rf, vbs, e') ->
-      if List.exists (fun vb -> side_effect vb.pvb_expr) vbs then ([], e)
-      else
-        let (args, e') = aux e' in
-        (args, make_expr ~loc (Pexp_let (rf, vbs, e')))
+      let vbs =
+        List.map (fun vb ->
+          let (args, e) = aux vb.pvb_expr in
+          let e = complete_function args e in
+          { vb with pvb_expr = e }) vbs in
+      let (args, e') = aux e' in
+      (*if List.exists (fun vb -> side_effect vb.pvb_expr) vbs then
+        ([], make_expr ~loc (Pexp_let (rf, vbs, complete_function args e')))
+      else*) (args, make_expr ~loc (Pexp_let (rf, vbs, e')))
     | Pexp_function cases ->
       let (args, cases) = cases_case cases in
-      (args, make_expr ~loc (Pexp_function cases))
+      let n = fresh_name "n" in
+      (Arg_var (Nolabel, None, n) :: args,
+       make_expr ~loc (Pexp_match (make_expr ~loc (Pexp_ident { txt = Lident n ; loc }), cases)))
     | Pexp_fun (lbl, eo, { ppat_desc = Ppat_var { txt = x ; _ } ; _ }, e') ->
       let (args, e') = aux e' in
       (Arg_var (lbl, eo, x) :: args, e')
@@ -466,32 +493,63 @@ let move_abstractions_up expr =
         let loc = e'.pexp_loc in
         let_expr ~loc p (make_expr ~loc (Pexp_ident { txt = Lident x ; loc })) e' in
       (Arg_var (lbl, eo, x) :: args, e')
+    | Pexp_apply (e', args') ->
+      let (args, e') = aux e' in
+      let rec match_args args args' e' =
+        match args, args' with
+        | args, [] -> (args, e')
+        | [], _ ->
+          if e'.pexp_desc = [%expr assert false].pexp_desc then ([], e')
+          else ([], make_expr ~loc (Pexp_apply (e', args')))
+        | Arg_type _ :: args, _ -> match_args args args' e'
+        | Arg_var (lbl1, _eo, x) :: args, (lbl2, e2) :: args' ->
+          assert (lbl1 = lbl2) ;
+          let e' = let_expr ~loc (make_pat ~loc (Ppat_var { txt = x ; loc })) e2 e' in
+          match_args args args' e' in
+      match_args args args' e'
     | Pexp_match (e', cases) ->
-      if side_effect e' then ([], e)
-      else
+      (*if side_effect e' then ([], e)
+      else*)
+        let (args, e') = aux e' in
+        let e' = complete_function args e' in
         let (args, cases) = cases_case cases in
         (args, make_expr ~loc (Pexp_match (e', cases)))
     | Pexp_ifthenelse (b, e1, Some e2) ->
-      if side_effect b then ([], e)
-      else
+      (*if side_effect b then ([], e)
+      else*)
         let (args, es) = merge_args_exp [aux e1; aux e2] in
         let (e1, e2) =
           match es with
           | [e1 ; e2] -> (e1, e2)
           | _ -> assert false in
         (args, make_expr ~loc (Pexp_ifthenelse (b, e1, Some e2)))
+    | Pexp_sequence (e1, e2) ->
+      let (args, e1) = aux e1 in
+      let e1 = complete_function args e1 in
+      let (args, e2) = aux e2 in
+      (args, make_expr ~loc (Pexp_sequence (e1, e2))) (* This might not always be sound. *)
     | Pexp_constraint (e', t) ->
       let (args, e') = aux e' in
-      if args = [] then ([], e)
-      else (
-        let rec aux args t e' =
-          let loc = e'.pexp_loc in
-          match args, t.ptyp_desc with
-          | [], _ -> make_expr ~loc (Pexp_constraint (e', t))
-          | Arg_var (lbl1, _, _) :: args, Ptyp_arrow (lbl2, _, t2) when lbl1 = lbl2 -> aux args t2 e'
-          | _, _ -> e' (* Giving up. *) in
-        (args, aux args t e')
-      )
+      let rec constrain args t e' =
+        let loc = e'.pexp_loc in
+        match args, t.ptyp_desc with
+        | [], _ -> make_expr ~loc (Pexp_constraint (e', t))
+        | Arg_var (lbl1, _, _) :: args, Ptyp_arrow (lbl2, _, t2) when lbl1 = lbl2 ->
+          constrain args t2 e'
+        | _, _ -> e' (* Giving up the type. *) in
+      (args, constrain args t e')
+    | Pexp_newtype ({ txt = t ; _ }, e') ->
+      let (args, e') = aux e' in
+      (Arg_type t :: args, e')
+    | Pexp_open (o, e') ->
+      let (args, e') = aux e' in
+      (args, make_expr ~loc (Pexp_open (o, e')))
+    | Pexp_letop {
+        let_ = { pbop_op = { txt = op ; loc } ; pbop_pat = p ; pbop_exp = e1 ; _ } ;
+        ands = [] ; body = e2 } ->
+      aux (make_expr ~loc (Pexp_apply (
+        make_expr ~loc (Pexp_ident { txt = Lident op ; loc }),
+        [(Nolabel, e1) ; (Nolabel, make_expr ~loc (Pexp_fun (Nolabel, None, p, e2)))])))
     | _ -> ([], e) in
   let (args, e) = aux expr in
   complete_function args e

@@ -185,8 +185,10 @@ let%inline_within rec decode_monad : type t. t Save.t -> t monad =
       | n ->
         let* x = decode_monad s in
         aux (x :: acc) (n - 1) in
-    aux [] size in function
-  | Save.Unit -> return ()
+    aux [] size in
+  fun (s : t Save.t) : t monad ->
+  match s with
+  | Save.Unit -> return (() : t)
   | Save.Bool ->
     let* c = read in
     (match c with
