@@ -21,7 +21,7 @@ module type T = sig
   include Monad.T
 
   (* To be called once: it ensures that the monadic computation is executed.
-   It is meant to be instantiable by Lwt_main. *)
+   It is meant to be instantiable by [Lwt_main.run]. *)
   val run : (unit -> unit m) -> unit
 
   (* Initialise the interface of a given width and height.

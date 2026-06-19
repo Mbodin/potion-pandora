@@ -4,7 +4,7 @@ module type Display = sig
   val height : int
 end
 
-module Engine (D : Display) (I : Interface.T) = struct
+module Make (D : Display) (I : Interface.T) = struct
 
   let interface = I.init D.width D.height
 

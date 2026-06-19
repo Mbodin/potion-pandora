@@ -10,7 +10,7 @@ module Launch (I : Interface.T) = struct
     let height = 80
   end
 
-  module E = Engine.Engine (Display) (I)
+  module E = Engine.Make (Display) (I)
 
   (* The center of the screen coordinates. *)
   let screen_coords = ref (0, 0)

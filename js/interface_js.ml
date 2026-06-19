@@ -17,9 +17,6 @@ type 'a m = 'a Lwt.t
 let return v = Lwt.return v
 let ( let* ) = Lwt.bind
 
-let ( %% ) m k =
-  let* () = m in k
-
 let global_object = ref None
 
 let get_object () =
@@ -81,48 +78,52 @@ let init width height =
       context ;
       pixel = context##createImageData 1 1
     } ;
-  Lwt_js_events.mousedowns canvas
-    (fun event _thread ->
-      if event##.button = 0 then
-        mouse_down := Some (convert_coords (to_int event##.offsetX, to_int event##.offsetY)) ;
-      return ()
-    ) %%
-  Lwt_js_events.mousemoves canvas
-    (fun event _thread ->
-      match !mouse_down with
-      | None -> return ()
-      | Some (init_x, init_y) ->
-        call_move (init_x, init_y) (convert_coords (to_int event##.offsetX, to_int event##.offsetY))
-    ) %%
-  Lwt_js_events.mouseups canvas
-    (fun event _thread ->
-      if event##.button = 0 then (
+  Lwt.async (fun () ->
+    Lwt_js_events.mousedowns canvas
+      (fun event _thread ->
+        if event##.button = 0 then
+          mouse_down := Some (convert_coords (to_int event##.offsetX, to_int event##.offsetY)) ;
+        return ()
+      )) ;
+  Lwt.async (fun () ->
+    Lwt_js_events.mousemoves canvas
+      (fun event _thread ->
         match !mouse_down with
         | None -> return ()
         | Some (init_x, init_y) ->
-          let (x, y) = convert_coords (to_int event##.offsetX, to_int event##.offsetY) in
-          if (init_x, init_y) = (x, y) then call_click (x, y)
-          else call_drag (init_x, init_y) (x, y)
-      ) else return ()
-    ) %%
-  Lwt_js_events.keydowns Html.document
-    (fun event _thread ->
-      let get key = Option.map Js.to_string (Js.Optdef.to_option key) in
-      match get event##.code, get event##.key with
-      | Some ("KeyA" | "KeyH" | "ArrowLeft"), _
-      | _, Some "ArrowLeft"
-        -> call_key_pressed (Some Potion_pandora.Interface.West)
-      | Some ("KeyD" | "KeyL" | "ArrowRight"), _
-      | _, Some "ArrowRight"
-        -> call_key_pressed (Some Potion_pandora.Interface.East)
-      | Some ("KeyW" | "KeyK" | "ArrowUp"), _
-      | _, Some "ArrowUp"
-        -> call_key_pressed (Some Potion_pandora.Interface.North)
-      | Some ("KeyS" | "KeyJ" | "ArrowDown"), _
-      | _, Some "ArrowDown"
-        -> call_key_pressed (Some Potion_pandora.Interface.South)
-      | _, _ -> call_key_pressed None
-    ) %%
+          call_move (init_x, init_y) (convert_coords (to_int event##.offsetX, to_int event##.offsetY))
+      )) ;
+  Lwt.async (fun () ->
+    Lwt_js_events.mouseups canvas
+      (fun event _thread ->
+        if event##.button = 0 then (
+          match !mouse_down with
+          | None -> return ()
+          | Some (init_x, init_y) ->
+            let (x, y) = convert_coords (to_int event##.offsetX, to_int event##.offsetY) in
+            if (init_x, init_y) = (x, y) then call_click (x, y)
+            else call_drag (init_x, init_y) (x, y)
+        ) else return ()
+      )) ;
+  Lwt.async (fun () ->
+    Lwt_js_events.keydowns Html.document
+      (fun event _thread ->
+        let get key = Option.map Js.to_string (Js.Optdef.to_option key) in
+        match get event##.code, get event##.key with
+        | Some ("KeyA" | "KeyH" | "ArrowLeft"), _
+        | _, Some "ArrowLeft"
+          -> call_key_pressed (Some Potion_pandora.Interface.West)
+        | Some ("KeyD" | "KeyL" | "ArrowRight"), _
+        | _, Some "ArrowRight"
+          -> call_key_pressed (Some Potion_pandora.Interface.East)
+        | Some ("KeyW" | "KeyK" | "ArrowUp"), _
+        | _, Some "ArrowUp"
+          -> call_key_pressed (Some Potion_pandora.Interface.North)
+        | Some ("KeyS" | "KeyJ" | "ArrowDown"), _
+        | _, Some "ArrowDown"
+          -> call_key_pressed (Some Potion_pandora.Interface.South)
+        | _, _ -> call_key_pressed None
+      )) ;
   (* One could add an event on_quit linked to the beforeunload Javascript event,
     but it seems that the corresponding binding is lacking Lwt_js_events. *)
   return ()
@@ -152,7 +153,7 @@ let wait () time f =
     let* r = f () in
     res := Some r ;
     return () in
-  Lwt.join [ Lwt_js.sleep (Float.of_int time /. 1000.) ; run () ] %%
+  let* () = Lwt.join [ Lwt_js.sleep (Float.of_int time /. 1000.) ; run () ] in
   match !res with
   | None -> assert false
   | Some r -> return r
