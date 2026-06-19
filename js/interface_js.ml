@@ -10,7 +10,7 @@ type obj = {
   height : int ;
   canvas : Html.canvasElement Js.t ;
   context : Html.canvasRenderingContext2D Js.t ;
-  pixel : Html.imageData Js.t
+  data : Html.imageData Js.t
 }
 
 type 'a m = 'a Lwt.t
@@ -70,13 +70,18 @@ let init width height =
   canvas##.height := height ;
   Dom.appendChild Html.document##.body canvas ;
   let context = canvas##getContext Html._2d_ in
+  context##.fillStyle := Js.string "black" ;
+  context##fillRect (Js.float 0.) (Js.float 0.)
+    (Js.float (Float.of_int width)) (Js.float (Float.of_int height)) ;
   global_object :=
     Some {
       width ;
       height ;
       canvas ;
       context ;
-      pixel = context##createImageData 1 1
+      data =
+        context##getImageData (Js.float 0.) (Js.float 0.)
+          (Js.float (Float.of_int width)) (Js.float (Float.of_int height))
     } ;
   Lwt.async (fun () ->
     Lwt_js_events.mousedowns canvas
@@ -129,17 +134,28 @@ let init width height =
   return ()
 
 let flush () =
+  let { width ; height ; context ; data ; _ } = get_object () in
+  context##putImageData data (Js.float 0.) (Js.float 0.) ;
+  for x = 0 to width - 1 do
+    for y = 0 to height - 1 do
+      let index = 4 * (y * width + x) in
+      Html.pixel_set data##.data (index + 0) 0 ;
+      Html.pixel_set data##.data (index + 1) 0 ;
+      Html.pixel_set data##.data (index + 2) 0 ;
+      Html.pixel_set data##.data (index + 3) 255
+    done
+  done ;
   Lwt_js.yield ()
 
 let write () (r, g, b) (x, y) =
-  let { width ; height ; context ; pixel ; _ } = get_object () in
+  let { width ; height ; context ; data ; _ } = get_object () in
   assert (x >= 0 && y >= 0) ;
   assert (x < width && y < height) ;
-  Html.pixel_set pixel##.data 0 r ;
-  Html.pixel_set pixel##.data 1 g ;
-  Html.pixel_set pixel##.data 2 b ;
-  Html.pixel_set pixel##.data 3 255 ;
-  context##putImageData pixel (Js.float (Float.of_int x)) (Js.float (Float.of_int y)) ;
+  let index = 4 * (y * width + x) in
+  Html.pixel_set data##.data (index + 0) r ;
+  Html.pixel_set data##.data (index + 1) g ;
+  Html.pixel_set data##.data (index + 2) b ;
+  Html.pixel_set data##.data (index + 3) 255 ;
   return ()
 
 let quit () =
