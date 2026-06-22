@@ -3,7 +3,7 @@
   (name main_js)
 	(libraries lwt potion_pandora js_of_ocaml-lwt)
   (preprocess (pps lwt_ppx js_of_ocaml-ppx))
-	(modes js)
+	(modes wasm)
   ; (js_of_ocaml (flags --pretty --debug-info --source-map))
   (flags (:standard -warn-error -A)))
 

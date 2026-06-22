@@ -18,6 +18,7 @@
 	"dependencies": {
 		"ocaml": "~5.1",
 		"@opam/dune": "~3.17",
+		"@opam/wasm_of_ocaml-compiler": "*",
 		"@opam/js_of_ocaml": "*",
 		"@opam/js_of_ocaml-lwt": "*",
 		"@opam/js_of_ocaml-ppx": "*",

@@ -41,7 +41,7 @@ jobs:
       - name: Updating packages.
         run: sudo apt update
       - name: Install dependencies.
-        run: sudo apt install -y npm pkgconf libsdl2-2.0-0 libsdl2-dev libsdl2-image-dev
+        run: sudo apt install -y npm cmake ninja-build pkgconf libsdl2-2.0-0 libsdl2-dev libsdl2-image-dev
       - name: Checking SDL version
         run: sdl2-config --version
 

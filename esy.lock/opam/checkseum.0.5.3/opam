@@ -31,7 +31,7 @@ depends: [
   "dune-configurator"
   "optint"        {>= "0.3.0"}
   "alcotest"      {with-test}
-  "bos"           {with-test}
+  "bos" {with-test & < "0.3.0"}
   "astring"       {with-test}
   "fmt"           {with-test}
   "fpath"         {with-test}
@@ -43,13 +43,13 @@ conflicts: [
   "mirage-xen" {< "6.0.0"}
   "ocaml-freestanding"
 ]
+x-maintenance-intent: [ "(latest)" ]
 url {
   src:
-    "https://github.com/mirage/checkseum/releases/download/v0.5.2/checkseum-0.5.2.tbz"
+    "https://github.com/mirage/checkseum/releases/download/v0.5.3/checkseum-0.5.3.tbz"
   checksum: [
-    "sha256=9e5e4fd4405cb4a8b4df00877543251833e08a6499ef42ccb8dba582df0dafc8"
-    "sha512=b66261effaa561ce5cb8d92a3ec78565a5579bf3d3c4b7f08eba59998ac4d7f49ae9c240986c231b22b965c93a949a8a2e35edec42277ecb5602829945fba6db"
+    "sha256=b88c11994341213a35c23f34168bba7a74bf3f89051f77beb39d823adce1a531"
+    "sha512=e4a35bdb7956b8d30a317923e86c750c174a7804b115b823bf67f66cf6dde5e40f687693a2fa9fee78e0a5a426ee0d1deeea22a723114905d57a41fd473e8b0e"
   ]
 }
-x-commit-hash: "79867ddb97f347657ff2ec026da1d77ec7864db6"
-x-maintenance-intent: [ "(latest)" ]
+x-commit-hash: "8e7f01715191305d4b10a4f85a918a679e7d5345"

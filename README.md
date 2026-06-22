@@ -10,7 +10,7 @@ The native graphical output depends on the system package libsdl2-dev.
 ## Using `esy`
 
 ```bash
-apt install libsdl2-dev pkgconf npm
+apt install libsdl2-dev libsdl2-2.0-0 libsdl2-image-dev pkgconf cmake ninja-build npm
 # Installing esy
 npm install esy
 # Installing the dependencies and compiling
