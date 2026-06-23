@@ -1,9 +1,22 @@
 
-(executable
-  (name main_js)
+(library
+  (name interface_js)
+  (modules interface_js)
 	(libraries lwt potion_pandora js_of_ocaml-lwt)
   (preprocess (pps lwt_ppx js_of_ocaml-ppx))
-	(modes wasm)
-  ; (js_of_ocaml (flags --pretty --debug-info --source-map))
   (flags (:standard -warn-error -A)))
+
+(executable
+  (name main_js)
+  (modules main_js)
+  (libraries interface_js)
+  ; (js_of_ocaml (flags --pretty --debug-info --source-map))
+  (modes wasm))
+
+(executable
+  (name editor_js)
+  (modules editor_js)
+  (libraries interface_js)
+  ; (js_of_ocaml (flags --pretty --debug-info --source-map))
+  (modes wasm))
 
