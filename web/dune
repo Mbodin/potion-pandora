@@ -9,3 +9,17 @@
 	(deps (:gen ../gen/gen_html.exe) (:js ../js/editor_js.bc.wasm.js))
   (action (with-stdout-to %{target} (pipe-stdout (cat %{js}) (run %{gen})))))
 
+(rule
+  (target "main_js.bc.wasm.assets")
+  (deps ../js/main_js.bc.wasm.js)
+  (action (progn
+     (bash "mkdir main_js.bc.wasm.assets")
+     (bash "cp ../js/main_js.bc.wasm.assets/* main_js.bc.wasm.assets/"))))
+
+(rule
+  (target "editor_js.bc.wasm.assets")
+  (deps ../js/editor_js.bc.wasm.js)
+  (action (progn
+     (bash "mkdir editor_js.bc.wasm.assets")
+     (bash "cp ../js/editor_js.bc.wasm.assets/* editor_js.bc.wasm.assets/"))))
+

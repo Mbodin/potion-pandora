@@ -1,5 +1,5 @@
 {
-  "checksum": "13cbedf45f0c59a6a37267505c188629",
+  "checksum": "079eb02665bdc524354a02416e10fca3",
   "root": "potion-pandora@link-dev:./package.json",
   "node": {
     "potion-pandora@link-dev:./package.json": {
@@ -31,7 +31,7 @@
         "@opam/imagelib@opam:20221222@0a152ce1",
         "@opam/dune@opam:3.17.2@74179923",
         "@opam/decompress@opam:1.5.3@fd6db8f3",
-        "@opam/bigstringaf@opam:0.10.0@bfac02ce",
+        "@opam/bigstringaf@github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac@d41d8cd9",
         "@opam/base64@opam:3.5.2@2aceb09c"
       ],
       "devDependencies": [],
@@ -2028,8 +2028,8 @@
         [ "windows", "x86_64" ]
       ]
     },
-    "@opam/js_of_ocaml-compiler@opam:6.0.1@ac2ae2e8": {
-      "id": "@opam/js_of_ocaml-compiler@opam:6.0.1@ac2ae2e8",
+    "@opam/js_of_ocaml-compiler@opam:6.0.1@b5ab3353": {
+      "id": "@opam/js_of_ocaml-compiler@opam:6.0.1@b5ab3353",
       "name": "@opam/js_of_ocaml-compiler",
       "version": "opam:6.0.1",
       "source": {
@@ -2093,12 +2093,12 @@
       "overrides": [],
       "dependencies": [
         "ocaml@5.1.1000@d41d8cd9", "@opam/ppxlib@opam:0.35.0@8cd01f8f",
-        "@opam/js_of_ocaml-compiler@opam:6.0.1@ac2ae2e8",
+        "@opam/js_of_ocaml-compiler@opam:6.0.1@b5ab3353",
         "@opam/dune@opam:3.17.2@74179923", "@esy-ocaml/substs@0.0.1@d41d8cd9"
       ],
       "devDependencies": [
         "ocaml@5.1.1000@d41d8cd9", "@opam/ppxlib@opam:0.35.0@8cd01f8f",
-        "@opam/js_of_ocaml-compiler@opam:6.0.1@ac2ae2e8",
+        "@opam/js_of_ocaml-compiler@opam:6.0.1@b5ab3353",
         "@opam/dune@opam:3.17.2@74179923"
       ],
       "available": [
@@ -2878,21 +2878,15 @@
         [ "windows", "x86_64" ]
       ]
     },
-    "@opam/bigstringaf@opam:0.10.0@bfac02ce": {
-      "id": "@opam/bigstringaf@opam:0.10.0@bfac02ce",
+    "@opam/bigstringaf@github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac@d41d8cd9": {
+      "id": "@opam/bigstringaf@github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac@d41d8cd9",
       "name": "@opam/bigstringaf",
-      "version": "opam:0.10.0",
+      "version": "github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac",
       "source": {
         "type": "install",
         "source": [
-          "archive:https://opam.ocaml.org/cache/sha512/b5/b51c756925d7016ffd7eac49e69393a1897391ca2685a8c30c7b6e3917b4d66c9400b49e8986d0f03329197b95ad52e096ff83dea5e03571cb5bc3d9a5170602#sha512:b51c756925d7016ffd7eac49e69393a1897391ca2685a8c30c7b6e3917b4d66c9400b49e8986d0f03329197b95ad52e096ff83dea5e03571cb5bc3d9a5170602",
-          "archive:https://github.com/inhabitedtype/bigstringaf/archive/0.10.0.tar.gz#sha512:b51c756925d7016ffd7eac49e69393a1897391ca2685a8c30c7b6e3917b4d66c9400b49e8986d0f03329197b95ad52e096ff83dea5e03571cb5bc3d9a5170602"
-        ],
-        "opam": {
-          "name": "bigstringaf",
-          "version": "0.10.0",
-          "path": "esy.lock/opam/bigstringaf.0.10.0"
-        }
+          "github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac"
+        ]
       },
       "overrides": [],
       "dependencies": [
@@ -3125,7 +3119,7 @@
           "@opam/imagelib@opam:20221222@0a152ce1",
           "@opam/dune@opam:3.17.2@74179923",
           "@opam/decompress@opam:1.5.3@fd6db8f3",
-          "@opam/bigstringaf@opam:0.10.0@bfac02ce",
+          "@opam/bigstringaf@github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac@d41d8cd9",
           "@opam/base64@opam:3.5.2@2aceb09c"
         ],
         "devDependencies": [],
@@ -4993,8 +4987,8 @@
           [ "windows", "x86_64" ]
         ]
       },
-      "@opam/js_of_ocaml-compiler@opam:6.0.1@ac2ae2e8": {
-        "id": "@opam/js_of_ocaml-compiler@opam:6.0.1@ac2ae2e8",
+      "@opam/js_of_ocaml-compiler@opam:6.0.1@b5ab3353": {
+        "id": "@opam/js_of_ocaml-compiler@opam:6.0.1@b5ab3353",
         "name": "@opam/js_of_ocaml-compiler",
         "version": "opam:6.0.1",
         "source": {
@@ -5058,13 +5052,13 @@
         "overrides": [],
         "dependencies": [
           "ocaml@5.1.1000@d41d8cd9", "@opam/ppxlib@opam:0.35.0@8cd01f8f",
-          "@opam/js_of_ocaml-compiler@opam:6.0.1@ac2ae2e8",
+          "@opam/js_of_ocaml-compiler@opam:6.0.1@b5ab3353",
           "@opam/dune@opam:3.17.2@74179923",
           "@esy-ocaml/substs@0.0.1@d41d8cd9"
         ],
         "devDependencies": [
           "ocaml@5.1.1000@d41d8cd9", "@opam/ppxlib@opam:0.35.0@8cd01f8f",
-          "@opam/js_of_ocaml-compiler@opam:6.0.1@ac2ae2e8",
+          "@opam/js_of_ocaml-compiler@opam:6.0.1@b5ab3353",
           "@opam/dune@opam:3.17.2@74179923"
         ],
         "available": [
@@ -5597,21 +5591,15 @@
           [ "windows", "x86_64" ]
         ]
       },
-      "@opam/bigstringaf@opam:0.10.0@bfac02ce": {
-        "id": "@opam/bigstringaf@opam:0.10.0@bfac02ce",
+      "@opam/bigstringaf@github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac@d41d8cd9": {
+        "id": "@opam/bigstringaf@github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac@d41d8cd9",
         "name": "@opam/bigstringaf",
-        "version": "opam:0.10.0",
+        "version": "github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac",
         "source": {
           "type": "install",
           "source": [
-            "archive:https://opam.ocaml.org/cache/sha512/b5/b51c756925d7016ffd7eac49e69393a1897391ca2685a8c30c7b6e3917b4d66c9400b49e8986d0f03329197b95ad52e096ff83dea5e03571cb5bc3d9a5170602#sha512:b51c756925d7016ffd7eac49e69393a1897391ca2685a8c30c7b6e3917b4d66c9400b49e8986d0f03329197b95ad52e096ff83dea5e03571cb5bc3d9a5170602",
-            "archive:https://github.com/inhabitedtype/bigstringaf/archive/0.10.0.tar.gz#sha512:b51c756925d7016ffd7eac49e69393a1897391ca2685a8c30c7b6e3917b4d66c9400b49e8986d0f03329197b95ad52e096ff83dea5e03571cb5bc3d9a5170602"
-          ],
-          "opam": {
-            "name": "bigstringaf",
-            "version": "0.10.0",
-            "path": "esy.lock/opam/bigstringaf.0.10.0"
-          }
+            "github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac"
+          ]
         },
         "overrides": [],
         "dependencies": [
@@ -5845,7 +5833,7 @@
           "@opam/imagelib@opam:20221222@0a152ce1",
           "@opam/dune@opam:3.17.2@74179923",
           "@opam/decompress@opam:1.5.3@fd6db8f3",
-          "@opam/bigstringaf@opam:0.10.0@bfac02ce",
+          "@opam/bigstringaf@github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac@d41d8cd9",
           "@opam/base64@opam:3.5.2@2aceb09c"
         ],
         "devDependencies": [],
@@ -7713,8 +7701,8 @@
           [ "windows", "x86_64" ]
         ]
       },
-      "@opam/js_of_ocaml-compiler@opam:6.0.1@ac2ae2e8": {
-        "id": "@opam/js_of_ocaml-compiler@opam:6.0.1@ac2ae2e8",
+      "@opam/js_of_ocaml-compiler@opam:6.0.1@b5ab3353": {
+        "id": "@opam/js_of_ocaml-compiler@opam:6.0.1@b5ab3353",
         "name": "@opam/js_of_ocaml-compiler",
         "version": "opam:6.0.1",
         "source": {
@@ -7778,13 +7766,13 @@
         "overrides": [],
         "dependencies": [
           "ocaml@5.1.1000@d41d8cd9", "@opam/ppxlib@opam:0.35.0@8cd01f8f",
-          "@opam/js_of_ocaml-compiler@opam:6.0.1@ac2ae2e8",
+          "@opam/js_of_ocaml-compiler@opam:6.0.1@b5ab3353",
           "@opam/dune@opam:3.17.2@74179923",
           "@esy-ocaml/substs@0.0.1@d41d8cd9"
         ],
         "devDependencies": [
           "ocaml@5.1.1000@d41d8cd9", "@opam/ppxlib@opam:0.35.0@8cd01f8f",
-          "@opam/js_of_ocaml-compiler@opam:6.0.1@ac2ae2e8",
+          "@opam/js_of_ocaml-compiler@opam:6.0.1@b5ab3353",
           "@opam/dune@opam:3.17.2@74179923"
         ],
         "available": [
@@ -8317,21 +8305,15 @@
           [ "windows", "x86_64" ]
         ]
       },
-      "@opam/bigstringaf@opam:0.10.0@bfac02ce": {
-        "id": "@opam/bigstringaf@opam:0.10.0@bfac02ce",
+      "@opam/bigstringaf@github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac@d41d8cd9": {
+        "id": "@opam/bigstringaf@github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac@d41d8cd9",
         "name": "@opam/bigstringaf",
-        "version": "opam:0.10.0",
+        "version": "github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac",
         "source": {
           "type": "install",
           "source": [
-            "archive:https://opam.ocaml.org/cache/sha512/b5/b51c756925d7016ffd7eac49e69393a1897391ca2685a8c30c7b6e3917b4d66c9400b49e8986d0f03329197b95ad52e096ff83dea5e03571cb5bc3d9a5170602#sha512:b51c756925d7016ffd7eac49e69393a1897391ca2685a8c30c7b6e3917b4d66c9400b49e8986d0f03329197b95ad52e096ff83dea5e03571cb5bc3d9a5170602",
-            "archive:https://github.com/inhabitedtype/bigstringaf/archive/0.10.0.tar.gz#sha512:b51c756925d7016ffd7eac49e69393a1897391ca2685a8c30c7b6e3917b4d66c9400b49e8986d0f03329197b95ad52e096ff83dea5e03571cb5bc3d9a5170602"
-          ],
-          "opam": {
-            "name": "bigstringaf",
-            "version": "0.10.0",
-            "path": "esy.lock/opam/bigstringaf.0.10.0"
-          }
+            "github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac"
+          ]
         },
         "overrides": [],
         "dependencies": [
@@ -8565,7 +8547,7 @@
           "@opam/imagelib@opam:20221222@0a152ce1",
           "@opam/dune@opam:3.17.2@74179923",
           "@opam/decompress@opam:1.5.3@fd6db8f3",
-          "@opam/bigstringaf@opam:0.10.0@bfac02ce",
+          "@opam/bigstringaf@github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac@d41d8cd9",
           "@opam/base64@opam:3.5.2@2aceb09c"
         ],
         "devDependencies": [],
@@ -10433,8 +10415,8 @@
           [ "windows", "x86_64" ]
         ]
       },
-      "@opam/js_of_ocaml-compiler@opam:6.0.1@ac2ae2e8": {
-        "id": "@opam/js_of_ocaml-compiler@opam:6.0.1@ac2ae2e8",
+      "@opam/js_of_ocaml-compiler@opam:6.0.1@b5ab3353": {
+        "id": "@opam/js_of_ocaml-compiler@opam:6.0.1@b5ab3353",
         "name": "@opam/js_of_ocaml-compiler",
         "version": "opam:6.0.1",
         "source": {
@@ -10498,13 +10480,13 @@
         "overrides": [],
         "dependencies": [
           "ocaml@5.1.1000@d41d8cd9", "@opam/ppxlib@opam:0.35.0@8cd01f8f",
-          "@opam/js_of_ocaml-compiler@opam:6.0.1@ac2ae2e8",
+          "@opam/js_of_ocaml-compiler@opam:6.0.1@b5ab3353",
           "@opam/dune@opam:3.17.2@74179923",
           "@esy-ocaml/substs@0.0.1@d41d8cd9"
         ],
         "devDependencies": [
           "ocaml@5.1.1000@d41d8cd9", "@opam/ppxlib@opam:0.35.0@8cd01f8f",
-          "@opam/js_of_ocaml-compiler@opam:6.0.1@ac2ae2e8",
+          "@opam/js_of_ocaml-compiler@opam:6.0.1@b5ab3353",
           "@opam/dune@opam:3.17.2@74179923"
         ],
         "available": [
@@ -11037,21 +11019,15 @@
           [ "windows", "x86_64" ]
         ]
       },
-      "@opam/bigstringaf@opam:0.10.0@bfac02ce": {
-        "id": "@opam/bigstringaf@opam:0.10.0@bfac02ce",
+      "@opam/bigstringaf@github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac@d41d8cd9": {
+        "id": "@opam/bigstringaf@github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac@d41d8cd9",
         "name": "@opam/bigstringaf",
-        "version": "opam:0.10.0",
+        "version": "github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac",
         "source": {
           "type": "install",
           "source": [
-            "archive:https://opam.ocaml.org/cache/sha512/b5/b51c756925d7016ffd7eac49e69393a1897391ca2685a8c30c7b6e3917b4d66c9400b49e8986d0f03329197b95ad52e096ff83dea5e03571cb5bc3d9a5170602#sha512:b51c756925d7016ffd7eac49e69393a1897391ca2685a8c30c7b6e3917b4d66c9400b49e8986d0f03329197b95ad52e096ff83dea5e03571cb5bc3d9a5170602",
-            "archive:https://github.com/inhabitedtype/bigstringaf/archive/0.10.0.tar.gz#sha512:b51c756925d7016ffd7eac49e69393a1897391ca2685a8c30c7b6e3917b4d66c9400b49e8986d0f03329197b95ad52e096ff83dea5e03571cb5bc3d9a5170602"
-          ],
-          "opam": {
-            "name": "bigstringaf",
-            "version": "0.10.0",
-            "path": "esy.lock/opam/bigstringaf.0.10.0"
-          }
+            "github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac"
+          ]
         },
         "overrides": [],
         "dependencies": [

@@ -34,10 +34,13 @@
 		"@opam/bigstringaf": "*",
 		"@opam/base64": "*",
 		"@opam/ppx_deriving": "*",
-		"@opam/ocamlsdl2": "*",
-		"@opam/ppxlib": "*"
+		"@opam/ocamlsdl2": "github:Mbodin/OCamlSDL2#22a4611750636d33a2d89eccfbedec50dcde599d",
+		"@opam/ppxlib": "*",
+		"@opam/bigstringaf": "github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac"
 	},
 	"resolutions": {
-		"@opam/ocamlsdl2": "github:Mbodin/OCamlSDL2#22a4611750636d33a2d89eccfbedec50dcde599d"
+		"@opam/ocamlsdl2": "github:Mbodin/OCamlSDL2#22a4611750636d33a2d89eccfbedec50dcde599d",
+		"@opam/bigstringaf": "github:inhabitedtype/bigstringaf#05d9dc328ddf1bd23e946feae16cb5c794a73fac"
 	}
 }
+
