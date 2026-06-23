@@ -32,6 +32,10 @@ module SplitVertical : Interface.T -> sig
     module Down : Interface.T
   end
 
+module SplitHorizontal : Interface.T -> sig
+    module Left : Interface.T
+    module Right : Interface.T
+  end
 
 (* Actions associated to each button.
   The 'unit type argument is used to encode monadic returns. *)

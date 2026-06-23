@@ -58,7 +58,22 @@ module Ops (I : Interface.T) = struct
 end
 
 
-module SplitVertical (I : Interface.T) = struct
+(* The state of half the screen. *)
+type 'event_functions half_state = {
+  shift_x : int (* By how much this subscreen is shifted right. *) ;
+  shift_y : int (* By how much this subscreen is shifted up. *) ;
+  width : int (* The width of the subscreen. *) ;
+  height : int (* The height of the subscreen. *) ;
+  event_functions : 'event_functions
+}
+
+module Split (I : Interface.T) (B : sig
+      (* Build the elements of the state from both dimensions. *)
+      val build_state :
+        'events ->
+        (int * int) -> (int * int) ->
+        (I.t * 'events half_state * 'events half_state) I.m
+    end) = struct
 
   (* Functions to be called when the appropriate event occurs. *)
   type event_functions = {
@@ -69,6 +84,8 @@ module SplitVertical (I : Interface.T) = struct
     event_quit : (unit -> unit I.m) option
   }
 
+  type nonrec half_state = event_functions half_state
+
   let none_event_functions = {
     event_click = None ;
     event_move = None ;
@@ -77,24 +94,15 @@ module SplitVertical (I : Interface.T) = struct
     event_quit = None
   }
 
-  (* The state of half the screen. *)
-  type half_state = {
-    shift_x : int (* By how much this screen is shifted right. *) ;
-    shift_y : int (* By how much this screen is shifted up. *) ;
-    width : int (* How many pixels are reserved after the shift. *) ;
-    height : int ;
-    event_functions : event_functions
-  }
-
-  (* A state, waiting for both [Up.init] and [Down.init] to be called. *)
+  (* A state, waiting for both [First.init] and [Second.init] to be called. *)
   type state =
-    | WaitingBoth (* None of Up.init and [Down.init] has been called. *)
-    | WaitingDown of (int * int) (* Only [Up.init] has been called. *)
-    | WaitingUp of (int * int) (* Only [Down.init] has been called. *)
-    | State of I.t * half_state * half_state (* Both has been called and both canvas are ready. *)
-    | ClosedUp of half_state (* [Up.quit] has been called: we continue to store down's state. *)
-    | ClosedDown of half_state (* [Down.quit] has been called: we continue to store up's state. *)
-    | Closed (* Both [Up.quit] and [Down.quit] have been called. *)
+    | WaitingBoth (* None of [First.init] and [Second.init] has been called. *)
+    | WaitingSecond of (int * int) (* Only [First.init] has been called. *)
+    | WaitingFirst of (int * int) (* Only [Second.init] has been called. *)
+    | State of I.t * half_state * half_state (* Both has been called and both subscreens are ready. *)
+    | ClosedFirst of half_state (* [First.quit] has been called: we continue to store second's state. *)
+    | ClosedSecond of half_state (* [Second.quit] has been called: we continue to store first's state. *)
+    | Closed (* Both [First.quit] and [Second.quit] have been called. *)
 
   (* The shared variable between the two created interfaces. *)
   let global_state = ref WaitingBoth
@@ -108,46 +116,28 @@ module SplitVertical (I : Interface.T) = struct
 
   let get_states () =
     match !global_state with
-    | State (t, st_up, st_down) -> (t, st_up, st_down)
-    | _ -> failwith "SplitVertical.get_states: not ready."
+    | State (t, st1, st2) -> (t, st1, st2)
+    | WaitingBoth | WaitingSecond _ | WaitingFirst _ -> failwith "Split.get_states: not ready."
+    | ClosedFirst _ | ClosedSecond _ | Closed -> failwith "Split.get_states: closed."
 
   let wait (type t) (time : int) (f : unit -> t m) : t m =
-    let (t, _st_up, _st_down) = get_states () in
+    let (t, _st1, _st2) = get_states () in
     I.wait t time f
 
-  (* Check if a global coordinate is within the upper interface. *)
-  let is_up (x, y) =
-    let (_t, st_up, _st_down) = get_states () in
-    y >= 0 && y < st_up.height
-    && x >= st_up.shift_x && x - st_up.shift_x < st_up.width
+  (* Check if a global coordinate is within an half interface. *)
+  let is_in st (x, y) =
+    y >= st.shift_y && y < st.shift_y + st.height
+    && x >= st.shift_x && x - st.shift_x < st.width
 
-  (* Check if a global coordinate is within the down interface. *)
-  let is_down (x, y) =
-    let (_t, _st_up, st_down) = get_states () in
-    y >= st_down.shift_y && y < st_down.shift_y + st_down.height
-    && x >= st_down.shift_x && x - st_down.shift_x < st_down.width
+  (* Convert a global coordinate into a local one. *)
+  let convert st (x, y) =
+    assert (is_in st (x, y)) ;
+    (x - st.shift_x, y - st.shift_y)
 
-  (* Convert a global coordinate into the local up one. *)
-  let convert_up (x, y) =
-    let (_t, st_up, _st_down) = get_states () in
-    (x - st_up.shift_x, y)
-
-  (* Convert a global coordinate into the local down one. *)
-  let convert_down (x, y) =
-    let (_t, _st_up, st_down) = get_states () in
-    (x - st_down.shift_x, y - st_down.shift_y)
-
-  (* Convert a local up coordinate into the global one. *)
-  let convert_up_inv (x, y) =
-    let (_t, st_up, _st_down) = get_states () in
-    assert (x >= 0 && y >= 0 && x < st_up.width && y < st_up.height) ;
-    (x + st_up.shift_x, y)
-
-  (* Convert a local down coordinate into the global one. *)
-  let convert_down_inv (x, y) =
-    let (_t, _st_up, st_down) = get_states () in
-    assert (x >= 0 && y >= 0 && x < st_down.width && y < st_down.height) ;
-    (x + st_down.shift_x, y + st_down.shift_y)
+  (* Convert a local coordinate into the global one. *)
+  let convert_inv st (x, y) =
+    assert (x >= 0 && y >= 0 && x < st.width && y < st.height) ;
+    (x + st.shift_x, y + st.shift_y)
 
   (* Set up the [I.on_*] functions to call the relevant function stored in the state. *)
   let setup_on_events () : unit m =
@@ -156,91 +146,74 @@ module SplitVertical (I : Interface.T) = struct
       match e with
       | None -> return ()
       | Some f -> k f in
-    let (t, _st_up, _st_down) = get_states () in
+    let (t, _st1, _st2) = get_states () in
     let* () =
       on_click t (fun xy ->
-        let (_t, st_up, st_down) = get_states () in
-        if is_up xy then
-          run_if_event st_up.event_functions.event_click
-            (fun f -> f (convert_up xy))
-        else if is_down xy then
-          run_if_event st_down.event_functions.event_click
-            (fun f -> f (convert_down xy))
-        else return ()) in
+        let (_t, st1, st2) = get_states () in
+        if is_in st1 xy then
+          run_if_event st1.event_functions.event_click
+            (fun f -> f (convert st1 xy))
+        else if is_in st2 xy then
+          run_if_event st2.event_functions.event_click
+            (fun f -> f (convert st2 xy))
+        else (* The click was done outside of both subscreens. *) return ()) in
     let on_move_drag f xy_start xy_end =
-      let (_t, st_up, st_down) = get_states () in
-      if is_up xy_end then
-        let xy_start =
-          if is_up xy_start then xy_start
-          else xy_end in
-        run_if_event (f st_up)
-          (fun f ->
-            f (convert_up xy_start)
-              (convert_up xy_end))
-      else if is_down xy_end then
-        let xy_start =
-          if is_down xy_start then xy_start
-          else xy_end in
-        run_if_event (f st_down)
-            (fun f ->
-              f (convert_down xy_start)
-                (convert_down xy_end))
+      let (_t, st1, st2) = get_states () in
+      if is_in st1 xy_end then
+        let xy_start = if is_in st1 xy_start then xy_start else xy_end in
+        run_if_event (f st1) (fun f ->
+          f (convert st1 xy_start)
+            (convert st1 xy_end))
+      else if is_in st2 xy_end then
+        let xy_start = if is_in st2 xy_start then xy_start else xy_end in
+        run_if_event (f st2) (fun f ->
+          f (convert st2 xy_start)
+            (convert st2 xy_end))
       else return () in
     let* () = on_move t (on_move_drag (fun st -> st.event_functions.event_move)) in
     let* () = on_drag t (on_move_drag (fun st -> st.event_functions.event_drag)) in
     let* () =
       on_key_pressed t (fun d ->
-        let (_t, st_up, st_down) = get_states () in
-        let* () = run_if_event st_up.event_functions.event_key_pressed (fun f -> f d) in
-        let* () = run_if_event st_down.event_functions.event_key_pressed (fun f -> f d) in
+        let (_t, st1, st2) = get_states () in
+        let* () = run_if_event st1.event_functions.event_key_pressed (fun f -> f d) in
+        let* () = run_if_event st2.event_functions.event_key_pressed (fun f -> f d) in
         return ()) in
     return ()
 
-  (* Build a [State _] from both up and down dimensions and store it into [global_state]. *)
-  let make_state (x_up, y_up) (x_down, y_down) : unit m =
-    let dim_x = max x_up x_down in (* FIXME: Do we want to fail if x_up <> x_down? *)
-    let* t = I.init dim_x (y_up + y_down) in
-    let setup shift_y (x, y) = {
-      shift_x = (dim_x - x) / 2 ;
-      shift_y ;
-      width = x ;
-      height = y ;
-      event_functions = none_event_functions
-    } in
-    let st_up = setup 0 (x_up, y_up) in
-    let st_down = setup y_up (x_down, y_down) in
-    let st = State (t, st_up, st_down) in
+  let make_state dim1 dim2 : unit m =
+    let* (t, st1, st2) = B.build_state none_event_functions dim1 dim2 in
+    let st = State (t, st1, st2) in
     global_state := st ;
     let* () = setup_on_events () in
     return ()
 
-  (* Given the setting of [Up.init] and the current state, build the new state. *)
-  let set_state_up width height =
-    let dim_up = (width, height) in
+  (* Given the setting of [First.init] and the current state, build the new state. *)
+  let set_st1 width height =
+    let dim1 = (width, height) in
     match !global_state with
-    | WaitingBoth -> return (global_state := WaitingDown dim_up)
-    | WaitingDown _ | State _ -> failwith "SplitVertical.set_state_up: setting Up.init twice."
-    | WaitingUp dim_down -> make_state dim_up dim_down
-    | ClosedUp _ | ClosedDown _ | Closed -> failwith "SplitVertical.set_state_up: initialising after close."
+    | WaitingBoth -> return (global_state := WaitingSecond dim1)
+    | WaitingSecond _ | State _ -> failwith "Split.set_st1: setting First.init twice."
+    | WaitingFirst dim2 -> make_state dim1 dim2
+    | ClosedFirst _ | ClosedSecond _ | Closed -> failwith "Split.set_st1: initialising after close."
 
-  (* Same than for [Down.init]. *)
-  let set_state_down width height =
-    let dim_down = (width, height) in
+  (* Same than for [Second.init]. *)
+  let set_st2 width height =
+    let dim2 = (width, height) in
     match !global_state with
-    | WaitingBoth -> return (global_state := WaitingUp dim_down)
-    | WaitingUp _ | State _ -> failwith "SplitVertical.set_state_down: setting Down.init twice."
-    | WaitingDown dim_up -> make_state dim_up dim_down
-    | ClosedUp _ | ClosedDown _ | Closed -> failwith "SplitVertical.set_state_down: initialising after close."
+    | WaitingBoth -> return (global_state := WaitingFirst dim2)
+    | WaitingFirst _ | State _ -> failwith "Split.set_st2: setting Second.init twice."
+    | WaitingSecond dim1 -> make_state dim1 dim2
+    | ClosedFirst _ | ClosedSecond _ | Closed -> failwith "Split.set_st2: initialising after close."
 
   (* Call a function [f] taking as arguments:
     - The global state [t],
-    - The [half_state] corresponding to the provided projection ([fst] for [Up] and [snd] for [Down]).
+    - The [half_state] corresponding to the provided projection ([fst] for [First] and [snd] for [Second]).
     - Other arguments, returning within the monad [m]. *)
   let call proj f () =
     match !global_state with
-    | State (t, st_up, st_down) -> f t (proj (st_up, st_down))
-    | WaitingUp _ | WaitingDown _ | WaitingBoth -> failwith "SplitVertical.call: waiting for an I.init function."
-    | ClosedUp _ | ClosedDown _ | Closed -> failwith "SplitVertical.call: the interface has been closed."
+    | State (t, st1, st2) -> f t (proj (st1, st2))
+    | WaitingFirst _ | WaitingSecond _ | WaitingBoth -> failwith "Split.call: waiting for an I.init."
+    | ClosedFirst _ | ClosedSecond _ | Closed -> failwith "Split.call: the interface has been closed."
 
   module Make (P : sig val proj : 'a * 'a -> 'a end) = struct
     open P
@@ -253,56 +226,60 @@ module SplitVertical (I : Interface.T) = struct
     let wait () = wait
     let run = run
 
-    let init = proj (set_state_up, set_state_down)
+    let init = proj (set_st1, set_st2)
 
-    let dimensions_up () =
+    let dimensions1 () =
       match !global_state with
-      | State (_t, st_up, _st_down) ->
-        return (st_up.width, st_up.height)
-      | WaitingDown dim_up -> return dim_up
-      | _ -> failwith "SplitVertical.dimensions_up: not ready"
+      | State (_t, st1, _st2) -> return (st1.width, st1.height)
+      | WaitingSecond dim1 -> return dim1
+      | _ -> failwith "Split.dimensions1: not ready"
 
-    let dimensions_down () =
+    let dimensions2 () =
       match !global_state with
-      | State (_t, _st_up, st_down) ->
-        return (st_down.width, st_down.height)
-      | WaitingUp dim_down -> return dim_down
-      | _ -> failwith "SplitVertical.dimensions_down: not ready"
+      | State (_t, _st1, st2) -> return (st2.width, st2.height)
+      | WaitingFirst dim2 -> return dim2
+      | _ -> failwith "Split.dimensions2: not ready"
 
-    let dimensions = proj (dimensions_up, dimensions_down)
+    let dimensions = proj (dimensions1, dimensions2)
 
     let run_quit st =
       match st.event_functions.event_quit with
       | None -> return ()
       | Some f -> f ()
 
-    let quit_up () =
+    let quit1 () =
       match !global_state with
-      | State (_t, st_up, st_down) ->
-        let* () = run_quit st_up in
-        return (global_state := ClosedUp st_down)
-      | ClosedDown st_up ->
-        let* () = run_quit st_up in
+      | State (_t, st1, st2) ->
+        let* () = run_quit st1 in
+        return (global_state := ClosedFirst st2)
+      | ClosedSecond st1 ->
+        let* () = run_quit st1 in
         return (global_state := Closed)
-      | WaitingBoth | WaitingUp _ | WaitingDown _ -> failwith "SplitVertical.quit_up: calling Up.quit before the initialisation finished."
-      | ClosedUp _ | Closed -> failwith "SplitVertical.quit_up: Already closed."
+      | WaitingBoth | WaitingFirst _ | WaitingSecond _ ->
+          failwith "Split.quit1: calling First.quit before the initialisation finished."
+      | ClosedFirst _ | Closed -> failwith "Split.quit1: Already closed."
 
-    let quit_down () =
+    let quit2 () =
       match !global_state with
-      | State (_t, st_up, st_down) ->
-        let* () = run_quit st_down in
-        return (global_state := ClosedDown st_up)
-      | ClosedUp st_down ->
-        let* () = run_quit st_down in
+      | State (_t, st1, st2) ->
+        let* () = run_quit st2 in
+        return (global_state := ClosedSecond st1)
+      | ClosedFirst st2 ->
+        let* () = run_quit st2 in
         return (global_state := Closed)
-      | WaitingBoth | WaitingUp _ | WaitingDown _ -> failwith "SplitVertical.quit_down: calling Up.quit before the initialisation finished."
-      | ClosedDown _ | Closed -> failwith "SplitVertical.quit_down: Already closed."
+      | WaitingBoth | WaitingFirst _ | WaitingSecond _ ->
+        failwith "Split.quit2: calling First.quit before the initialisation finished."
+      | ClosedSecond _ | Closed -> failwith "Split.quit2: Already closed."
 
-    let quit = proj (quit_up, quit_down)
+    let quit = proj (quit1, quit2)
 
-    let is_in = proj (is_up, is_down)
-    let convert_coord = proj (convert_up, convert_down)
-    let convert_coord_inv = proj (convert_up_inv, convert_down_inv)
+    let shift f x =
+      let (_t, st1, st2) = get_states () in
+      proj (f st1, f st2) x
+
+    let is_in = shift is_in
+    let convert_coord = shift convert
+    let convert_coord_inv = shift convert_inv
 
     let write =
       call proj (fun t _st rgb xy ->
@@ -313,14 +290,16 @@ module SplitVertical (I : Interface.T) = struct
 
     let on_event update () handler =
       match !global_state with
-      | State (t, st_up, st_down) ->
+      | State (t, st1, st2) ->
         let update_st st =
           { st with event_functions = update st.event_functions (Some handler) } in
-        let (st_up, st_down) =
-          proj ((update_st st_up, st_down), (st_up, update_st st_down)) in
-        return (global_state := State (t, st_up, st_down))
-      | WaitingUp _ | WaitingDown _ | WaitingBoth -> failwith "SplitVertical.on_event: waiting for an I.init function."
-      | ClosedUp _ | ClosedDown _ | Closed -> failwith "SplitVertical.on_event: the interface has been closed."
+        let (st1, st2) =
+          proj ((update_st st1, st2), (st1, update_st st2)) in
+        return (global_state := State (t, st1, st2))
+      | WaitingFirst _ | WaitingSecond _ | WaitingBoth ->
+        failwith "Split.on_event: waiting for an I.init function."
+      | ClosedFirst _ | ClosedSecond _ | Closed ->
+        failwith "Split.on_event: the interface has been closed."
 
     let on_click = on_event (fun st handler -> { st with event_click = handler })
     let on_move = on_event (fun st handler -> { st with event_move = handler })
@@ -330,8 +309,59 @@ module SplitVertical (I : Interface.T) = struct
 
   end
 
+end
+
+module SplitVertical (I : Interface.T) = struct
+
+  module B = struct
+    open I
+
+    let build_state none_event_functions (x_up, y_up) (x_down, y_down) =
+      let dim_x = max x_up x_down in
+      let* t = I.init dim_x (y_up + y_down) in
+      let setup shift_y (x, y) = {
+        shift_x = (dim_x - x) / 2 ;
+        shift_y ;
+        width = x ;
+        height = y ;
+        event_functions = none_event_functions
+      } in
+      let st_up = setup 0 (x_up, y_up) in
+      let st_down = setup y_up (x_down, y_down) in
+      return (t, st_up, st_down)
+  end
+  module S = Split (I) (B)
+  include S
+
   module Up = Make (struct let proj = fst end)
   module Down = Make (struct let proj = snd end)
+
+end
+
+module SplitHorizontal (I : Interface.T) = struct
+
+  module B = struct
+    open I
+
+    let build_state none_event_functions (x_left, y_left) (x_right, y_right) =
+      let dim_y = max y_left y_right in
+      let* t = I.init (x_left + x_right) dim_y in
+      let setup shift_x (x, y) = {
+        shift_x ;
+        shift_y = (dim_y - y) / 2 ;
+        width = x ;
+        height = y ;
+        event_functions = none_event_functions
+      } in
+      let st_left = setup 0 (x_left, y_left) in
+      let st_right = setup x_left (x_right, y_right) in
+      return (t, st_left, st_right)
+  end
+  module S = Split (I) (B)
+  include S
+
+  module Left = Make (struct let proj = fst end)
+  module Right = Make (struct let proj = snd end)
 
 end
 
