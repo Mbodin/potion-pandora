@@ -4,3 +4,8 @@
 	(deps (:gen ../gen/gen_html.exe) (:js ../js/main_js.bc.js))
   (action (with-stdout-to %{target} (pipe-stdout (cat %{js}) (run %{gen})))))
 
+(rule
+  (target "editor.html")
+	(deps (:gen ../gen/gen_html.exe) (:js ../js/editor_js.bc.js))
+  (action (with-stdout-to %{target} (pipe-stdout (cat %{js}) (run %{gen})))))
+
