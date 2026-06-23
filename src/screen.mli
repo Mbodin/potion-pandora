@@ -27,14 +27,14 @@ end
 
 (* This functor splits the screen into two independent interfaces.
   Both initialisations should happen before any other operation. *)
-module SplitVertical : Interface.T -> sig
-    module Up : Interface.T
-    module Down : Interface.T
+module SplitVertical (I : Interface.T) : sig
+    module Up : Interface.T with type 'a m = 'a I.m
+    module Down : Interface.T with type 'a m = 'a I.m
   end
 
-module SplitHorizontal : Interface.T -> sig
-    module Left : Interface.T
-    module Right : Interface.T
+module SplitHorizontal (I : Interface.T) : sig
+    module Left : Interface.T with type 'a m = 'a I.m
+    module Right : Interface.T with type 'a m = 'a I.m
   end
 
 (* Actions associated to each button.
@@ -48,8 +48,12 @@ type 'unit button_actions = {
 (* A description of buttons and their actions. *)
 module type ButtonInputs = sig
   type _ m
+
+  (* The size of the interface used to draw the buttons. *)
   val width : int
   val height : int
+
+  (* A description of all the buttons. *)
   val buttons : (Subimage.t * unit m button_actions) list m
 end
 

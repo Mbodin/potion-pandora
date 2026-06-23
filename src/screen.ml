@@ -58,21 +58,9 @@ module Ops (I : Interface.T) = struct
 end
 
 
-(* The state of half the screen. *)
-type 'event_functions half_state = {
-  shift_x : int (* By how much this subscreen is shifted right. *) ;
-  shift_y : int (* By how much this subscreen is shifted up. *) ;
-  width : int (* The width of the subscreen. *) ;
-  height : int (* The height of the subscreen. *) ;
-  event_functions : 'event_functions
-}
-
-module Split (I : Interface.T) (B : sig
-      (* Build the elements of the state from both dimensions. *)
-      val build_state :
-        'events ->
-        (int * int) -> (int * int) ->
-        (I.t * 'events half_state * 'events half_state) I.m
+module Split (I : Interface.T) (Get : sig
+      (* From both dimensions, compute both shifts. *)
+      val shifts : (int * int) -> (int * int) -> (int * int) * (int * int)
     end) = struct
 
   (* Functions to be called when the appropriate event occurs. *)
@@ -84,7 +72,14 @@ module Split (I : Interface.T) (B : sig
     event_quit : (unit -> unit I.m) option
   }
 
-  type nonrec half_state = event_functions half_state
+  (* The state of half the screen. *)
+  type half_state = {
+    shift_x : int (* By how much this subscreen is shifted right. *) ;
+    shift_y : int (* By how much this subscreen is shifted up. *) ;
+    width : int (* The width of the subscreen. *) ;
+    height : int (* The height of the subscreen. *) ;
+    event_functions : event_functions
+  }
 
   let none_event_functions = {
     event_click = None ;
@@ -180,8 +175,21 @@ module Split (I : Interface.T) (B : sig
         return ()) in
     return ()
 
-  let make_state dim1 dim2 : unit m =
-    let* (t, st1, st2) = B.build_state none_event_functions dim1 dim2 in
+  let make_state (x1, y1) (x2, y2) : unit m =
+    let ((shift_x1, shift_y1), (shift_x2, shift_y2)) = Get.shifts  (x1, y1) (x2, y2) in
+    let* t =
+      I.init
+        (max (shift_x1 + x1) (shift_x2 + x2))
+        (max (shift_y1 + y1) (shift_y2 + y2)) in
+    let setup shift_x shift_y (x, y) = {
+        shift_x ;
+        shift_y ;
+        width = x ;
+        height = y ;
+        event_functions = none_event_functions
+      } in
+    let st1 = setup shift_x1 shift_y1 (x1, y1) in
+    let st2 = setup shift_x2 shift_y2 (x2, y2) in
     let st = State (t, st1, st2) in
     global_state := st ;
     let* () = setup_on_events () in
@@ -316,19 +324,10 @@ module SplitVertical (I : Interface.T) = struct
   module B = struct
     open I
 
-    let build_state none_event_functions (x_up, y_up) (x_down, y_down) =
+    let shifts (x_up, y_up) (x_down, y_down) =
       let dim_x = max x_up x_down in
-      let* t = I.init dim_x (y_up + y_down) in
-      let setup shift_y (x, y) = {
-        shift_x = (dim_x - x) / 2 ;
-        shift_y ;
-        width = x ;
-        height = y ;
-        event_functions = none_event_functions
-      } in
-      let st_up = setup 0 (x_up, y_up) in
-      let st_down = setup y_up (x_down, y_down) in
-      return (t, st_up, st_down)
+      let shift_x x = (dim_x - x) / 2 in
+      ((shift_x x_up, 0), (shift_x x_down, y_up))
   end
   module S = Split (I) (B)
   include S
@@ -343,19 +342,10 @@ module SplitHorizontal (I : Interface.T) = struct
   module B = struct
     open I
 
-    let build_state none_event_functions (x_left, y_left) (x_right, y_right) =
+    let shifts (x_left, y_left) (x_right, y_right) =
       let dim_y = max y_left y_right in
-      let* t = I.init (x_left + x_right) dim_y in
-      let setup shift_x (x, y) = {
-        shift_x ;
-        shift_y = (dim_y - y) / 2 ;
-        width = x ;
-        height = y ;
-        event_functions = none_event_functions
-      } in
-      let st_left = setup 0 (x_left, y_left) in
-      let st_right = setup x_left (x_right, y_right) in
-      return (t, st_left, st_right)
+      let shift_y y = (dim_y - y) / 2 in
+      ((0, shift_y y_left), (x_left, shift_y y_right))
   end
   module S = Split (I) (B)
   include S
@@ -476,25 +466,26 @@ module Buttons (I : Interface.T) (B : ButtonInputs with type 'a m = 'a I.m) = st
     let interface =
       let* interface = init B.width B.height in
       (* Drawing lines and buttons. *)
-      fill interface dark_color (1, 1) (B.width - 2, B.height - 2) %%
-      for_ 0 (nb_lines - 1) (fun y ->
-        let pixel_at_y y = (B.height * y) / nb_lines in
-        let py_begin = pixel_at_y y in
-        let py_end = pixel_at_y (y + 1) - 1 in
-        horizontal_line interface bright_color ~y:py_begin 0 (B.width - 1) %%
-        let nb_buttons_on_this_line = nb_buttons_on_line y in
-        for_ 0 (nb_buttons_on_this_line - 1) (fun x ->
-          let b =
-            let i = y * button_per_lines + x in
-            fst buttons_img.(i) in
-          let pixel_at_x x = (B.width * x) / nb_buttons_on_this_line in
-          let px_begin = pixel_at_x x in
-          let px_end = pixel_at_x (x + 1) - 1 in
-          vertical_line interface bright_color ~x:px_begin (py_begin + 1) (py_end - 1) %%
-          display_image interface b
-            ((px_end - px_begin) / 2 - dimx / 2,
-             (py_end - py_begin) / 2 - dimy / 2))) %%
-      horizontal_line interface bright_color ~y:(B.height - 1) 0 (B.width - 1) %%
+      let* () = fill interface dark_color (1, 1) (B.width - 2, B.height - 2) in
+      let* () =
+        for_ 0 (nb_lines - 1) (fun y ->
+          let pixel_at_y y = (B.height * y) / nb_lines in
+          let py_begin = pixel_at_y y in
+          let py_end = pixel_at_y (y + 1) - 1 in
+          horizontal_line interface bright_color ~y:py_begin 0 (B.width - 1) %%
+          let nb_buttons_on_this_line = nb_buttons_on_line y in
+          for_ 0 (nb_buttons_on_this_line - 1) (fun x ->
+            let b =
+              let i = y * button_per_lines + x in
+              fst buttons_img.(i) in
+            let pixel_at_x x = (B.width * x) / nb_buttons_on_this_line in
+            let px_begin = pixel_at_x x in
+            let px_end = pixel_at_x (x + 1) - 1 in
+            vertical_line interface bright_color ~x:px_begin (py_begin + 1) (py_end - 1) %%
+            display_image interface b
+              ((px_end - px_begin) / 2 - dimx / 2,
+               (py_end - py_begin) / 2 - dimy / 2))) %%
+        horizontal_line interface bright_color ~y:(B.height - 1) 0 (B.width - 1) in
       flush interface %%
       return interface in
 
@@ -513,12 +504,13 @@ module Buttons (I : Interface.T) (B : ButtonInputs with type 'a m = 'a I.m) = st
         let px_begin = pixel_at_x x in
         let px_end = pixel_at_x (x + 1) - 1 in
         let* interface in
-        fill interface (if b then bright_color else dark_color)
-          (px_begin + 1, py_begin + 1) (px_end - 1, py_end - 1) %%
-        display_image interface
-          ((if b then fst else snd) buttons_img.(i))
-          ((px_end - px_begin) / 2 - dimx / 2,
-           (py_end - py_begin) / 2 - dimy / 2) %%
+        let* () =
+          fill interface (if b then bright_color else dark_color)
+            (px_begin + 1, py_begin + 1) (px_end - 1, py_end - 1) %%
+          display_image interface
+            ((if b then fst else snd) buttons_img.(i))
+            ((px_end - px_begin) / 2 - dimx / 2,
+             (py_end - py_begin) / 2 - dimy / 2) in
         (if b then on_press else on_release) false
       ) else return () in
 
@@ -557,7 +549,7 @@ module SelectButtons (I : Interface.T) (B : ButtonInputs with type 'a m = 'a I.m
         let rec aux i = function
           | [] -> return (assert (i < 0))
           | toggle :: l ->
-            !toggle (i = 0) %%
+            let* () = !toggle (i = 0) in
             aux (i - 1) l in
         aux i toggles in
       list_mapi_ (fun index ((img, actions), toggle) ->
@@ -570,7 +562,7 @@ module SelectButtons (I : Interface.T) (B : ButtonInputs with type 'a m = 'a I.m
           (* On can't release a button in this setting, so we just cancel the action. *)
           !toggle true in
         (* When we receive a message to toggle a button, we apply it. *)
-        actions.set_toggle (fun b -> if b then on_press false else return ()) %%
+        let* () = actions.set_toggle (fun b -> if b then on_press false else return ()) in
         return (img, {
           on_press ;
           on_release ;

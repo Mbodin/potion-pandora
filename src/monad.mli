@@ -15,7 +15,9 @@ module Ops (M : T) : sig
 
   include T with type 'a m = 'a M.m
 
-  (* Symbol for sequence. *)
+  (* Symbol for sequence.
+    Note that it might evaluate parts of the second arguments before the first one returns:
+    to be used with great care. *)
   val ( %% ) : unit m -> 'a m -> 'a m
 
   (* For-loops within monads: [for_ min max f] behaves like [for i = min to max do f i done] but

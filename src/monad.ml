@@ -17,19 +17,19 @@ module Ops (M : T) = struct
   let rec for_ min max f =
     if min > max then return ()
     else
-      f min %%
+      let* () = f min in
       for_ (min + 1) max f
 
   let iter_ f l =
     List.fold_left (fun u v ->
-      u %% f v) (return ()) l
+      let* () = u in f v) (return ()) l
 
   let iteri_ f l =
     let* _length =
       List.fold_left (fun i v ->
         let* i = i in
         let i = i + 1 in
-        f i v %%
+        let* () = f i v in
         return i) (return 0) l in
     return ()
 

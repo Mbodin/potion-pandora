@@ -604,18 +604,20 @@ type state = {
   backtrack : state option (* Invariant: the pointed state will always have a [backtrack] field set to [None]. *)
 }
 
-type 'a m = state -> (state * 'a)
+module M = struct
+  type 'a m = state -> (state * 'a)
 
-let return (type a) (a : a) : a m = fun st -> (st, a)
-let bind (type u v) (o : u m) (k : u -> v m) : v m =
-  fun st ->
-    let (st, r) = o st in
-    k r st
+  let return (type a) (a : a) : a m = fun st -> (st, a)
+  let bind (type u v) (o : u m) (k : u -> v m) : v m =
+    fun st ->
+      let (st, r) = o st in
+      k r st
 
-let ( let* ) = bind
+  let ( let* ) = bind
+end
 
-let ( %% ) (type t) : unit m -> t m -> t m =
-  fun m1 m2 -> bind m1 (fun () -> m2)
+module Ops = Monad.Ops (M)
+open Ops
 
 (* Reading the next character, removing it from the next characters.
   If it returns [Right], it also returns a boolean: if it is true,
@@ -706,7 +708,7 @@ let write (img, offset, break) : unit m =
 
 (* Insert (and commit) a new line. *)
 let new_line : unit m =
-  commit %%
+  let* () = commit in
   fun st ->
     let zero_width_image img =
       Subimage.sub img 0 (snd (Subimage.dimensions img)) (0, 0) in
@@ -741,7 +743,7 @@ let render str max_width =
     let* r = read in
     match r with
     | Either.Right b ->
-      new_line %%
+      let* () = new_line in
       if b then aux true else return ()
     | Either.Left c ->
       let* has_saved =
@@ -750,9 +752,9 @@ let render str max_width =
         | None -> return false
         | Some l ->
           let l = List.map (fun data -> Some data) l in
-          save_with (l @ [None]) %%
+          let* () = save_with (l @ [None]) in
           return true in
-      write c %%
+      let* () = write c in
       let* p = get_current_position_if_new_line in
       let* n = peek in
       if p > max_width && not prevent_backtrack && n <> Either.Right true then (
