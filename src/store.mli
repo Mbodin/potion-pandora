@@ -30,7 +30,10 @@ val add_bird_location : t -> ?level:int -> Projection.game_coords -> unit
   the associated rectangle.
   The objects will be listed in topological order.
   If a level is provided, only the objects from this specific level are returned. *)
-val all : t -> ?level:int -> Projection.screen_coords -> Projection.screen_coords -> obj list
+val all_in : t -> ?level:int -> Projection.screen_coords -> Projection.screen_coords -> obj list
+
+(* Return all stored objects. *)
+val all : t -> obj list
 
 (* Given an object, return its coordinates. *)
 val get_coords : t -> obj -> Projection.game_coords

@@ -58,6 +58,9 @@ module Biarray : sig
   (* Call a function to each elements of the biarray. *)
   val iter : ('a -> unit) -> 'a t -> unit
 
+  (* Convert the array into a list ordered from minimum to maximum index. *)
+  val to_list : 'a t -> 'a list
+
 end = struct
 
   type 'a t = {
@@ -107,6 +110,10 @@ end = struct
     negative = Array.map f a.negative ;
     positive = Array.map f a.positive
   }
+
+  let to_list a =
+    List.rev (Array.to_list a.negative)
+    @ Array.to_list a.positive
 
 end
 
@@ -179,6 +186,9 @@ module Data : sig
   (* Iter through all the objects whose coordinate is within the group of the x-coordinate provided. *)
   val iter_at_x : ('a -> unit) -> 'a t -> int -> unit
 
+  (* Get all the elements in a list. *)
+  val to_list : 'a t -> 'a list
+
 end = struct
 
   let group_size = 16
@@ -226,6 +236,9 @@ end = struct
     ]
 
   type 'a t = 'a Biarray.t Biarray.t
+
+  let to_list a =
+    List.concat (List.map Biarray.to_list (Biarray.to_list a))
 
   let init default =
     Biarray.init group_size (Biarray.init 0 default)
@@ -460,30 +473,40 @@ let remove store obj =
   let a = Data.set a g l in
   store := { !store with data = IMap.add !obj.level a !store.data }
 
-(* Similar to the all function, but limited to a particular level.
+let all_at_level a =
+  let l = List.concat (Data.to_list a) in
+  List.sort (fun o1 o2 -> Id.compare !o1.id !o2.id) l
+
+let all store =
+  let l =
+    IMap.fold (fun level a acc ->
+      all_at_level a :: acc) !store.data [] in
+  List.concat l
+
+(* Similar to the all_in function, but limited to a particular level.
   Instead of a store *)
-let all_at_level a min_coords max_coords =
+let all_in_at_level a min_coords max_coords =
   let groups = Data.groups_between (Data.get_group min_coords) (Data.get_group max_coords) in
   let l = List.flatten (List.map (Data.get a) groups) in
   List.sort (fun o1 o2 -> Id.compare !o1.id !o2.id) l
 
-(* Similar to the all function without a level argument. *)
-let all_raw store min_coords max_coords =
+(* Similar to the all_in function without a level argument. *)
+let all_in_raw store min_coords max_coords =
   let l =
     IMap.fold (fun level a acc ->
       let p = Projection.from_screen level in
-      all_at_level a (p min_coords) (p max_coords) :: acc) !store.data [] in
+      all_in_at_level a (p min_coords) (p max_coords) :: acc) !store.data [] in
   List.concat l
 
-let all store ?level min_coords max_coords =
+let all_in store ?level min_coords max_coords =
   match level with
-  | None -> all_raw store min_coords max_coords
+  | None -> all_in_raw store min_coords max_coords
   | Some level ->
     let p = Projection.from_screen level in
     match IMap.find_opt level !store.data with
     | None -> []
     | Some a ->
-      all_at_level a (p min_coords) (p max_coords)
+      all_in_at_level a (p min_coords) (p max_coords)
 
 (* An internal version of send that only updates the object, without any check. *)
 let send_direct obj e =

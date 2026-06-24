@@ -4,7 +4,7 @@
   (name main_sdl)
   (modules main_sdl interface_sdl)
   (libraries potion_pandora sdl2 imagelib)
-; (flags (:standard -warn-error -A -cclib -lSDL2-2.0))
+  (flags (:standard -warn-error -A -cclib -lSDL2-2.0))
 	(modes native))
 
 (executable
@@ -12,6 +12,6 @@
   (name editor_sdl)
   (modules editor_sdl interface_sdl)
   (libraries potion_pandora sdl2 imagelib)
-; (flags (:standard -warn-error -A -cclib -lSDL2-2.0))
+  (flags (:standard -warn-error -A -cclib -lSDL2-2.0))
 	(modes native))
 

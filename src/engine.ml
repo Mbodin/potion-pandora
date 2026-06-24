@@ -40,11 +40,10 @@ module Make (D : Display) (I : Interface.T) = struct
         (fun obj ->
           let image = Animation.image (Store.get_display !level obj) in
           let raw_coords = Store.get_coords !level obj in
-          let diff_coords =
-            (fst raw_coords - fst min_coords, snd raw_coords - snd min_coords) in
+          let diff_coords = (fst raw_coords - fst min_coords, snd raw_coords - snd min_coords) in
           let coords = Projection.to_screen (Store.get_level !level obj) diff_coords in
           display_image image coords)
-        (Store.all !level min_coords max_coords) in
+        (Store.all_in !level min_coords max_coords) in
     I.flush interface
 
 end
